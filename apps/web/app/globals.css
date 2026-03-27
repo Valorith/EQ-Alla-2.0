@@ -1,0 +1,132 @@
+@import "tailwindcss";
+
+:root {
+  --background: #eff2f5;
+  --background-strong: #d8dde5;
+  --foreground: #1a2230;
+  --muted: #697487;
+  --muted-strong: #2d3747;
+  --accent: #d7a45f;
+  --accent-strong: #9c6733;
+  --accent-foreground: #1f160f;
+  --card: rgba(255, 255, 255, 0.95);
+  --panel: rgba(246, 247, 249, 0.94);
+  --border: rgba(39, 49, 65, 0.1);
+  --border-strong: rgba(39, 49, 65, 0.16);
+  --ring: rgba(215, 164, 95, 0.34);
+  --sidebar-bg: linear-gradient(180deg, rgba(21, 21, 21, 0.9), rgba(191, 126, 70, 0.88));
+  --sidebar-border: rgba(255, 255, 255, 0.12);
+  --sidebar-text: rgba(255, 255, 255, 0.96);
+  --sidebar-muted: rgba(255, 255, 255, 0.68);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  color: var(--foreground);
+  background:
+    radial-gradient(circle, transparent 40%, rgba(0, 0, 0, 0.72) 96%),
+    linear-gradient(rgba(34, 28, 24, 0.6), rgba(34, 28, 24, 0.6)),
+    url("/eq-wallpaper-1.jpg");
+  background-position: center center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  font-family: var(--font-body), sans-serif;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at top left, rgba(255, 212, 140, 0.14), transparent 24%),
+    linear-gradient(180deg, rgba(7, 10, 15, 0.2), rgba(7, 10, 15, 0.38));
+  pointer-events: none;
+  z-index: -1;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+select,
+button,
+input {
+  font: inherit;
+}
+
+.eq-sidebar-surface {
+  position: relative;
+  background-image:
+    linear-gradient(180deg, rgba(21, 21, 21, 0.92), rgba(191, 126, 70, 0.84)),
+    url("/eq-wallpaper-1.jpg");
+  background-position: center;
+  background-size: cover;
+}
+
+.eq-sidebar-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 24%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04), transparent 18%);
+  pointer-events: none;
+}
+
+.eq-hero-surface {
+  position: relative;
+  background:
+    radial-gradient(circle at top right, rgba(215, 164, 95, 0.16), transparent 28%),
+    linear-gradient(180deg, rgba(14, 18, 26, 0.98), rgba(31, 39, 54, 0.96));
+}
+
+.eq-hero-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 22px 22px;
+  opacity: 0.14;
+  pointer-events: none;
+}
+
+.eq-shell-glow {
+  box-shadow: 0 22px 60px rgba(9, 12, 18, 0.3);
+}
+
+.eq-wordmark {
+  font-family: var(--font-brand), serif;
+  letter-spacing: -0.04em;
+  text-shadow: 0 0 12px rgba(0, 0, 0, 0.45);
+}
+
+::-webkit-scrollbar {
+  width: 14px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.25);
+  border-radius: 9999px;
+  border: 4px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.45);
+}

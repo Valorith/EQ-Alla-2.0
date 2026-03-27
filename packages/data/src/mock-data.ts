@@ -1,0 +1,319 @@
+import type {
+  FactionDetail,
+  ItemDetail,
+  NpcDetail,
+  PetDetail,
+  RecipeDetail,
+  SpellDetail,
+  SpawnGroupDetail,
+  TaskDetail,
+  ZoneDetail
+} from "./types";
+
+export const items: ItemDetail[] = [
+  {
+    id: 1001,
+    name: "Runed Mithril Bracer",
+    type: "Armor",
+    slot: "Wrist",
+    classes: ["Warrior", "Paladin", "Shadow Knight"],
+    tradeable: true,
+    levelRequired: 35,
+    zone: "Castle Mistmoore",
+    icon: "bracer",
+    lore: "A silvered wristguard etched with old Mistmoore heraldry.",
+    stats: [
+      { label: "Armor Class", value: "18" },
+      { label: "Hit Points", value: "+35" },
+      { label: "Strength", value: "+6" },
+      { label: "Magic Resist", value: "+8" }
+    ],
+    droppedBy: [{ id: 3001, name: "a mistmoore guard", href: "/npcs/3001" }],
+    soldBy: [],
+    usedInRecipes: [{ id: 9001, name: "Runed Reinforcement", href: "/recipes/9001" }]
+  },
+  {
+    id: 1002,
+    name: "Midnight Archivist's Staff",
+    type: "2H Blunt",
+    slot: "Primary / Secondary",
+    classes: ["Cleric", "Wizard", "Enchanter"],
+    tradeable: false,
+    levelRequired: 52,
+    zone: "The Plane of Knowledge",
+    icon: "staff",
+    lore: "A lacquered staff humming with planar script.",
+    stats: [
+      { label: "Damage / Delay", value: "25 / 30" },
+      { label: "Mana", value: "+85" },
+      { label: "Intelligence", value: "+12" },
+      { label: "Focus", value: "Improved Healing III" }
+    ],
+    droppedBy: [{ id: 3002, name: "Matron V'Lyra", href: "/npcs/3002" }],
+    soldBy: [],
+    usedInRecipes: []
+  },
+  {
+    id: 1003,
+    name: "Traveler's Restorative Draught",
+    type: "Potion",
+    slot: "Inventory",
+    classes: ["All"],
+    tradeable: true,
+    levelRequired: 1,
+    zone: "The Plane of Knowledge",
+    icon: "potion",
+    lore: "A portable tonic sold to wayfarers heading into old ruins.",
+    stats: [
+      { label: "Effect", value: "Restores 150 HP" },
+      { label: "Charges", value: "5" }
+    ],
+    droppedBy: [],
+    soldBy: [{ id: 3003, name: "Scholar Alquen", href: "/npcs/3003" }],
+    usedInRecipes: [{ id: 9002, name: "Traveler's Kit", href: "/recipes/9002" }]
+  }
+];
+
+export const spells: SpellDetail[] = [
+  {
+    id: 2001,
+    name: "Spirit of Wolf",
+    classes: ["Druid", "Shaman"],
+    level: 9,
+    skill: "Alteration",
+    effect: "Movement speed increase",
+    mana: 10,
+    target: "Single",
+    duration: "36 min",
+    resist: "Beneficial",
+    description: "A classic run-speed buff with long duration."
+  },
+  {
+    id: 2002,
+    name: "Complete Heal",
+    classes: ["Cleric"],
+    level: 39,
+    skill: "Alteration",
+    effect: "Restores target to full health",
+    mana: 400,
+    target: "Single",
+    duration: "Instant",
+    resist: "Beneficial",
+    description: "The defining cleric heal for group and raid play."
+  },
+  {
+    id: 2003,
+    name: "Archivist's Ember",
+    classes: ["Wizard", "Magician"],
+    level: 54,
+    skill: "Evocation",
+    effect: "Fire damage over time",
+    mana: 225,
+    target: "Single",
+    duration: "24 sec",
+    resist: "Fire",
+    description: "A modernized sample nuke and DoT entry used by the mock catalog."
+  }
+];
+
+export const spawnGroups: SpawnGroupDetail[] = [
+  {
+    id: 7001,
+    name: "Castle Hallway Patrol",
+    zone: {
+      shortName: "mistmoore",
+      longName: "Castle Mistmoore",
+      href: "/zones/mistmoore"
+    },
+    respawn: "22 minutes",
+    locations: ["-150 / 420 / 12", "-130 / 389 / 12"],
+    entries: [
+      { id: 3001, name: "a mistmoore guard", chance: "70%", href: "/npcs/3001" },
+      { id: 3002, name: "Matron V'Lyra", chance: "30%", href: "/npcs/3002" }
+    ]
+  }
+];
+
+export const npcs: NpcDetail[] = [
+  {
+    id: 3001,
+    name: "a mistmoore guard",
+    race: "Dark Elf",
+    level: "35 - 38",
+    zone: "Castle Mistmoore",
+    named: false,
+    klass: "Warrior",
+    hp: 9200,
+    damage: "78 - 165",
+    faction: "Mayong's Retainers",
+    spells: [],
+    drops: [{ id: 1001, name: "Runed Mithril Bracer", href: "/items/1001" }],
+    sells: [],
+    spawnGroups: [{ id: 7001, name: "Castle Hallway Patrol", href: "/spawngroups/7001" }]
+  },
+  {
+    id: 3002,
+    name: "Matron V'Lyra",
+    race: "Dark Elf",
+    level: "52",
+    zone: "Castle Mistmoore",
+    named: true,
+    klass: "Cleric",
+    hp: 24000,
+    damage: "160 - 260",
+    faction: "Mayong's Retainers",
+    spells: [
+      { id: 2002, name: "Complete Heal", href: "/spells/2002" },
+      { id: 2003, name: "Archivist's Ember", href: "/spells/2003" }
+    ],
+    drops: [{ id: 1002, name: "Midnight Archivist's Staff", href: "/items/1002" }],
+    sells: [],
+    spawnGroups: [{ id: 7001, name: "Castle Hallway Patrol", href: "/spawngroups/7001" }]
+  },
+  {
+    id: 3003,
+    name: "Scholar Alquen",
+    race: "Human",
+    level: "60",
+    zone: "The Plane of Knowledge",
+    named: true,
+    klass: "Merchant",
+    hp: 100000,
+    damage: "0 - 0",
+    faction: "Keepers of the Knowledge",
+    spells: [],
+    drops: [],
+    sells: [{ id: 1003, name: "Traveler's Restorative Draught", href: "/items/1003" }],
+    spawnGroups: []
+  }
+];
+
+export const factions: FactionDetail[] = [
+  {
+    id: 4001,
+    name: "Mayong's Retainers",
+    category: "Castle Faction",
+    alignedZone: "Castle Mistmoore",
+    overview: "The retainers who keep the Mistmoore estate functional and hostile to intruders.",
+    raisedBy: [],
+    loweredBy: [
+      { id: 3001, name: "a mistmoore guard", href: "/npcs/3001" },
+      { id: 3002, name: "Matron V'Lyra", href: "/npcs/3002" }
+    ]
+  },
+  {
+    id: 4002,
+    name: "Keepers of the Knowledge",
+    category: "City Faction",
+    alignedZone: "The Plane of Knowledge",
+    overview: "Scholars, guides, and quartermasters supporting travel across Norrath.",
+    raisedBy: [{ id: 3003, name: "Scholar Alquen", href: "/npcs/3003" }],
+    loweredBy: []
+  }
+];
+
+export const recipes: RecipeDetail[] = [
+  {
+    id: 9001,
+    name: "Runed Reinforcement",
+    tradeskill: "Smithing",
+    trivial: 188,
+    result: "Runed Mithril Bracer",
+    container: "Forge",
+    notes: "A reinforcement step used by castle armorers.",
+    creates: [{ id: 1001, name: "Runed Mithril Bracer", href: "/items/1001", count: 1 }],
+    ingredients: [
+      { id: 1003, name: "Traveler's Restorative Draught", href: "/items/1003", count: 1 }
+    ]
+  },
+  {
+    id: 9002,
+    name: "Traveler's Kit",
+    tradeskill: "Alchemy",
+    trivial: 102,
+    result: "Traveler's Restorative Draught",
+    container: "Medicine Bag",
+    notes: "A light utility combine for mock merchant stock.",
+    creates: [{ id: 1003, name: "Traveler's Restorative Draught", href: "/items/1003", count: 2 }],
+    ingredients: []
+  }
+];
+
+export const pets: PetDetail[] = [
+  {
+    id: 5001,
+    name: "Spirit Wolf Companion",
+    ownerClass: "Shaman",
+    levelRange: "34 - 49",
+    grantedBy: { id: 2001, name: "Spirit of Wolf", href: "/spells/2001" },
+    notes: "A fast scouting pet used here as a stand-in for legacy pet listings."
+  }
+];
+
+export const tasks: TaskDetail[] = [
+  {
+    id: 6001,
+    title: "The Count's Ledger",
+    zone: {
+      shortName: "mistmoore",
+      longName: "Castle Mistmoore",
+      href: "/zones/mistmoore"
+    },
+    levelRange: "35 - 55",
+    reward: "Runed Mithril Bracer",
+    summary: "Recover an old ledger from the archive wing and return it to the scout outside the gate.",
+    objectives: [
+      "Search the archive hall in Castle Mistmoore.",
+      "Defeat Matron V'Lyra if she appears.",
+      "Return the ledger to the quest giver."
+    ]
+  }
+];
+
+export const zones: ZoneDetail[] = [
+  {
+    shortName: "mistmoore",
+    longName: "Castle Mistmoore",
+    era: "Classic",
+    levelRange: "30 - 55",
+    population: "Undead, nobles, and castle guards",
+    safePoint: "-178 / 44 / 3",
+    resources: [
+      { label: "Bestiary", href: "/zones/mistmoore?mode=npcs" },
+      { label: "Named mobs", href: "/zones/mistmoore/named" },
+      { label: "Equipment", href: "/zones/mistmoore?mode=items" },
+      { label: "Spawn groups", href: "/zones/mistmoore?mode=spawngroups" },
+      { label: "Tasks", href: "/zones/mistmoore?mode=tasks" }
+    ],
+    bestiary: [
+      { id: 3001, name: "a mistmoore guard", href: "/npcs/3001" },
+      { id: 3002, name: "Matron V'Lyra", href: "/npcs/3002" }
+    ],
+    namedNpcs: [{ id: 3002, name: "Matron V'Lyra", href: "/npcs/3002" }],
+    itemDrops: [
+      { id: 1001, name: "Runed Mithril Bracer", href: "/items/1001" },
+      { id: 1002, name: "Midnight Archivist's Staff", href: "/items/1002" }
+    ],
+    forage: [],
+    tasks: [{ id: 6001, name: "The Count's Ledger", href: "/tasks/6001" }],
+    spawnGroups
+  },
+  {
+    shortName: "poknowledge",
+    longName: "The Plane of Knowledge",
+    era: "Planes of Power",
+    levelRange: "1 - 65",
+    population: "Merchants, spell vendors, and portal traffic",
+    safePoint: "825 / -65 / -159",
+    resources: [
+      { label: "Bestiary", href: "/zones/poknowledge?mode=npcs" },
+      { label: "Equipment", href: "/zones/poknowledge?mode=items" }
+    ],
+    bestiary: [{ id: 3003, name: "Scholar Alquen", href: "/npcs/3003" }],
+    namedNpcs: [{ id: 3003, name: "Scholar Alquen", href: "/npcs/3003" }],
+    itemDrops: [{ id: 1003, name: "Traveler's Restorative Draught", href: "/items/1003" }],
+    forage: [],
+    tasks: [],
+    spawnGroups: []
+  }
+];

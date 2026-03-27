@@ -1,0 +1,25 @@
+{
+  "name": "eq-alla-2.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @eq-alla/web",
+    "build": "npm run build -w @eq-alla/web",
+    "start": "npm run start -w @eq-alla/web",
+    "typecheck": "npm run typecheck -w @eq-alla/data && npm run typecheck -w @eq-alla/ui && npm run typecheck -w @eq-alla/web",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^24.9.2",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2"
+  }
+}
+

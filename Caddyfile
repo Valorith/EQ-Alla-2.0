@@ -1,0 +1,5 @@
+:80 {
+  encode gzip zstd
+
+  reverse_proxy web:3000
+}
