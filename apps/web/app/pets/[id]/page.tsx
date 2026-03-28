@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPetDetail } from "@eq-alla/data";
-import { DefinitionGrid, PageHero, SectionCard } from "../../../components/catalog";
+import { DefinitionGrid, PageHero, SectionCard } from "../../../components/catalog-shell";
 
 type PetDetailPageProps = {
   params: Promise<{ id: string }>;

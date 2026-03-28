@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getZonesByEra } from "@eq-alla/data";
-import { PageHero, SectionCard, SimpleTable } from "../../../../components/catalog";
+import { PageHero, SectionCard, SimpleTable } from "../../../../components/catalog-shell";
 
 type ZonesByEraDetailPageProps = {
   params: Promise<{ era: string }>;

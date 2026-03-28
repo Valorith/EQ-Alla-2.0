@@ -1,9 +1,31 @@
-import Redis from "ioredis";
+import Redis, { type RedisOptions } from "ioredis";
 import { env } from "./env";
 
 const memory = new Map<string, { expiresAt: number; value: unknown }>();
 
 let redis: Redis | null = null;
+
+function createRedisOptions(connectionUrl: string): RedisOptions {
+  const parsed = new URL(connectionUrl);
+  const dbValue = parsed.pathname.replace(/^\//, "");
+  const db = dbValue ? Number(dbValue) : undefined;
+  const familyValue = parsed.searchParams.get("family");
+  const family = familyValue ? Number(familyValue) : undefined;
+
+  return {
+    host: parsed.hostname,
+    port: parsed.port ? Number(parsed.port) : 6379,
+    username: parsed.username ? decodeURIComponent(parsed.username) : undefined,
+    password: parsed.password ? decodeURIComponent(parsed.password) : undefined,
+    db: Number.isFinite(db) ? db : undefined,
+    family: family === 4 || family === 6 ? family : undefined,
+    tls: parsed.protocol === "rediss:" ? {} : undefined,
+    lazyConnect: true,
+    maxRetriesPerRequest: 1,
+    enableOfflineQueue: false,
+    connectTimeout: 500
+  };
+}
 
 function getRedis() {
   if (process.env.VITEST || process.env.NODE_ENV === "test") {
@@ -15,12 +37,7 @@ function getRedis() {
   }
 
   if (!redis) {
-    redis = new Redis(env.EQ_REDIS_URL, {
-      lazyConnect: true,
-      maxRetriesPerRequest: 1,
-      enableOfflineQueue: false,
-      connectTimeout: 500
-    });
+    redis = new Redis(createRedisOptions(env.EQ_REDIS_URL));
     redis.on("error", () => {});
   }
 

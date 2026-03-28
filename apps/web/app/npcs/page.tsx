@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { listNpcs } from "@eq-alla/data";
 import { Input } from "@eq-alla/ui";
-import { FilterForm, PageHero, SectionCard, SelectField, SimpleTable } from "../../components/catalog";
+import { FilterForm, PageHero, SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../components/catalog-shell";
 
 type NpcsPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -10,8 +10,9 @@ type NpcsPageProps = {
 export default async function NpcsPage({ searchParams }: NpcsPageProps) {
   const params = await searchParams;
   const q = typeof params.q === "string" ? params.q : "";
+  const hasQuery = q.trim().length > 0;
   const zone = typeof params.zone === "string" ? params.zone : "";
-  const npcs = await listNpcs({ q, zone });
+  const npcs = hasQuery ? await listNpcs({ q, zone }) : [];
 
   return (
     <>
@@ -36,19 +37,23 @@ export default async function NpcsPage({ searchParams }: NpcsPageProps) {
           <SelectField label="Zone" name="zone" defaultValue={zone} options={["Castle Mistmoore", "The Plane of Knowledge"]} />
         </FilterForm>
       </SectionCard>
-      <SectionCard title={`${npcs.length} matching NPCs`}>
-        <SimpleTable
-          columns={["Name", "Race", "Level", "Zone", "Named"]}
-          rows={npcs.map((npc) => [
-            <Link key={npc.id} href={`/npcs/${npc.id}`} className="font-medium hover:underline">
-              {npc.name}
-            </Link>,
-            npc.race,
-            npc.level,
-            npc.zone,
-            npc.named ? "Yes" : "No"
-          ])}
-        />
+      <SectionCard title={hasQuery ? `${npcs.length} matching NPCs` : "Results"}>
+        {hasQuery ? (
+          <SimpleTable
+            columns={["Name", "Race", "Level", "Zone", "Named"]}
+            rows={npcs.map((npc) => [
+              <Link key={npc.id} href={`/npcs/${npc.id}`} className="font-medium hover:underline">
+                {npc.name}
+              </Link>,
+              npc.race,
+              npc.level,
+              npc.zone,
+              npc.named ? "Yes" : "No"
+            ])}
+          />
+        ) : (
+          <SearchPrompt message="Enter an NPC name to load results." />
+        )}
       </SectionCard>
     </>
   );

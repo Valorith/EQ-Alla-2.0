@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getNpcDetail } from "@eq-alla/data";
-import { DefinitionGrid, LinkList, PageHero, SectionCard } from "../../../components/catalog";
+import { DefinitionGrid, LinkList, PageHero, SectionCard } from "../../../components/catalog-shell";
 
 type NpcDetailPageProps = {
   params: Promise<{ id: string }>;

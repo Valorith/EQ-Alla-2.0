@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getZonesByLevel } from "@eq-alla/data";
-import { PageHero, SectionCard, SimpleTable } from "../../../components/catalog";
+import { PageHero, SectionCard, SimpleTable } from "../../../components/catalog-shell";
 
 export default async function ZonesByLevelPage() {
   const zones = await getZonesByLevel();

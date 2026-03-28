@@ -52,8 +52,9 @@ function loadEnvFile(filename: string) {
   }
 }
 
-loadEnvFile(".env.local");
-loadEnvFile(".env");
+for (const filename of [".env.local", ".env", "env.local", "env"]) {
+  loadEnvFile(filename);
+}
 
 const envSchema = z.object({
   EQ_USE_MOCK_DATA: z.string().optional().default("true"),

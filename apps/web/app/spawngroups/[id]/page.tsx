@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getSpawnGroupDetail } from "@eq-alla/data";
-import { DefinitionGrid, LinkList, PageHero, SectionCard } from "../../../components/catalog";
+import { DefinitionGrid, LinkList, PageHero, SectionCard } from "../../../components/catalog-shell";
 
 type SpawnGroupPageProps = {
   params: Promise<{ id: string }>;
@@ -30,4 +30,3 @@ export default async function SpawnGroupPage({ params }: SpawnGroupPageProps) {
     </>
   );
 }
-

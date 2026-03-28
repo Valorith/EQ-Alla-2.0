@@ -21,17 +21,47 @@ export type SearchHit = {
 export type ItemSummary = {
   id: number;
   name: string;
+  icon: string;
   type: string;
   slot: string;
   classes: string[];
   tradeable: boolean;
   levelRequired: number;
   zone: string;
+  ac: number;
+  hp: number;
+  mana: number;
+  damage: number;
+  delay: number;
 };
 
 export type ItemDetail = ItemSummary & {
   icon: string;
   lore: string;
+  flags: string[];
+  classDisplay: string;
+  raceDisplay: string;
+  slotDisplay: string;
+  size: string;
+  weight: string;
+  skill: string;
+  itemTypeLabel: string;
+  recommendedLevel: number;
+  range: number;
+  attack: number;
+  haste: number;
+  endurance: number;
+  hpRegen: number;
+  manaRegen: number;
+  enduranceRegen: number;
+  damageBonus: number;
+  coinValue: { pp: number; gp: number; sp: number; cp: number };
+  augmentSlots: Array<{ slot: number; type: number }>;
+  droppedInZones: Array<{ shortName: string; longName: string; href: string }>;
+  combatEffect?: { id: number; name: string; href: string; level?: number; chanceModifier?: number };
+  wornEffect?: { id: number; name: string; href: string; level?: number };
+  focusEffect?: { id: number; name: string; href: string; level?: number };
+  clickEffect?: { id: number; name: string; href: string; level?: number; castType?: string };
   stats: Array<{ label: string; value: string }>;
   droppedBy: Array<{ id: number; name: string; href: string }>;
   soldBy: Array<{ id: number; name: string; href: string }>;
@@ -45,6 +75,8 @@ export type SpellSummary = {
   level: number;
   skill: string;
   effect: string;
+  mana: number;
+  target: string;
 };
 
 export type SpellDetail = SpellSummary & {
@@ -59,6 +91,7 @@ export type NpcSummary = {
   id: number;
   name: string;
   race: string;
+  klass: string;
   level: string;
   zone: string;
   named: boolean;
@@ -165,4 +198,3 @@ export type SchemaCapabilities = {
   databaseReachable: boolean;
   tables: Record<string, boolean>;
 };
-

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getZoneDetail } from "@eq-alla/data";
-import { LinkList, PageHero, SectionCard } from "../../../../components/catalog";
+import { LinkList, PageHero, SectionCard } from "../../../../components/catalog-shell";
 
 type ZoneNamedPageProps = {
   params: Promise<{ shortName: string }>;

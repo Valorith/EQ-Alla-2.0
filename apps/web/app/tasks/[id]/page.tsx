@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTaskDetail } from "@eq-alla/data";
-import { DefinitionGrid, PageHero, SectionCard } from "../../../components/catalog";
+import { DefinitionGrid, PageHero, SectionCard } from "../../../components/catalog-shell";
 
 type TaskDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -42,4 +42,3 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
     </>
   );
 }
-

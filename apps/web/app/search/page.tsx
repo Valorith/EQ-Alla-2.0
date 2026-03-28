@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { searchCatalog } from "@eq-alla/data";
 import { Input } from "@eq-alla/ui";
-import { PageHero, SectionCard, SimpleTable } from "../../components/catalog";
+import { PageHero, SearchPrompt, SectionCard, SimpleTable } from "../../components/catalog-shell";
 
 type SearchPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -10,7 +10,8 @@ type SearchPageProps = {
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const params = await searchParams;
   const query = typeof params.q === "string" ? params.q : "";
-  const hits = query ? await searchCatalog(query) : [];
+  const hasQuery = query.trim().length > 0;
+  const hits = hasQuery ? await searchCatalog(query) : [];
 
   return (
     <>
@@ -29,20 +30,23 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         </form>
       </SectionCard>
 
-      <SectionCard title="Matches">
-        <SimpleTable
-          columns={["Name", "Type", "Summary", "Tags"]}
-          rows={hits.map((hit) => [
-            <Link key={hit.href} href={hit.href} className="font-medium hover:underline">
-              {hit.title}
-            </Link>,
-            hit.type,
-            hit.subtitle,
-            hit.tags.join(" • ")
-          ])}
-        />
+      <SectionCard title={hasQuery ? "Matches" : "Results"}>
+        {hasQuery ? (
+          <SimpleTable
+            columns={["Name", "Type", "Summary", "Tags"]}
+            rows={hits.map((hit) => [
+              <Link key={hit.href} href={hit.href} className="font-medium hover:underline">
+                {hit.title}
+              </Link>,
+              hit.type,
+              hit.subtitle,
+              hit.tags.join(" • ")
+            ])}
+          />
+        ) : (
+          <SearchPrompt message="Enter a search term to search across items, spells, NPCs, zones, and more." />
+        )}
       </SectionCard>
     </>
   );
 }
-

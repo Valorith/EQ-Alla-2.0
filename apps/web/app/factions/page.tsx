@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { listFactions } from "@eq-alla/data";
 import { Input } from "@eq-alla/ui";
-import { PageHero, SectionCard, SimpleTable } from "../../components/catalog";
+import { PageHero, SearchPrompt, SectionCard, SimpleTable } from "../../components/catalog-shell";
 
 type FactionsPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -10,7 +10,8 @@ type FactionsPageProps = {
 export default async function FactionsPage({ searchParams }: FactionsPageProps) {
   const params = await searchParams;
   const q = typeof params.q === "string" ? params.q : "";
-  const factions = listFactions(q);
+  const hasQuery = q.trim().length > 0;
+  const factions = hasQuery ? listFactions(q) : [];
 
   return (
     <>
@@ -23,19 +24,22 @@ export default async function FactionsPage({ searchParams }: FactionsPageProps) 
           </button>
         </form>
       </SectionCard>
-      <SectionCard title={`${factions.length} factions`}>
-        <SimpleTable
-          columns={["Name", "Category", "Aligned zone"]}
-          rows={factions.map((faction) => [
-            <Link key={faction.id} href={`/factions/${faction.id}`} className="font-medium hover:underline">
-              {faction.name}
-            </Link>,
-            faction.category,
-            faction.alignedZone
-          ])}
-        />
+      <SectionCard title={hasQuery ? `${factions.length} factions` : "Results"}>
+        {hasQuery ? (
+          <SimpleTable
+            columns={["Name", "Category", "Aligned zone"]}
+            rows={factions.map((faction) => [
+              <Link key={faction.id} href={`/factions/${faction.id}`} className="font-medium hover:underline">
+                {faction.name}
+              </Link>,
+              faction.category,
+              faction.alignedZone
+            ])}
+          />
+        ) : (
+          <SearchPrompt message="Enter a faction name to load results." />
+        )}
       </SectionCard>
     </>
   );
 }
-

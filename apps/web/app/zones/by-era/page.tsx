@@ -1,5 +1,5 @@
 import { listZoneEras } from "@eq-alla/data";
-import { LinkList, PageHero, SectionCard } from "../../../components/catalog";
+import { LinkList, PageHero, SectionCard } from "../../../components/catalog-shell";
 
 export default async function ZonesByEraPage() {
   const eras = await listZoneEras();

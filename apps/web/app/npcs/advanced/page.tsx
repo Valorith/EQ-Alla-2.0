@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { listNpcs } from "@eq-alla/data";
 import { Input } from "@eq-alla/ui";
-import { FilterForm, PageHero, SectionCard, SelectField, SimpleTable } from "../../../components/catalog";
+import { FilterForm, PageHero, SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../../components/catalog-shell";
 
 type AdvancedNpcsPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -10,11 +10,12 @@ type AdvancedNpcsPageProps = {
 export default async function AdvancedNpcsPage({ searchParams }: AdvancedNpcsPageProps) {
   const params = await searchParams;
   const q = typeof params.name === "string" ? params.name : "";
+  const hasQuery = q.trim().length > 0;
   const race = typeof params.race === "string" ? params.race : "";
   const minLevel = typeof params.minLevel === "string" ? Number(params.minLevel) : undefined;
   const maxLevel = typeof params.maxLevel === "string" ? Number(params.maxLevel) : undefined;
   const named = params.named === "true" ? true : undefined;
-  const npcs = await listNpcs({ q, race, minLevel, maxLevel, named });
+  const npcs = hasQuery ? await listNpcs({ q, race, minLevel, maxLevel, named }) : [];
 
   return (
     <>
@@ -35,19 +36,23 @@ export default async function AdvancedNpcsPage({ searchParams }: AdvancedNpcsPag
           <SelectField label="Named only" name="named" defaultValue={String(named ?? "")} options={["true"]} />
         </FilterForm>
       </SectionCard>
-      <SectionCard title={`${npcs.length} matches`}>
-        <SimpleTable
-          columns={["Name", "Race", "Level", "Zone", "Named"]}
-          rows={npcs.map((npc) => [
-            <Link key={npc.id} href={`/npcs/${npc.id}`} className="font-medium hover:underline">
-              {npc.name}
-            </Link>,
-            npc.race,
-            npc.level,
-            npc.zone,
-            npc.named ? "Named" : "Common"
-          ])}
-        />
+      <SectionCard title={hasQuery ? `${npcs.length} matches` : "Results"}>
+        {hasQuery ? (
+          <SimpleTable
+            columns={["Name", "Race", "Level", "Zone", "Named"]}
+            rows={npcs.map((npc) => [
+              <Link key={npc.id} href={`/npcs/${npc.id}`} className="font-medium hover:underline">
+                {npc.name}
+              </Link>,
+              npc.race,
+              npc.level,
+              npc.zone,
+              npc.named ? "Named" : "Common"
+            ])}
+          />
+        ) : (
+          <SearchPrompt message="Enter an NPC name to load results." />
+        )}
       </SectionCard>
     </>
   );

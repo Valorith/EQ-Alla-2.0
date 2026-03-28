@@ -23,11 +23,19 @@ import type {
   ZoneSummary
 } from "./types";
 
-type ItemFilters = { q?: string; className?: string; slot?: string; tradeable?: boolean };
-type SpellFilters = { q?: string; className?: string; level?: number };
+type ItemFilters = {
+  q?: string;
+  className?: string;
+  slot?: string;
+  type?: string;
+  tradeable?: boolean;
+  minLevel?: number;
+  maxLevel?: number;
+};
+type SpellFilters = { q?: string; className?: string; level?: number; levelMode?: "exact" | "min" | "max" };
 type NpcFilters = { q?: string; zone?: string; minLevel?: number; maxLevel?: number; race?: string; named?: boolean };
 type ZoneFilters = { q?: string; era?: string };
-type RecipeFilters = { q?: string; tradeskill?: string };
+type RecipeFilters = { q?: string; tradeskill?: string; minTrivial?: number; maxTrivial?: number };
 
 const sourceMode = useMockData() ? "mock" : "hybrid";
 const db = getDb();
@@ -50,6 +58,25 @@ const classNames = [
   "Enchanter",
   "Beastlord",
   "Berserker"
+] as const;
+
+const classCodes = [
+  "WAR",
+  "CLR",
+  "PAL",
+  "RNG",
+  "SHD",
+  "DRU",
+  "MNK",
+  "BRD",
+  "ROG",
+  "SHM",
+  "NEC",
+  "WIZ",
+  "MAG",
+  "ENC",
+  "BST",
+  "BER"
 ] as const;
 
 const slotFlags: Array<[number, string]> = [
@@ -110,6 +137,57 @@ const raceNames: Record<number, string> = {
   330: "Froglok",
   522: "Drakkin"
 };
+
+const sizeNames: Record<number, string> = {
+  0: "TINY",
+  1: "SMALL",
+  2: "MEDIUM",
+  3: "LARGE",
+  4: "GIANT"
+};
+
+const skillNames: Record<number, string> = {
+  0: "1HS",
+  1: "2HS",
+  2: "1HP",
+  3: "1HB",
+  4: "2HB",
+  5: "Archery",
+  7: "Throwing",
+  8: "Shield",
+  35: "2HP",
+  42: "H2H"
+};
+
+const lightNames: Record<number, string> = {
+  9: "Light",
+  10: "Greater Light",
+  11: "Brilliant Light",
+  12: "Shiny Light"
+};
+
+const effectCastTypes: Record<number, string> = {
+  0: "Combat",
+  1: "Clicky",
+  2: "Clicky",
+  3: "Clicky",
+  4: "Must Equip. Clicky",
+  5: "Inventory Clicky"
+};
+
+const twoHandDamageBonuses = [
+  0,
+  14, 14, 14, 14, 14, 14, 14, 14, 14,
+  14, 14, 14, 14, 14, 14, 14, 14, 14, 14,
+  14, 14, 14, 14, 14, 14, 14, 14, 35, 35,
+  36, 36, 37, 37, 38, 38, 39, 39, 40, 40,
+  42, 42, 42, 45, 45, 47, 48, 49, 49, 51,
+  51, 52, 53, 54, 54, 56, 56, 57, 58, 59,
+  59, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  68, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 80, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 88
+];
 
 const npcClassNames: Record<number, string> = {
   1: "Warrior",
@@ -189,6 +267,37 @@ function decodeClassMask(mask: number | null | undefined) {
   return classes.length > 0 ? [...classes] : ["All"];
 }
 
+function formatClassMask(mask: number | null | undefined) {
+  if (!mask || mask <= 0 || mask >= 65535) {
+    return "ALL";
+  }
+
+  const classes = classCodes.filter((_, index) => (mask & (1 << index)) !== 0);
+  return classes.length > 0 ? classes.join(" ") : "ALL";
+}
+
+function formatRaceMask(mask: number | null | undefined) {
+  if (!mask || mask <= 0 || mask >= 65535) {
+    return "ALL";
+  }
+
+  const races = Object.entries(raceNames)
+    .filter(([flag]) => (mask & Number(flag)) !== 0)
+    .map(([, label]) => label);
+
+  return races.length > 0 ? races.join(", ") : "ALL";
+}
+
+function formatSlotList(mask: number | null | undefined, itemClass: number | null | undefined) {
+  if (itemClass && itemClass !== 0) {
+    return "Inventory";
+  }
+
+  const slots = slotFlags.filter(([flag]) => ((mask ?? 0) & flag) !== 0).map(([, label]) => label);
+  const unique = [...new Set(slots)];
+  return unique.length > 0 ? unique.join(", ") : "Inventory";
+}
+
 function formatSlotMask(mask: number | null | undefined, itemClass: number | null | undefined) {
   if (itemClass && itemClass !== 0) {
     return "Inventory";
@@ -232,6 +341,70 @@ function formatItemType(itemClass: number | null | undefined, itemType: number |
 
 function formatExpansion(expansion: number | null | undefined) {
   return expansionNames[expansion ?? 0] ?? `Expansion ${expansion ?? 0}`;
+}
+
+function formatWeight(weight: number | null | undefined) {
+  const normalized = Number(weight ?? 0) / 10;
+  return normalized % 1 === 0 ? String(normalized.toFixed(0)) : String(normalized);
+}
+
+function formatSize(size: number | null | undefined) {
+  return sizeNames[size ?? 2] ?? "MEDIUM";
+}
+
+function formatSkill(itemType: number | null | undefined, damage: number | null | undefined, itemClass: number | null | undefined) {
+  if (itemClass && itemClass !== 0) {
+    return "Container";
+  }
+
+  if ((damage ?? 0) <= 0) {
+    return formatItemType(itemClass, itemType, damage);
+  }
+
+  return skillNames[itemType ?? -1] ?? formatItemType(itemClass, itemType, damage);
+}
+
+function formatItemTypeLabel(
+  itemType: number | null | undefined,
+  damage: number | null | undefined,
+  itemClass: number | null | undefined,
+  light: number | null | undefined
+) {
+  if ((damage ?? 0) > 0) {
+    return formatItemType(itemClass, itemType, damage);
+  }
+
+  if ((light ?? 0) > 0) {
+    return lightNames[Number(light)] ?? "Light";
+  }
+
+  return formatItemType(itemClass, itemType, damage);
+}
+
+function calculateDamageBonus(itemType: number | null | undefined, damage: number | null | undefined, delay: number | null | undefined) {
+  if ((damage ?? 0) <= 0) {
+    return 0;
+  }
+
+  if ([0, 2, 3, 42].includes(itemType ?? -1)) {
+    return 13;
+  }
+
+  if ([1, 4, 35].includes(itemType ?? -1)) {
+    return twoHandDamageBonuses[Number(delay ?? 0)] ?? 0;
+  }
+
+  return 0;
+}
+
+function formatCoinValue(price: number | null | undefined) {
+  const totalCopper = Math.max(0, Number(price ?? 0));
+  return {
+    pp: Math.floor(totalCopper / 1000),
+    gp: Math.floor((totalCopper % 1000) / 100),
+    sp: Math.floor((totalCopper % 100) / 10),
+    cp: totalCopper % 10
+  };
 }
 
 function formatRace(race: number | null | undefined) {
@@ -298,35 +471,63 @@ function numberFromLevelRange(level: string) {
   return digits ? Number(digits[0]) : 0;
 }
 
+async function spellNamesById(ids: number[]) {
+  if (!db || ids.length === 0) {
+    return new Map<number, string>();
+  }
+
+  const uniqueIds = [...new Set(ids.filter((id) => id > 0 && id < 65535))];
+  if (uniqueIds.length === 0) {
+    return new Map<number, string>();
+  }
+
+  const rows = await sql<{ id: number; name: string }>`
+    select id, name
+    from spells_new
+    where id in (${sql.join(uniqueIds)})
+  `.execute(db);
+
+  return new Map(rows.rows.map((row) => [row.id, row.name]));
+}
+
 function summarizeItems(): ItemSummary[] {
-  return items.map(({ id, name, type, slot, classes, tradeable, levelRequired, zone }) => ({
+  return items.map(({ id, name, icon, type, slot, classes, tradeable, levelRequired, zone, stats }) => ({
     id,
     name,
+    icon,
     type,
     slot,
     classes,
     tradeable,
     levelRequired,
-    zone
+    zone,
+    ac: Number(stats.find((entry) => entry.label === "Armor Class")?.value ?? 0),
+    hp: Number(String(stats.find((entry) => entry.label === "Hit Points")?.value ?? 0).replace(/^\+/, "")),
+    mana: Number(String(stats.find((entry) => entry.label === "Mana")?.value ?? 0).replace(/^\+/, "")),
+    damage: Number((stats.find((entry) => entry.label === "Damage / Delay")?.value ?? "0 / 0").split("/")[0]?.trim() ?? 0),
+    delay: Number((stats.find((entry) => entry.label === "Damage / Delay")?.value ?? "0 / 0").split("/")[1]?.trim() ?? 0)
   }));
 }
 
 function summarizeSpells(): SpellSummary[] {
-  return spells.map(({ id, name, classes, level, skill, effect }) => ({
+  return spells.map(({ id, name, classes, level, skill, effect, mana, target }) => ({
     id,
     name,
     classes,
     level,
     skill,
-    effect
+    effect,
+    mana,
+    target
   }));
 }
 
 function summarizeNpcs(): NpcSummary[] {
-  return npcs.map(({ id, name, race, level, zone, named }) => ({
+  return npcs.map(({ id, name, race, klass, level, zone, named }) => ({
     id,
     name,
     race,
+    klass,
     level,
     zone,
     named
@@ -530,8 +731,24 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
 
 export async function listItems(filters: ItemFilters = {}) {
   return withDatabaseFallback(async () => {
-    const rows = await sql<{ id: number; name: string; itemclass: number; itemtype: number; slots: number; classes: number; nodrop: number; reqlevel: number; damage: number; source: string | null }>`
-      select id, Name as name, itemclass, itemtype, slots, classes, nodrop, reqlevel, damage, source
+    const rows = await sql<{
+      id: number;
+      name: string;
+      itemclass: number;
+      itemtype: number;
+      slots: number;
+      classes: number;
+      nodrop: number;
+      reqlevel: number;
+      damage: number;
+      delay: number;
+      source: string | null;
+      ac: number;
+      hp: number;
+      mana: number;
+      icon: number;
+    }>`
+      select id, Name as name, itemclass, itemtype, slots, classes, nodrop, reqlevel, damage, delay, source, ac, hp, mana, icon
       from items
       where Name like ${like(filters.q)}
       order by reqlevel desc, Name asc
@@ -542,33 +759,116 @@ export async function listItems(filters: ItemFilters = {}) {
       .map((row) => ({
         id: row.id,
         name: row.name,
+        icon: String(row.icon ?? 0),
         type: formatItemType(row.itemclass, row.itemtype, row.damage),
         slot: formatSlotMask(row.slots, row.itemclass),
         classes: decodeClassMask(row.classes),
         tradeable: Number(row.nodrop ?? 0) === 0,
         levelRequired: Number(row.reqlevel ?? 0),
-        zone: row.source?.trim() || "Various"
+        zone: row.source?.trim() || "Various",
+        ac: Number(row.ac ?? 0),
+        hp: Number(row.hp ?? 0),
+        mana: Number(row.mana ?? 0),
+        damage: Number(row.damage ?? 0),
+        delay: Number(row.delay ?? 0)
       }))
       .filter((item) => {
         if (filters.className && !item.classes.some((klass) => includesFolded(klass, filters.className))) return false;
         if (filters.slot && !includesFolded(item.slot, filters.slot)) return false;
+        if (filters.type && !includesFolded(item.type, filters.type)) return false;
         if (typeof filters.tradeable === "boolean" && item.tradeable !== filters.tradeable) return false;
+        if (filters.minLevel && item.levelRequired < filters.minLevel) return false;
+        if (filters.maxLevel && item.levelRequired > filters.maxLevel) return false;
         return true;
       });
   }, () => summarizeItems().filter((item) => {
     if (!includesFolded(item.name, filters.q)) return false;
     if (filters.className && !item.classes.some((klass) => includesFolded(klass, filters.className))) return false;
     if (filters.slot && !includesFolded(item.slot, filters.slot)) return false;
+    if (filters.type && !includesFolded(item.type, filters.type)) return false;
     if (typeof filters.tradeable === "boolean" && item.tradeable !== filters.tradeable) return false;
+    if (filters.minLevel && item.levelRequired < filters.minLevel) return false;
+    if (filters.maxLevel && item.levelRequired > filters.maxLevel) return false;
     return true;
   }));
 }
 
 export async function getItemDetail(id: number): Promise<ItemDetail | undefined> {
   return withDatabaseFallback(async () => {
-    const result = await sql<{ id: number; name: string; itemclass: number; itemtype: number; slots: number; classes: number; nodrop: number; reqlevel: number; damage: number; delay: number; lore: string | null; source: string | null; ac: number; hp: number; mana: number; astr: number; asta: number; aagi: number; adex: number; aint: number; awis: number; acha: number; mr: number; fr: number; cr: number; dr: number; pr: number; icon: number }>`
-      select id, Name as name, itemclass, itemtype, slots, classes, nodrop, reqlevel, damage, delay, lore, source, ac, hp, mana,
-             astr, asta, aagi, adex, aint, awis, acha, mr, fr, cr, dr, pr, icon
+    const result = await sql<{
+      id: number;
+      name: string;
+      itemclass: number;
+      itemtype: number;
+      slots: number;
+      classes: number;
+      races: number;
+      nodrop: number;
+      attuneable: number;
+      magic: number;
+      reqlevel: number;
+      reclevel: number;
+      damage: number;
+      delay: number;
+      item_range: number;
+      attack: number;
+      haste: number;
+      hp: number;
+      mana: number;
+      endur: number;
+      regen: number;
+      manaregen: number;
+      enduranceregen: number;
+      ac: number;
+      astr: number;
+      asta: number;
+      aagi: number;
+      adex: number;
+      aint: number;
+      awis: number;
+      acha: number;
+      mr: number;
+      fr: number;
+      cr: number;
+      dr: number;
+      pr: number;
+      augslot1type: number;
+      augslot1visible: number;
+      augslot2type: number;
+      augslot2visible: number;
+      augslot3type: number;
+      augslot3visible: number;
+      augslot4type: number;
+      augslot4visible: number;
+      augslot5type: number;
+      augslot5visible: number;
+      augslot6type: number;
+      augslot6visible: number;
+      proceffect: number;
+      proclevel2: number;
+      procrate: number;
+      worneffect: number;
+      wornlevel: number;
+      focuseffect: number;
+      focuslevel: number;
+      clickeffect: number;
+      clicklevel2: number;
+      clicktype: number;
+      lore: string | null;
+      source: string | null;
+      size: number;
+      weight: number;
+      light: number;
+      price: number;
+      icon: number;
+    }>`
+      select id, Name as name, itemclass, itemtype, slots, classes, races, nodrop, attuneable, magic, reqlevel, reclevel,
+             damage, delay, ${sql.raw("`range`")} as item_range, attack, haste, hp, mana, endur, regen, manaregen, enduranceregen, ac,
+             astr, asta, aagi, adex, aint, awis, acha, mr, fr, cr, dr, pr,
+             augslot1type, augslot1visible, augslot2type, augslot2visible, augslot3type, augslot3visible,
+             augslot4type, augslot4visible, augslot5type, augslot5visible, augslot6type, augslot6visible,
+             proceffect, proclevel2, procrate, worneffect, wornlevel, focuseffect, focuslevel, clickeffect, clicklevel2, clicktype,
+             lore, source, size, weight, light, price, icon
       from items where id = ${id}
     `.execute(db!);
 
@@ -576,10 +876,65 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
 
     if (!row) return undefined;
 
+    const droppedByRowsPromise = sql<{ id: number; name: string }>`
+      select distinct nt.id, nt.name
+      from lootdrop_entries lde
+      join loottable_entries lte on lte.lootdrop_id = lde.lootdrop_id
+      join npc_types nt on nt.loottable_id = lte.loottable_id
+      where lde.item_id = ${id}
+      order by nt.name asc
+      limit 40
+    `.execute(db!);
+
+    const droppedZoneRowsPromise = sql<{ short_name: string; long_name: string }>`
+      select distinct z.short_name, z.long_name
+      from lootdrop_entries lde
+      join loottable_entries lte on lte.lootdrop_id = lde.lootdrop_id
+      join npc_types nt on nt.loottable_id = lte.loottable_id
+      join spawnentry se on se.npcID = nt.id
+      join spawngroup sg on sg.id = se.spawngroupID
+      join spawn2 s2 on s2.spawngroupID = sg.id
+      join zone z on z.short_name = s2.zone and z.version = s2.version
+      where lde.item_id = ${id}
+      order by z.long_name asc
+      limit 20
+    `.execute(db!);
+
+    const soldByRowsPromise = sql<{ id: number; name: string }>`
+      select distinct nt.id, nt.name
+      from merchantlist ml
+      join npc_types nt on nt.merchant_id = ml.merchantid
+      where ml.item = ${id}
+      order by nt.name asc
+      limit 40
+    `.execute(db!);
+
+    const recipeRowsPromise = sql<{ id: number; name: string }>`
+      select distinct tr.id, tr.name
+      from tradeskill_recipe_entries tre
+      join tradeskill_recipe tr on tr.id = tre.recipe_id
+      where tre.item_id = ${id}
+      order by tr.name asc
+      limit 40
+    `.execute(db!);
+
+    const effectNameMapPromise = spellNamesById([row.proceffect, row.worneffect, row.focuseffect, row.clickeffect].map(Number));
+
+    const [droppedByRows, droppedZoneRows, soldByRows, recipeRows, effectNameMap] = await Promise.all([
+      droppedByRowsPromise,
+      droppedZoneRowsPromise,
+      soldByRowsPromise,
+      recipeRowsPromise,
+      effectNameMapPromise
+    ]);
+
     const statPairs: Array<[string, string | number | null | undefined]> = [
-      ["Armor Class", row.ac],
-      ["Hit Points", row.hp],
+      ["AC", row.ac],
+      ["HP", row.hp],
       ["Mana", row.mana],
+      ["End", row.endur],
+      ["Attack", row.attack],
+      ["Haste", row.haste ? `${row.haste}%` : 0],
       ["Strength", row.astr],
       ["Stamina", row.asta],
       ["Agility", row.aagi],
@@ -592,29 +947,108 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       ["Cold Resist", row.cr],
       ["Disease Resist", row.dr],
       ["Poison Resist", row.pr],
+      ["HP Regen", row.regen],
+      ["Mana Regen", row.manaregen],
       ["Damage / Delay", row.damage && row.delay ? `${row.damage} / ${row.delay}` : 0]
     ];
 
     const stats: Array<{ label: string; value: string }> = statPairs
-      .filter(([, value]) => Number(value) !== 0)
+      .filter(([, value]) => {
+        if (typeof value === "string" && value.includes("/")) {
+          return true;
+        }
+        return Number(value) !== 0;
+      })
       .map(([label, value]) => ({ label, value: String(value) }));
+
+    const flags = [
+      Number(row.magic ?? 0) > 0 ? "Magic" : null,
+      Number(row.nodrop ?? 0) > 0 ? "No Drop" : null,
+      Number(row.attuneable ?? 0) > 0 ? "Attuneable" : null
+    ].filter((value): value is string => Boolean(value));
+
+    const augmentSlots = Array.from({ length: 6 }, (_, index) => index + 1)
+      .map((slot) => ({
+        slot,
+        type: Number(row[`augslot${slot}type` as keyof typeof row] ?? 0),
+        visible: Number(row[`augslot${slot}visible` as keyof typeof row] ?? 0)
+      }))
+      .filter((entry) => entry.visible > 0 && entry.type > 0)
+      .map(({ slot, type }) => ({ slot, type }));
+
+    const buildEffect = (
+      effectId: number | null | undefined,
+      labelLevel: number | null | undefined,
+      extra?: { chanceModifier?: number; castType?: string }
+    ) => {
+      const normalizedId = Number(effectId ?? 0);
+      if (normalizedId <= 0 || normalizedId >= 65535) {
+        return undefined;
+      }
+
+      return {
+        id: normalizedId,
+        name: effectNameMap.get(normalizedId) ?? `Spell ${normalizedId}`,
+        href: `/spells/${normalizedId}`,
+        level: Number(labelLevel ?? 0) > 0 ? Number(labelLevel) : undefined,
+        chanceModifier: extra?.chanceModifier,
+        castType: extra?.castType
+      };
+    };
+
+    const coinValue = formatCoinValue(row.price);
 
     const detail: ItemDetail = {
       id: row.id,
       name: row.name,
+      icon: String(row.icon ?? 0),
       type: formatItemType(row.itemclass, row.itemtype, row.damage),
       slot: formatSlotMask(row.slots, row.itemclass),
       classes: decodeClassMask(row.classes),
+      flags,
+      classDisplay: formatClassMask(row.classes),
+      raceDisplay: formatRaceMask(row.races),
+      slotDisplay: formatSlotList(row.slots, row.itemclass),
+      size: formatSize(row.size),
+      weight: formatWeight(row.weight),
+      skill: formatSkill(row.itemtype, row.damage, row.itemclass),
+      itemTypeLabel: formatItemTypeLabel(row.itemtype, row.damage, row.itemclass, row.light),
       tradeable: Number(row.nodrop ?? 0) === 0,
       levelRequired: Number(row.reqlevel ?? 0),
-      zone: row.source?.trim() || "Various",
-      icon: String(row.icon ?? 0),
+      recommendedLevel: Number(row.reclevel ?? 0),
+      range: Number(row.item_range ?? 0),
+      attack: Number(row.attack ?? 0),
+      haste: Number(row.haste ?? 0),
+      endurance: Number(row.endur ?? 0),
+      hpRegen: Number(row.regen ?? 0),
+      manaRegen: Number(row.manaregen ?? 0),
+      enduranceRegen: Number(row.enduranceregen ?? 0),
+      damageBonus: calculateDamageBonus(row.itemtype, row.damage, row.delay),
+      coinValue,
+      zone: droppedZoneRows.rows[0]?.long_name ?? (row.source?.trim() || "Various"),
+      ac: Number(row.ac ?? 0),
+      hp: Number(row.hp ?? 0),
+      mana: Number(row.mana ?? 0),
+      damage: Number(row.damage ?? 0),
+      delay: Number(row.delay ?? 0),
       lore: row.lore?.trim() || "No lore text available.",
+      augmentSlots,
+      droppedInZones: droppedZoneRows.rows.map((entry) => ({
+        shortName: entry.short_name,
+        longName: entry.long_name,
+        href: `/zones/${entry.short_name}`
+      })),
+      combatEffect: buildEffect(row.proceffect, row.proclevel2, { chanceModifier: 100 + Number(row.procrate ?? 0) }),
+      wornEffect: buildEffect(row.worneffect, row.wornlevel),
+      focusEffect: buildEffect(row.focuseffect, row.focuslevel),
+      clickEffect: buildEffect(row.clickeffect, row.clicklevel2, { castType: effectCastTypes[Number(row.clicktype ?? 0)] }),
       stats,
-      droppedBy: [],
-      soldBy: [],
-      usedInRecipes: []
+      droppedBy: droppedByRows.rows.map((entry) => ({ id: entry.id, name: entry.name, href: `/npcs/${entry.id}` })),
+      soldBy: soldByRows.rows.map((entry) => ({ id: entry.id, name: entry.name, href: `/npcs/${entry.id}` })),
+      usedInRecipes: recipeRows.rows.map((entry) => ({ id: entry.id, name: entry.name, href: `/recipes/${entry.id}` }))
     };
+    detail.stats.push({ label: "Value", value: `${coinValue.pp}pp ${coinValue.gp}gp ${coinValue.sp}sp ${coinValue.cp}cp` });
+
     return detail;
   }, () => items.find((item) => item.id === id));
 }
@@ -622,7 +1056,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
 export async function listSpells(filters: SpellFilters = {}) {
   return withDatabaseFallback(async () => {
     const rows = await sql<Record<string, unknown>>`
-      select id, name, skill, effectid1, classes1, classes2, classes3, classes4, classes5, classes6, classes7, classes8,
+      select id, name, skill, effectid1, mana, targettype, classes1, classes2, classes3, classes4, classes5, classes6, classes7, classes8,
              classes9, classes10, classes11, classes12, classes13, classes14, classes15, classes16
       from spells_new
       where name like ${like(filters.q)}
@@ -639,18 +1073,28 @@ export async function listSpells(filters: SpellFilters = {}) {
           classes: classes.map((entry) => entry.klass),
           level: Math.min(...classes.map((entry) => entry.level), 255),
           skill: formatSpellSkill(Number(row.skill ?? 0)),
-          effect: `Effect ${Number(row.effectid1 ?? 0)}`
+          effect: `Effect ${Number(row.effectid1 ?? 0)}`,
+          mana: Number(row.mana ?? 0),
+          target: formatTarget(Number(row.targettype ?? 0))
         };
       })
       .filter((spell) => {
         if (filters.className && !spell.classes.some((klass) => includesFolded(klass, filters.className))) return false;
-        if (filters.level && spell.level !== filters.level) return false;
+        if (filters.level) {
+          if (filters.levelMode === "min" && spell.level < filters.level) return false;
+          else if (filters.levelMode === "max" && spell.level > filters.level) return false;
+          else if ((!filters.levelMode || filters.levelMode === "exact") && spell.level !== filters.level) return false;
+        }
         return true;
       });
   }, () => summarizeSpells().filter((spell) => {
     if (!includesFolded(spell.name, filters.q)) return false;
     if (filters.className && !spell.classes.some((klass) => includesFolded(klass, filters.className))) return false;
-    if (filters.level && spell.level !== filters.level) return false;
+    if (filters.level) {
+      if (filters.levelMode === "min" && spell.level < filters.level) return false;
+      else if (filters.levelMode === "max" && spell.level > filters.level) return false;
+      else if ((!filters.levelMode || filters.levelMode === "exact") && spell.level !== filters.level) return false;
+    }
     return true;
   }));
 }
@@ -706,6 +1150,7 @@ export async function listNpcs(filters: NpcFilters = {}) {
         id: row.id,
         name: row.name,
         race: formatRace(row.race),
+        klass: formatNpcClass(row.class),
         level: String(row.level),
         zone: row.zone_name ?? "Unknown",
         named: isNamedNpcName(row.name)
@@ -878,6 +1323,8 @@ export function listRecipes(filters: RecipeFilters = {}) {
   return summarizeRecipes().filter((recipe) => {
     if (!includesFolded(recipe.name, filters.q)) return false;
     if (filters.tradeskill && !includesFolded(recipe.tradeskill, filters.tradeskill)) return false;
+    if (filters.minTrivial && recipe.trivial < filters.minTrivial) return false;
+    if (filters.maxTrivial && recipe.trivial > filters.maxTrivial) return false;
     return true;
   });
 }

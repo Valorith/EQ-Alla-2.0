@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getFactionDetail } from "@eq-alla/data";
-import { LinkList, PageHero, SectionCard } from "../../../components/catalog";
+import { LinkList, PageHero, SectionCard } from "../../../components/catalog-shell";
 
 type FactionDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -31,4 +31,3 @@ export default async function FactionDetailPage({ params }: FactionDetailPagePro
     </>
   );
 }
-

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { listRecipes } from "@eq-alla/data";
 import { Input } from "@eq-alla/ui";
-import { FilterForm, PageHero, SectionCard, SelectField, SimpleTable } from "../../components/catalog";
+import { FilterForm, PageHero, SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../components/catalog-shell";
 
 type RecipesPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -10,8 +10,9 @@ type RecipesPageProps = {
 export default async function RecipesPage({ searchParams }: RecipesPageProps) {
   const params = await searchParams;
   const q = typeof params.q === "string" ? params.q : "";
+  const hasQuery = q.trim().length > 0;
   const tradeskill = typeof params.tradeskill === "string" ? params.tradeskill : "";
-  const recipes = listRecipes({ q, tradeskill });
+  const recipes = hasQuery ? listRecipes({ q, tradeskill }) : [];
 
   return (
     <>
@@ -25,18 +26,22 @@ export default async function RecipesPage({ searchParams }: RecipesPageProps) {
           <SelectField label="Tradeskill" name="tradeskill" defaultValue={tradeskill} options={["Alchemy", "Smithing"]} />
         </FilterForm>
       </SectionCard>
-      <SectionCard title={`${recipes.length} recipes`}>
-        <SimpleTable
-          columns={["Recipe", "Tradeskill", "Trivial", "Result"]}
-          rows={recipes.map((recipe) => [
-            <Link key={recipe.id} href={`/recipes/${recipe.id}`} className="font-medium hover:underline">
-              {recipe.name}
-            </Link>,
-            recipe.tradeskill,
-            recipe.trivial,
-            recipe.result
-          ])}
-        />
+      <SectionCard title={hasQuery ? `${recipes.length} recipes` : "Results"}>
+        {hasQuery ? (
+          <SimpleTable
+            columns={["Recipe", "Tradeskill", "Trivial", "Result"]}
+            rows={recipes.map((recipe) => [
+              <Link key={recipe.id} href={`/recipes/${recipe.id}`} className="font-medium hover:underline">
+                {recipe.name}
+              </Link>,
+              recipe.tradeskill,
+              recipe.trivial,
+              recipe.result
+            ])}
+          />
+        ) : (
+          <SearchPrompt message="Enter a recipe name to load results." />
+        )}
       </SectionCard>
     </>
   );

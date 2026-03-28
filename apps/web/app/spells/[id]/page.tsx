@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getSpellDetail } from "@eq-alla/data";
-import { DefinitionGrid, PageHero, SectionCard } from "../../../components/catalog";
+import { DefinitionGrid, PageHero, SectionCard } from "../../../components/catalog-shell";
 
 type SpellDetailPageProps = {
   params: Promise<{ id: string }>;

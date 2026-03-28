@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { listPets } from "@eq-alla/data";
 import { Input } from "@eq-alla/ui";
-import { PageHero, SectionCard, SimpleTable } from "../../components/catalog";
+import { PageHero, SearchPrompt, SectionCard, SimpleTable } from "../../components/catalog-shell";
 
 type PetsPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -10,7 +10,8 @@ type PetsPageProps = {
 export default async function PetsPage({ searchParams }: PetsPageProps) {
   const params = await searchParams;
   const q = typeof params.q === "string" ? params.q : "";
-  const pets = listPets(q);
+  const hasQuery = q.trim().length > 0;
+  const pets = hasQuery ? listPets(q) : [];
 
   return (
     <>
@@ -23,20 +24,23 @@ export default async function PetsPage({ searchParams }: PetsPageProps) {
           </button>
         </form>
       </SectionCard>
-      <SectionCard title={`${pets.length} pets`}>
-        <SimpleTable
-          columns={["Name", "Owner class", "Levels", "Granted by"]}
-          rows={pets.map((pet) => [
-            <Link key={pet.id} href={`/pets/${pet.id}`} className="font-medium hover:underline">
-              {pet.name}
-            </Link>,
-            pet.ownerClass,
-            pet.levelRange,
-            pet.grantedBy.name
-          ])}
-        />
+      <SectionCard title={hasQuery ? `${pets.length} pets` : "Results"}>
+        {hasQuery ? (
+          <SimpleTable
+            columns={["Name", "Owner class", "Levels", "Granted by"]}
+            rows={pets.map((pet) => [
+              <Link key={pet.id} href={`/pets/${pet.id}`} className="font-medium hover:underline">
+                {pet.name}
+              </Link>,
+              pet.ownerClass,
+              pet.levelRange,
+              pet.grantedBy.name
+            ])}
+          />
+        ) : (
+          <SearchPrompt message="Enter a pet name to load results." />
+        )}
       </SectionCard>
     </>
   );
 }
-

@@ -1,6 +1,24 @@
 @import "tailwindcss";
 
 :root {
+  --font-display:
+    "Avenir Next",
+    "Segoe UI",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  --font-body:
+    "Avenir Next",
+    "Segoe UI",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  --font-brand:
+    "Iowan Old Style",
+    "Palatino Linotype",
+    "Book Antiqua",
+    "Times New Roman",
+    serif;
   --background: #eff2f5;
   --background-strong: #d8dde5;
   --foreground: #1a2230;
@@ -110,6 +128,95 @@ input {
   font-family: var(--font-brand), serif;
   letter-spacing: -0.04em;
   text-shadow: 0 0 12px rgba(0, 0, 0, 0.45);
+}
+
+.eq-home-stage {
+  position: relative;
+}
+
+body.eq-home-page::before {
+  background-image:
+    radial-gradient(circle at top left, rgba(255, 220, 156, 0.22), transparent 26%),
+    radial-gradient(circle at 55% 12%, rgba(255, 244, 208, 0.16), transparent 24%),
+    linear-gradient(180deg, rgba(255, 244, 220, 0.06), rgba(7, 10, 15, 0.22));
+  opacity: 1;
+  transition:
+    background-image 320ms ease,
+    opacity 320ms ease;
+}
+
+body.eq-home-page.eq-home-search-focused::before {
+  background-image:
+    radial-gradient(circle at top left, rgba(255, 212, 140, 0.14), transparent 24%),
+    linear-gradient(180deg, rgba(7, 10, 15, 0.2), rgba(7, 10, 15, 0.38));
+}
+
+.eq-home-search {
+  transition:
+    transform 280ms ease,
+    filter 280ms ease;
+}
+
+.eq-home-search-icon {
+  transition:
+    color 280ms ease,
+    transform 280ms ease;
+}
+
+.eq-home-search input {
+  transition:
+    transform 280ms ease,
+    box-shadow 280ms ease,
+    border-color 280ms ease,
+    background-color 280ms ease;
+}
+
+.eq-home-stage:focus-within .eq-home-search {
+  transform: translateY(-4px);
+  filter: brightness(1.04);
+}
+
+.eq-home-stage:focus-within .eq-home-search-icon {
+  color: rgba(255, 255, 255, 0.78);
+  transform: translateY(-50%) scale(1.06);
+}
+
+.eq-home-stage:focus-within .eq-home-search input {
+  background-color: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow:
+    0 30px 80px rgba(6, 10, 15, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 0 0 5px rgba(255, 255, 255, 0.08);
+  transform: scale(1.012);
+}
+
+.eq-item-search-scope {
+  --foreground: #e6dcc9;
+  --muted: #b4a58e;
+  --muted-strong: #efe2ca;
+  --card: rgba(31, 26, 24, 0.88);
+  --panel: rgba(25, 24, 28, 0.84);
+  --border: rgba(201, 167, 114, 0.12);
+  --border-strong: rgba(201, 167, 114, 0.22);
+  --ring: rgba(215, 164, 95, 0.24);
+}
+
+.eq-item-search-scope input,
+.eq-item-search-scope select {
+  background: rgba(27, 24, 24, 0.9);
+  color: #eadfcf;
+  border-color: rgba(201, 167, 114, 0.18);
+}
+
+.eq-item-search-scope input::placeholder {
+  color: #a79983;
+}
+
+.eq-item-search-scope input:focus,
+.eq-item-search-scope select:focus {
+  background: rgba(31, 27, 26, 0.94);
+  border-color: rgba(215, 164, 95, 0.62);
 }
 
 ::-webkit-scrollbar {
