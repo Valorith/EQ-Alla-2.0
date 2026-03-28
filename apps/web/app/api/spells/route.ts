@@ -6,6 +6,14 @@ export async function GET(request: Request) {
   const q = searchParams.get("q") ?? undefined;
   const className = searchParams.get("class") ?? undefined;
   const level = searchParams.get("level") ? Number(searchParams.get("level")) : undefined;
+  const data = await listSpells({ q, className, level });
 
-  return NextResponse.json({ data: await listSpells({ q, className, level }) });
+  return NextResponse.json(
+    { data },
+    {
+      headers: {
+        "Cache-Control": "public, max-age=30, stale-while-revalidate=120"
+      }
+    }
+  );
 }

@@ -16,6 +16,7 @@ export type SearchHit = {
   href: string;
   subtitle: string;
   tags: string[];
+  icon?: string;
 };
 
 export type ItemSummary = {
@@ -71,7 +72,9 @@ export type ItemDetail = ItemSummary & {
 export type SpellSummary = {
   id: number;
   name: string;
+  icon: string;
   classes: string[];
+  classLevel: string;
   level: number;
   skill: string;
   effect: string;
@@ -109,8 +112,10 @@ export type NpcDetail = NpcSummary & {
 };
 
 export type ZoneSummary = {
+  id: number;
   shortName: string;
   longName: string;
+  spawns: number;
   era: string;
   levelRange: string;
   population: string;
@@ -157,6 +162,24 @@ export type RecipeSummary = {
   result: string;
 };
 
+export type PetSummary = {
+  id: number;
+  spellId: number;
+  spellName: string;
+  spellIcon: string;
+  ownerClass: string;
+  ownerClassId: number;
+  spellLevel: number;
+  race: string;
+  petLevel: number;
+  petClass: string;
+  hp: number;
+  mana: number;
+  ac: number;
+  minDamage: number;
+  maxDamage: number;
+};
+
 export type RecipeDetail = RecipeSummary & {
   container: string;
   notes: string;
@@ -168,9 +191,20 @@ export type PetDetail = {
   id: number;
   name: string;
   ownerClass: string;
+  ownerClassId?: number;
   levelRange: string;
   grantedBy: { id: number; name: string; href: string };
   notes: string;
+  spellLevel?: number;
+  spellIcon?: string;
+  race?: string;
+  petLevel?: number;
+  petClass?: string;
+  hp?: number;
+  mana?: number;
+  ac?: number;
+  minDamage?: number;
+  maxDamage?: number;
 };
 
 export type TaskDetail = {

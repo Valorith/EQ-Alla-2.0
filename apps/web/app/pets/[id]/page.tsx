@@ -9,7 +9,7 @@ type PetDetailPageProps = {
 
 export default async function PetDetailPage({ params }: PetDetailPageProps) {
   const { id } = await params;
-  const pet = getPetDetail(Number(id));
+  const pet = await getPetDetail(Number(id));
 
   if (!pet) notFound();
 

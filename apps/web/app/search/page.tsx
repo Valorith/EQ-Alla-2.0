@@ -1,7 +1,5 @@
-import Link from "next/link";
-import { searchCatalog } from "@eq-alla/data";
-import { Input } from "@eq-alla/ui";
-import { PageHero, SearchPrompt, SectionCard, SimpleTable } from "../../components/catalog-shell";
+import { PageHero } from "../../components/catalog-shell";
+import { SearchClient } from "./search-client";
 
 type SearchPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -10,8 +8,6 @@ type SearchPageProps = {
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const params = await searchParams;
   const query = typeof params.q === "string" ? params.q : "";
-  const hasQuery = query.trim().length > 0;
-  const hits = hasQuery ? await searchCatalog(query) : [];
 
   return (
     <>
@@ -20,33 +16,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         title={query ? `Results for "${query}"` : "Search the archive"}
         description="Cross-entity search spans items, spells, NPCs, zones, and the rest of the Alla catalog."
       />
-
-      <SectionCard title="Query">
-        <form action="/search" className="flex flex-col gap-3 sm:flex-row">
-          <Input name="q" type="search" defaultValue={query} placeholder="Search for zones, NPCs, items..." />
-          <button className="h-11 rounded-full bg-[var(--accent)] px-5 text-sm font-medium text-[var(--accent-foreground)]">
-            Search
-          </button>
-        </form>
-      </SectionCard>
-
-      <SectionCard title={hasQuery ? "Matches" : "Results"}>
-        {hasQuery ? (
-          <SimpleTable
-            columns={["Name", "Type", "Summary", "Tags"]}
-            rows={hits.map((hit) => [
-              <Link key={hit.href} href={hit.href} className="font-medium hover:underline">
-                {hit.title}
-              </Link>,
-              hit.type,
-              hit.subtitle,
-              hit.tags.join(" • ")
-            ])}
-          />
-        ) : (
-          <SearchPrompt message="Enter a search term to search across items, spells, NPCs, zones, and more." />
-        )}
-      </SectionCard>
+      <SearchClient initialQuery={query} />
     </>
   );
 }

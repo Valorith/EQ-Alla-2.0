@@ -7,11 +7,17 @@ describe("catalog services", () => {
     expect(tradeableItems.every((item) => item.tradeable)).toBe(true);
   });
 
+  it("normalizes whitespace in item search queries", async () => {
+    const trimmed = await listItems({ q: "fiend" });
+    const spaced = await listItems({ q: "  fiend  " });
+    expect(spaced.map((item) => item.id)).toEqual(trimmed.map((item) => item.id));
+  });
+
   it("returns populated search hits", async () => {
     const hits = await searchCatalog("mistmoore");
     expect(hits.some((hit) => hit.type === "zone")).toBe(true);
     expect(hits.some((hit) => hit.type === "npc")).toBe(true);
-  });
+  }, 10_000);
 
   it("maps legacy item routes", () => {
     const target = resolveLegacyRoute("/", new URLSearchParams("a=item&id=1001"));

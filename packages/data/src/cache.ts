@@ -2,6 +2,7 @@ import Redis, { type RedisOptions } from "ioredis";
 import { env } from "./env";
 
 const memory = new Map<string, { expiresAt: number; value: unknown }>();
+const inFlight = new Map<string, Promise<unknown>>();
 
 let redis: Redis | null = null;
 
@@ -89,4 +90,30 @@ export async function cacheSet<T>(key: string, value: T, ttlSeconds: number) {
     expiresAt: Date.now() + ttlSeconds * 1_000,
     value
   });
+}
+
+export async function cacheGetOrResolve<T>(key: string, ttlSeconds: number, resolve: () => Promise<T>) {
+  const cached = await cacheGet<T>(key);
+
+  if (cached !== null) {
+    return cached;
+  }
+
+  const existing = inFlight.get(key);
+  if (existing) {
+    return existing as Promise<T>;
+  }
+
+  const pending = (async () => {
+    try {
+      const value = await resolve();
+      await cacheSet(key, value, ttlSeconds);
+      return value;
+    } finally {
+      inFlight.delete(key);
+    }
+  })();
+
+  inFlight.set(key, pending);
+  return pending;
 }

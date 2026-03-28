@@ -168,7 +168,9 @@ export const spells: SpellDetail[] = [
   {
     id: 2001,
     name: "Spirit of Wolf",
+    icon: "638",
     classes: ["Druid", "Shaman"],
+    classLevel: "Druid 9",
     level: 9,
     skill: "Alteration",
     effect: "Movement speed increase",
@@ -181,7 +183,9 @@ export const spells: SpellDetail[] = [
   {
     id: 2002,
     name: "Complete Heal",
+    icon: "18",
     classes: ["Cleric"],
+    classLevel: "Cleric 39",
     level: 39,
     skill: "Alteration",
     effect: "Restores target to full health",
@@ -194,7 +198,9 @@ export const spells: SpellDetail[] = [
   {
     id: 2003,
     name: "Archivist's Ember",
+    icon: "546",
     classes: ["Wizard", "Magician"],
+    classLevel: "Wizard 54",
     level: 54,
     skill: "Evocation",
     effect: "Fire damage over time",
@@ -334,9 +340,20 @@ export const pets: PetDetail[] = [
     id: 5001,
     name: "Spirit Wolf Companion",
     ownerClass: "Shaman",
+    ownerClassId: 10,
     levelRange: "34 - 49",
     grantedBy: { id: 2001, name: "Spirit of Wolf", href: "/spells/2001" },
-    notes: "A fast scouting pet used here as a stand-in for legacy pet listings."
+    notes: "A fast scouting pet used here as a stand-in for legacy pet listings.",
+    spellLevel: 34,
+    spellIcon: "638",
+    race: "Wolf",
+    petLevel: 39,
+    petClass: "Warrior",
+    hp: 1850,
+    mana: 0,
+    ac: 420,
+    minDamage: 58,
+    maxDamage: 94
   }
 ];
 
@@ -362,8 +379,10 @@ export const tasks: TaskDetail[] = [
 
 export const zones: ZoneDetail[] = [
   {
+    id: 33,
     shortName: "mistmoore",
     longName: "Castle Mistmoore",
+    spawns: 142,
     era: "Classic",
     levelRange: "30 - 55",
     population: "Undead, nobles, and castle guards",
@@ -389,8 +408,10 @@ export const zones: ZoneDetail[] = [
     spawnGroups
   },
   {
+    id: 202,
     shortName: "poknowledge",
     longName: "The Plane of Knowledge",
+    spawns: 64,
     era: "Planes of Power",
     levelRange: "1 - 65",
     population: "Merchants, spell vendors, and portal traffic",

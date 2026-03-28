@@ -186,11 +186,15 @@ export function SelectField({
   label,
   name,
   defaultValue,
+  value,
+  onChange,
   options
 }: {
   label: string;
   name: string;
   defaultValue?: string;
+  value?: string;
+  onChange?: (value: string) => void;
   options: string[];
 }) {
   return (
@@ -198,7 +202,9 @@ export function SelectField({
       <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">{label}</span>
       <select
         name={name}
-        defaultValue={defaultValue}
+        defaultValue={value === undefined ? defaultValue : undefined}
+        value={value}
+        onChange={onChange ? (event) => onChange(event.target.value) : undefined}
         className="h-11 rounded-xl border border-[var(--border-strong)] bg-white/94 px-4 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--accent)] focus:shadow-[0_0_0_4px_rgba(215,164,95,0.12)]"
       >
         <option value="">Any</option>

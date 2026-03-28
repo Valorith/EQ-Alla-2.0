@@ -1,0 +1,432 @@
+"use client";
+
+import Link from "next/link";
+import { startTransition, useEffect, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import type { SearchHit } from "@eq-alla/data";
+import { Input } from "@eq-alla/ui";
+import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
+import { SearchPrompt, SectionCard } from "../../components/catalog-shell";
+import { ItemIcon } from "../../components/item-icon";
+import { SpellIcon } from "../../components/spell-icon";
+
+type SearchClientProps = {
+  initialQuery: string;
+};
+
+type SearchResolutionMeta = {
+  key: string;
+  durationMs: number;
+  source: "network" | "cache";
+};
+
+type SearchCacheEntry = {
+  expiresAt: number;
+  hits: SearchHit[];
+  touchedAt: number;
+};
+
+const globalSearchDebounceMs = 500;
+const globalSearchAutoQueryMinLength = 3;
+const searchCacheTtlMs = 180_000;
+const searchCacheMaxEntries = 12;
+const searchSessionStorageKey = "eq-global-search-cache";
+
+const searchResultCache = new Map<string, SearchCacheEntry>();
+let searchCacheHydrated = false;
+const globalSearchOrder: SearchHit["type"][] = ["zone", "npc", "item", "spell", "faction", "recipe"];
+const globalSearchLabels: Record<SearchHit["type"], string> = {
+  item: "Items",
+  spell: "Spells",
+  npc: "Mobs",
+  zone: "Zones",
+  faction: "Factions",
+  recipe: "Trade Skills",
+  pet: "Pets",
+  task: "Tasks",
+  spawngroup: "Spawn Groups"
+};
+
+function buildSearchKey(query: string) {
+  return query.trim();
+}
+
+function hasQuery(query: string) {
+  return buildSearchKey(query).length > 0;
+}
+
+function hasAutoSearchableQuery(query: string) {
+  return buildSearchKey(query).length >= globalSearchAutoQueryMinLength;
+}
+
+function formatDuration(durationMs: number) {
+  if (durationMs < 1_000) {
+    return `${Math.max(1, Math.round(durationMs))}ms`;
+  }
+
+  return `${(durationMs / 1_000).toFixed(durationMs >= 10_000 ? 1 : 2)}s`;
+}
+
+function persistSearchCache() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    const payload = Object.fromEntries(searchResultCache.entries());
+    window.sessionStorage.setItem(searchSessionStorageKey, JSON.stringify(payload));
+  } catch {
+    // Ignore storage failures and keep using memory cache.
+  }
+}
+
+function pruneSearchCache(now = Date.now()) {
+  for (const [key, entry] of searchResultCache.entries()) {
+    if (entry.expiresAt < now) {
+      searchResultCache.delete(key);
+    }
+  }
+
+  if (searchResultCache.size <= searchCacheMaxEntries) {
+    return;
+  }
+
+  const oldestEntries = [...searchResultCache.entries()]
+    .sort((left, right) => left[1].touchedAt - right[1].touchedAt)
+    .slice(0, searchResultCache.size - searchCacheMaxEntries);
+
+  for (const [key] of oldestEntries) {
+    searchResultCache.delete(key);
+  }
+}
+
+function hydrateSearchCache() {
+  if (searchCacheHydrated || typeof window === "undefined") {
+    return;
+  }
+
+  searchCacheHydrated = true;
+
+  const payload = window.sessionStorage.getItem(searchSessionStorageKey);
+  if (!payload) {
+    return;
+  }
+
+  try {
+    const parsed = JSON.parse(payload) as Record<string, SearchCacheEntry>;
+    const now = Date.now();
+
+    for (const [key, entry] of Object.entries(parsed)) {
+      if (entry && Array.isArray(entry.hits) && typeof entry.expiresAt === "number") {
+        searchResultCache.set(key, {
+          expiresAt: entry.expiresAt,
+          hits: entry.hits,
+          touchedAt: typeof entry.touchedAt === "number" ? entry.touchedAt : now
+        });
+      }
+    }
+
+    pruneSearchCache(now);
+    persistSearchCache();
+  } catch {
+    window.sessionStorage.removeItem(searchSessionStorageKey);
+  }
+}
+
+function getClientCachedHits(key: string) {
+  hydrateSearchCache();
+
+  const entry = searchResultCache.get(key);
+
+  if (!entry) {
+    return null;
+  }
+
+  if (entry.expiresAt < Date.now()) {
+    searchResultCache.delete(key);
+    persistSearchCache();
+    return null;
+  }
+
+  entry.touchedAt = Date.now();
+  return entry.hits;
+}
+
+function setClientCachedHits(key: string, hits: SearchHit[]) {
+  hydrateSearchCache();
+
+  searchResultCache.set(key, {
+    expiresAt: Date.now() + searchCacheTtlMs,
+    hits,
+    touchedAt: Date.now()
+  });
+
+  pruneSearchCache();
+  persistSearchCache();
+}
+
+export function SearchClient({ initialQuery }: SearchClientProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [query, setQuery] = useState(initialQuery);
+  const [hits, setHits] = useState<SearchHit[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [isFetching, setIsFetching] = useState(hasQuery(initialQuery));
+  const [displayKey, setDisplayKey] = useState("");
+  const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
+  const [submitCount, setSubmitCount] = useState(0);
+  const [awaitingManualSubmit, setAwaitingManualSubmit] = useState(false);
+  const [activeType, setActiveType] = useState<SearchHit["type"] | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const currentUrlKeyRef = useRef(buildSearchKey(initialQuery));
+  const lastHandledSubmitRef = useRef(0);
+
+  useEffect(() => {
+    const key = buildSearchKey(initialQuery);
+    if (!key) {
+      return;
+    }
+
+    const cachedHits = getClientCachedHits(key);
+    if (!cachedHits) {
+      return;
+    }
+
+    setHits(cachedHits);
+    setDisplayKey(key);
+    setIsFetching(false);
+    setError(null);
+    setResolutionMeta({
+      key,
+      durationMs: 0,
+      source: "cache"
+    });
+  }, [initialQuery]);
+
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
+
+  const submitSearch = () => {
+    if (!hasQuery(query)) {
+      return;
+    }
+
+    setSubmitCount((current) => current + 1);
+  };
+
+  useEffect(() => {
+    const isForcedSearch = submitCount !== lastHandledSubmitRef.current;
+    const timer = window.setTimeout(() => {
+      if (isForcedSearch) {
+        lastHandledSubmitRef.current = submitCount;
+      }
+
+      const nextKey = buildSearchKey(query);
+      const nextHref = nextKey ? `${pathname}?q=${encodeURIComponent(nextKey)}` : pathname;
+
+      if (nextKey !== currentUrlKeyRef.current) {
+        currentUrlKeyRef.current = nextKey;
+        startTransition(() => {
+          router.replace(nextHref, { scroll: false });
+        });
+      }
+
+      if (nextKey === displayKey && !isForcedSearch) {
+        return;
+      }
+
+      abortRef.current?.abort();
+
+      if (!nextKey) {
+        setHits([]);
+        setError(null);
+        setDisplayKey(nextKey);
+        setIsFetching(false);
+        setResolutionMeta(null);
+        setAwaitingManualSubmit(false);
+        return;
+      }
+
+      if (!isForcedSearch && !hasAutoSearchableQuery(query)) {
+        setHits([]);
+        setError(null);
+        setDisplayKey(nextKey);
+        setIsFetching(false);
+        setResolutionMeta(null);
+        setAwaitingManualSubmit(true);
+        return;
+      }
+
+      setAwaitingManualSubmit(false);
+      const startedAt = performance.now();
+      const cachedHits = getClientCachedHits(nextKey);
+      if (cachedHits) {
+        setHits(cachedHits);
+        setDisplayKey(nextKey);
+        setError(null);
+        setIsFetching(false);
+        setResolutionMeta({
+          key: nextKey,
+          durationMs: performance.now() - startedAt,
+          source: "cache"
+        });
+        return;
+      }
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setIsFetching(true);
+      setError(null);
+
+      void (async () => {
+        try {
+          const response = await fetch(`/api/search?q=${encodeURIComponent(nextKey)}`, {
+            signal: controller.signal
+          });
+
+          if (!response.ok) {
+            throw new Error(`Search failed with ${response.status}`);
+          }
+
+          const payload = (await response.json()) as { data?: SearchHit[] };
+
+          if (controller.signal.aborted) {
+            return;
+          }
+
+          setHits(payload.data ?? []);
+          setDisplayKey(nextKey);
+          setClientCachedHits(nextKey, payload.data ?? []);
+          setResolutionMeta({
+            key: nextKey,
+            durationMs: performance.now() - startedAt,
+            source: "network"
+          });
+        } catch (searchError) {
+          if (controller.signal.aborted) {
+            return;
+          }
+
+          console.error(searchError);
+          setError("Could not refresh global search results. Showing the last successful search.");
+        } finally {
+          if (abortRef.current === controller) {
+            abortRef.current = null;
+            setIsFetching(false);
+          }
+        }
+      })();
+    }, isForcedSearch ? 0 : globalSearchDebounceMs);
+
+    return () => window.clearTimeout(timer);
+  }, [displayKey, pathname, query, router, submitCount]);
+
+  const activeQuery = buildSearchKey(query);
+  const groupedHits = globalSearchOrder
+    .map((type) => ({ type, hits: hits.filter((hit) => hit.type === type) }))
+    .filter((entry) => entry.hits.length > 0);
+  const visibleType = groupedHits.some((entry) => entry.type === activeType) ? activeType : groupedHits[0]?.type ?? null;
+  const visibleHits = groupedHits.find((entry) => entry.type === visibleType)?.hits ?? [];
+  const hasShortQuery = activeQuery.length > 0 && activeQuery.length < globalSearchAutoQueryMinLength;
+  const showResults = activeQuery.length > 0 || isFetching || displayKey.length > 0;
+  const resultTitle = showResults ? (isFetching && hits.length === 0 ? "Loading matches" : `${hits.length} matches`) : "Results";
+  const statusLabel = error ? error : isFetching ? "Refreshing results..." : "Search updates automatically";
+  const resolvedTiming =
+    resolutionMeta && resolutionMeta.key === displayKey && !isFetching
+      ? `Loaded in ${formatDuration(resolutionMeta.durationMs)}${resolutionMeta.source === "cache" ? " from cache" : ""}`
+      : null;
+
+  useEffect(() => {
+    if (groupedHits.length === 0) {
+      setActiveType(null);
+      return;
+    }
+    if (!visibleType) {
+      setActiveType(groupedHits[0].type);
+    }
+  }, [groupedHits, visibleType]);
+
+  return (
+    <>
+      <SectionCard title="Query" right={<p className="text-xs font-medium text-[#ccb594]">{statusLabel}</p>}>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Input
+            name="q"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                submitSearch();
+              }
+            }}
+            placeholder="Search for zones, NPCs, items..."
+          />
+          <button
+            type="button"
+            onClick={submitSearch}
+            className="h-11 rounded-full bg-[var(--accent)] px-5 text-sm font-medium text-[var(--accent-foreground)]"
+          >
+            Search
+          </button>
+        </div>
+      </SectionCard>
+
+      <SectionCard title={resultTitle}>
+        {showResults && hits.length > 0 ? (
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {groupedHits.map((entry) => (
+                <button
+                  key={entry.type}
+                  type="button"
+                  onClick={() => setActiveType(entry.type)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] transition ${
+                    visibleType === entry.type
+                      ? "border-[#d7a45f] bg-[#d7a45f]/14 text-[#f5dfb8]"
+                      : "border-white/12 bg-white/5 text-white/68 hover:border-white/25 hover:text-white"
+                  }`}
+                >
+                  {globalSearchLabels[entry.type]} ({entry.hits.length})
+                </button>
+              ))}
+            </div>
+
+            <div className="rounded-2xl border border-[#7b603b]/20 bg-[linear-gradient(180deg,rgba(35,30,27,0.86),rgba(18,20,24,0.84))] px-4 py-4 shadow-[0_18px_44px_rgba(0,0,0,0.24)] backdrop-blur-md">
+              <ul className="space-y-2">
+                {visibleHits.map((hit) => (
+                  <li key={hit.href} className="text-left text-sm text-[#e8dfcf]">
+                    <Link href={hit.href} className="inline-flex items-center gap-2 font-medium hover:underline">
+                      {hit.type === "item" && hit.icon ? <ItemIcon icon={hit.icon} name={hit.title} size="xs" /> : null}
+                      {hit.type === "spell" && hit.icon ? <SpellIcon icon={hit.icon} name={hit.title} /> : null}
+                      <span>{hit.title}</span>
+                    </Link>
+                    {hit.subtitle || hit.tags.length > 0 ? (
+                      <span className="ml-2 text-xs text-[#aa9d89]">
+                        {[hit.subtitle, hit.tags.join(" • ")].filter(Boolean).join(" • ")}
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        ) : showResults ? (
+          isFetching ? (
+            <ClassLoadingIndicator message="Loading global search" detail="Sweeping items, spells, NPCs, and zones." />
+          ) : awaitingManualSubmit && hasShortQuery ? (
+            <SearchPrompt message={`Type ${globalSearchAutoQueryMinLength}+ characters to auto-search, or press Enter to search now.`} />
+          ) : (
+            <SearchPrompt message="No archive entries matched this search." />
+          )
+        ) : (
+          <SearchPrompt message="Enter a search term to search across items, spells, NPCs, zones, and more." />
+        )}
+
+        {resolvedTiming ? <p className="pt-1 text-right text-[11px] uppercase tracking-[0.16em] text-[#9f8e79]">{resolvedTiming}</p> : null}
+      </SectionCard>
+    </>
+  );
+}

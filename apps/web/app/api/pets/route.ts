@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { searchCatalog } from "@eq-alla/data";
+import { listPets } from "@eq-alla/data";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const q = searchParams.get("q") ?? "";
-  const data = q ? await searchCatalog(q) : [];
+  const className = searchParams.get("class") ?? undefined;
+  const data = await listPets({ className });
 
   return NextResponse.json(
     { data },
