@@ -60,7 +60,12 @@ function hasQuery(filters: RecipeFilters) {
 }
 
 function hasAutoSearchableQuery(filters: RecipeFilters) {
-  return filters.q.trim().length >= recipeSearchAutoQueryMinLength;
+  return (
+    filters.q.trim().length >= recipeSearchAutoQueryMinLength ||
+    filters.tradeskill.length > 0 ||
+    filters.minTrivial.trim().length > 0 ||
+    filters.maxTrivial.trim().length > 0
+  );
 }
 
 function formatDuration(durationMs: number) {

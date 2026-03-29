@@ -2805,7 +2805,7 @@ export async function getFactionDetail(id: number): Promise<FactionDetail | unde
 export async function listRecipes(filters: RecipeFilters = {}) {
   return withDatabaseFallback(async () => {
     const clauses = [sql`1 = 1`];
-    const isPoisonSearch = includesFolded("Poison", filters.tradeskill);
+    const isPoisonSearch = Boolean(filters.tradeskill && includesFolded("Poison", filters.tradeskill));
 
     if (filters.q) {
       clauses.push(sql`name like ${like(filters.q)}`);
