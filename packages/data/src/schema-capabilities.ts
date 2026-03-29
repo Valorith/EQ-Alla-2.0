@@ -5,6 +5,7 @@ import type { SchemaCapabilities } from "./types";
 
 const knownTables = [
   "items",
+  "discovered_items",
   "spells_new",
   "npc_types",
   "zone",
@@ -49,4 +50,3 @@ export async function detectSchemaCapabilities(): Promise<SchemaCapabilities> {
     tables: Object.fromEntries(knownTables.map((table) => [table, existing.has(table)]))
   };
 }
-

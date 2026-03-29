@@ -676,6 +676,14 @@ function spellClassesFromRow(row: Record<string, unknown>) {
     .filter((entry) => entry.level > 0 && entry.level < 255);
 }
 
+function discoveredItemClause(columnRef: string) {
+  return sql`exists (
+    select 1
+    from discovered_items di
+    where di.item_id = ${sql.ref(columnRef)}
+  )`;
+}
+
 async function withDatabaseFallback<T>(run: () => Promise<T>, _fallback: () => T | Promise<T>) {
   if (!databaseEnabled || !db) {
     throw new Error("Database connection is required. Mock data fallback has been disabled.");
@@ -1141,10 +1149,11 @@ async function fetchItemCandidateIds(filters: ItemFilters, limit: number) {
   }
 
   const result = await sql<{ id: number }>`
-    select id
-    from items
-    where ${sql.join(clauses, sql` and `)}
-    order by ${filters.q ? sql`Name asc` : sql`id asc`}
+    select i.id
+    from items i
+    where ${discoveredItemClause("i.id")}
+      and ${sql.join(clauses, sql` and `)}
+    order by ${filters.q ? sql`Name asc` : sql`i.id asc`}
     limit ${limit}
   `.execute(db);
 
@@ -1157,9 +1166,10 @@ async function fetchItemsByIds(ids: number[]) {
   }
 
   const rows = await sql<ItemSearchRow>`
-    select id, Name as name, itemclass, itemtype, slots, classes, nodrop, reqlevel, damage, delay, source, ac, hp, mana, icon
-    from items
-    where id in (${sql.join(ids)})
+    select i.id, i.Name as name, i.itemclass, i.itemtype, i.slots, i.classes, i.nodrop, i.reqlevel, i.damage, i.delay, i.source, i.ac, i.hp, i.mana, i.icon
+    from items i
+    where ${discoveredItemClause("i.id")}
+      and i.id in (${sql.join(ids)})
   `.execute(db);
 
   const byId = new Map(rows.rows.map((row) => [row.id, mapItemRowToSummary(row)]));
@@ -1280,7 +1290,7 @@ export async function getCatalogStats(): Promise<CatalogStats> {
       tasks: number;
     }>`
       select
-        (select count(*) from items) as items,
+        (select count(*) from items i where ${discoveredItemClause("i.id")}) as items,
         (select count(*) from spells_new) as spells,
         (select count(*) from npc_types) as npcs,
         (select count(*) from zone) as zones,
@@ -1327,8 +1337,9 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
       const [itemRows, spellRows, npcRows, zoneRows, factionRows, recipeRows] = await Promise.all([
         sql<{ id: number; name: string; icon: number; itemclass: number; itemtype: number; slots: number; damage: number }>`
           select id, Name as name, icon, itemclass, itemtype, slots, damage
-          from items
-          where Name like ${like(query)}
+          from items i
+          where ${discoveredItemClause("i.id")}
+            and Name like ${like(query)}
           order by Name asc
           limit 8
         `.execute(db!),
@@ -1584,7 +1595,9 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
              augslot4type, augslot4visible, augslot5type, augslot5visible, augslot6type, augslot6visible,
              proceffect, proclevel2, procrate, worneffect, wornlevel, focuseffect, focuslevel, clickeffect, clicklevel2, clicktype,
              lore, source, size, weight, light, price, icon
-      from items where id = ${id}
+      from items i
+      where i.id = ${id}
+        and ${discoveredItemClause("i.id")}
     `.execute(db!);
 
     const row = result.rows[0];
@@ -1913,16 +1926,18 @@ export async function getSpellDetail(id: number): Promise<SpellDetail | undefine
     const [componentResult, itemSourceResult] = await Promise.all([
       componentIds.length > 0
         ? sql<{ id: number; name: string }>`
-            select id, Name as name
-            from items
-            where id in (${sql.join(componentIds)})
+            select i.id, i.Name as name
+            from items i
+            where ${discoveredItemClause("i.id")}
+              and i.id in (${sql.join(componentIds)})
           `.execute(db!)
         : Promise.resolve({ rows: [] as Array<{ id: number; name: string }> }),
       sql<{ id: number; name: string; icon: number }>`
-        select id, Name as name, icon
-        from items
-        where scrolleffect = ${id}
-        order by Name asc
+        select i.id, i.Name as name, i.icon
+        from items i
+        where ${discoveredItemClause("i.id")}
+          and i.scrolleffect = ${id}
+        order by i.Name asc
       `.execute(db!)
     ]);
 
@@ -1968,9 +1983,14 @@ export async function getSpellDetail(id: number): Promise<SpellDetail | undefine
           return undefined;
         }
 
+        const reagentName = componentNames.get(reagentId);
+        if (!reagentName) {
+          return undefined;
+        }
+
         return {
           id: reagentId,
-          name: componentNames.get(reagentId) ?? `Item ${reagentId}`,
+          name: reagentName,
           count: Number(row[`component_counts${index + 1}`] ?? 1),
           href: `/items/${reagentId}`
         };
@@ -2117,6 +2137,7 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
             join lootdrop_entries lde on lde.lootdrop_id = lte.lootdrop_id
             join items i on i.id = lde.item_id
             where lte.loottable_id = ${row.loottable_id}
+              and ${discoveredItemClause("i.id")}
             order by lte.lootdrop_id asc, i.Name asc
           `.execute(db!)
         : Promise.resolve({
@@ -2137,6 +2158,7 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
             from merchantlist ml
             join items i on i.id = ml.item
             where ml.merchantid = ${row.merchant_id}
+              and ${discoveredItemClause("i.id")}
             order by ml.slot asc
           `.execute(db!)
         : Promise.resolve({ rows: [] as Array<{ id: number; name: string; icon: number; price: number; ldonprice: number }> }),
@@ -2478,6 +2500,7 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
         join spawn2 s2 on s2.spawngroupID = sg.id
         where s2.zone = ${shortName}
           and s2.version = 0
+          and ${discoveredItemClause("i.id")}
           and nt.class not in (${sql.join(merchantNpcClasses.map((value) => sql`${value}`), sql`, `)})
         order by i.Name asc
       `.execute(db!),
@@ -2497,6 +2520,7 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
         join zone z on z.zoneidnumber = f.zoneid and z.version = 0
         join items i on i.id = f.Itemid
         where z.short_name = ${shortName}
+          and ${discoveredItemClause("i.id")}
         group by i.id, i.Name, i.icon
         order by i.Name asc
       `.execute(db!),
@@ -2800,6 +2824,7 @@ export async function listRecipes(filters: RecipeFilters = {}) {
               join items poison_items on poison_items.id = poison_entries.item_id
               where poison_entries.recipe_id = tradeskill_recipe.id
                 and poison_entries.iscontainer = 1
+                and ${discoveredItemClause("poison_items.id")}
                 and poison_items.Name like '%Poison%'
             )
           )
@@ -2876,6 +2901,7 @@ export async function getRecipeDetail(id: number): Promise<RecipeDetail | undefi
       select tre.item_id, tre.successcount, tre.componentcount, tre.iscontainer, i.Name as item_name, i.icon as item_icon
       from tradeskill_recipe_entries tre
       left join items i on i.id = tre.item_id
+        and ${discoveredItemClause("i.id")}
       where tre.recipe_id = ${id}
       order by tre.id asc
     `.execute(db!);
@@ -2900,7 +2926,7 @@ export async function getRecipeDetail(id: number): Promise<RecipeDetail | undefi
     const containers = resolvedContainers.length > 0 ? resolvedContainers : rawContainers;
 
     const creates = entryRows.rows
-      .filter((entry) => Number(entry.successcount ?? 0) > 0)
+      .filter((entry) => Number(entry.successcount ?? 0) > 0 && Boolean(entry.item_name))
       .map((entry) => ({
         id: entry.item_id,
         name: entry.item_name?.trim() || `Item ${entry.item_id}`,
@@ -2910,7 +2936,7 @@ export async function getRecipeDetail(id: number): Promise<RecipeDetail | undefi
       }));
 
     const ingredients = entryRows.rows
-      .filter((entry) => Number(entry.componentcount ?? 0) > 0)
+      .filter((entry) => Number(entry.componentcount ?? 0) > 0 && Boolean(entry.item_name))
       .map((entry) => ({
         id: entry.item_id,
         name: entry.item_name?.trim() || `Item ${entry.item_id}`,
