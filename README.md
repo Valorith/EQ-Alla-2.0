@@ -197,6 +197,8 @@ dist/windows-server/EQ-Alla-2.0-Server.exe
 
 3. If you run the command on macOS or Linux, it will still assemble the portable runtime package, but you must run the same command once on a Windows machine to generate the native `.exe`.
 
+You can also let GitHub Actions build the Windows package for you automatically. Every push to `main`, plus any manual run from the Actions tab, triggers the `Build Windows Server Package` workflow and uploads `dist/windows-server` as a downloadable artifact.
+
 4. In the packaged folder:
 
 - copy `.env.example` to `.env`
