@@ -5,7 +5,7 @@ import { startTransition, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { ItemSummary } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
-import { SearchPrompt, SectionCard, SimpleTable } from "../../components/catalog-shell";
+import { PaginationControls, SearchPrompt, SectionCard, SimpleTable } from "../../components/catalog-shell";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { ItemIcon } from "../../components/item-icon";
 
@@ -34,6 +34,7 @@ type SearchResolutionMeta = {
 
 const itemSearchDebounceMs = 500;
 const itemSearchAutoQueryMinLength = 3;
+const itemResultsPerPage = 25;
 
 type ClientCacheEntry = {
   expiresAt: number;
@@ -65,8 +66,16 @@ function buildSearchParams(filters: ItemSearchFilters) {
   return params;
 }
 
-function hasQuery(filters: ItemSearchFilters) {
-  return filters.q.trim().length > 0;
+function hasActiveFilters(filters: ItemSearchFilters) {
+  return (
+    filters.q.trim().length > 0 ||
+    filters.className.length > 0 ||
+    filters.slot.length > 0 ||
+    filters.type.length > 0 ||
+    filters.minLevel.length > 0 ||
+    filters.maxLevel.length > 0 ||
+    filters.tradeable.length > 0
+  );
 }
 
 function hasAutoSearchableQuery(filters: ItemSearchFilters) {
@@ -240,11 +249,12 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
   const [filters, setFilters] = useState(initialFilters);
   const [items, setItems] = useState(initialItems);
   const [error, setError] = useState<string | null>(null);
-  const [isFetching, setIsFetching] = useState(hasQuery(initialFilters) && !initialResultsResolved);
+  const [isFetching, setIsFetching] = useState(hasActiveFilters(initialFilters) && !initialResultsResolved);
   const [displayKey, setDisplayKey] = useState(initialResultsResolved ? buildSearchParams(initialFilters).toString() : "");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
-  const [submitCount, setSubmitCount] = useState(0);
+  const [submitCount, setSubmitCount] = useState(hasActiveFilters(initialFilters) && !initialResultsResolved ? 1 : 0);
   const [awaitingManualSubmit, setAwaitingManualSubmit] = useState(false);
+  const [page, setPage] = useState(1);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(buildSearchParams(initialFilters).toString());
   const lastResolvedFiltersRef = useRef(initialFilters);
@@ -296,7 +306,7 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
   };
 
   const submitSearch = () => {
-    if (!hasQuery(filters)) {
+    if (!hasActiveFilters(filters)) {
       return;
     }
 
@@ -342,7 +352,7 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
 
       abortRef.current?.abort();
 
-      if (!hasQuery(filters)) {
+      if (!hasActiveFilters(filters)) {
         setItems([]);
         setError(null);
         setDisplayKey(nextKey);
@@ -434,14 +444,28 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
   }, [displayKey, filters, pathname, router, submitCount]);
 
   const activeQuery = filters.q.trim();
+  const totalPages = Math.max(1, Math.ceil(items.length / itemResultsPerPage));
+  const visiblePage = Math.min(page, totalPages);
+  const pagedItems = items.slice((visiblePage - 1) * itemResultsPerPage, visiblePage * itemResultsPerPage);
   const hasShortQuery = activeQuery.length > 0 && activeQuery.length < itemSearchAutoQueryMinLength;
-  const showResults = activeQuery.length > 0 || isFetching || displayKey.includes("q=");
+  const draftKey = buildSearchParams(filters).toString();
+  const showResults = hasActiveFilters(filters) || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && items.length === 0 ? "Loading items" : `${items.length} matching items`) : "Results";
-  const statusLabel = error ? error : isFetching ? "Refreshing results..." : "Search updates automatically";
+  const statusLabel = error ? error : isFetching ? "Refreshing results..." : draftKey === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
   const resolvedTiming =
     resolutionMeta && resolutionMeta.key === displayKey && !isFetching
       ? `Loaded in ${formatDuration(resolutionMeta.durationMs)}${resolutionMeta.source === "cache" ? " from cache" : ""}`
       : null;
+
+  useEffect(() => {
+    setPage(1);
+  }, [displayKey]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   return (
     <>
@@ -503,8 +527,11 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
             onChange={(value) => setFilter("tradeable", value)}
             options={["true", "false"]}
           />
-          <div className="flex items-end">
-            <Button type="button" variant="outline" className="w-full" onClick={clearFilters}>
+          <div className="flex items-end gap-3 md:col-span-2 xl:col-span-4">
+            <Button type="button" className="w-full sm:w-auto" onClick={submitSearch}>
+              Search
+            </Button>
+            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={clearFilters}>
               Clear filters
             </Button>
           </div>
@@ -513,31 +540,46 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
 
       <SectionCard title={resultTitle} className={frameClassName}>
         {showResults && items.length > 0 ? (
-          <SimpleTable
-            columns={["Icon", "Item", "Type", "AC", "HP", "Mana", "Damage", "Delay", "Item ID"]}
-            rows={items.map((item) => [
-              <ItemIcon key={`${item.id}-icon`} icon={item.icon} name={item.name} size="sm" />,
-              <Link
-                key={item.id}
-                href={`/items/${item.id}`}
-                className="font-medium text-[#f1e8d6] underline decoration-[#c9a772]/0 underline-offset-2 transition hover:text-[#fff5e2] hover:decoration-[#c9a772]/70"
-              >
-                {item.name}
-              </Link>,
-              item.type,
-              item.ac || "—",
-              item.hp || "—",
-              item.mana || "—",
-              item.damage || "—",
-              item.delay || "—",
-              item.id
-            ])}
-          />
+          <>
+            <SimpleTable
+              columns={["Icon", "Item", "Type", "AC", "HP", "Mana", "Damage", "Delay", "Item ID"]}
+              rows={pagedItems.map((item) => [
+                <ItemIcon key={`${item.id}-icon`} icon={item.icon} name={item.name} size="sm" />,
+                <Link
+                  key={item.id}
+                  href={`/items/${item.id}`}
+                  className="font-medium text-[#f1e8d6] underline decoration-[#c9a772]/0 underline-offset-2 transition hover:text-[#fff5e2] hover:decoration-[#c9a772]/70"
+                >
+                  {item.name}
+                </Link>,
+                item.type,
+                item.ac || "—",
+                item.hp || "—",
+                item.mana || "—",
+                item.damage || "—",
+                item.delay || "—",
+                item.id
+              ])}
+            />
+            <PaginationControls
+              currentPage={visiblePage}
+              totalPages={totalPages}
+              totalItems={items.length}
+              pageSize={itemResultsPerPage}
+              onPageChange={setPage}
+            />
+          </>
         ) : showResults ? (
           isFetching ? (
             <ClassLoadingIndicator detail="Summoning item records from the archive." message="Loading matching items..." />
-          ) : awaitingManualSubmit && hasShortQuery ? (
-            <SearchPrompt message={`Type ${itemSearchAutoQueryMinLength}+ characters to auto-search, or press Enter to search now.`} />
+          ) : awaitingManualSubmit ? (
+            <SearchPrompt
+              message={
+                hasShortQuery
+                  ? `Type ${itemSearchAutoQueryMinLength}+ characters to auto-search, or press Search to run now.`
+                  : "Press Search to apply these filters."
+              }
+            />
           ) : (
             <SearchPrompt message="No items matched this search." />
           )

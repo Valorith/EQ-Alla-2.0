@@ -74,6 +74,7 @@ export type SpellSummary = {
   name: string;
   icon: string;
   classes: string[];
+  className: string;
   classLevel: string;
   level: number;
   skill: string;
@@ -83,11 +84,24 @@ export type SpellSummary = {
 };
 
 export type SpellDetail = SpellSummary & {
-  mana: number;
-  target: string;
+  description: string;
+  classLevels: Array<{ className: string; level: number }>;
+  messages: Array<{ label: string; text: string }>;
+  castTime: string;
+  recoveryTime: string;
+  recastTime: string;
+  range: string;
   duration: string;
   resist: string;
-  description: string;
+  resistAdjust: number;
+  interruptible: boolean;
+  hateGenerated: number;
+  aoeRange: number;
+  aoeMaxTargets: number;
+  aoeDuration: string;
+  reagents: Array<{ id: number; name: string; count: number; href: string }>;
+  effects: Array<{ slot: number; text: string }>;
+  itemSources: Array<{ id: number; name: string; href: string; icon: string }>;
 };
 
 export type NpcSummary = {
@@ -101,14 +115,28 @@ export type NpcSummary = {
 };
 
 export type NpcDetail = NpcSummary & {
-  klass: string;
+  fullName: string;
   hp: number;
+  mana: number;
   damage: string;
   faction: string;
-  spells: Array<{ id: number; name: string; href: string }>;
-  drops: Array<{ id: number; name: string; href: string }>;
-  sells: Array<{ id: number; name: string; href: string }>;
+  mainFaction: { id: number; name: string; href: string } | null;
+  attackSpeed: string;
+  specialAttacks: string[];
+  spells: Array<{ id: number; name: string; href: string; type: string; icon: string }>;
+  drops: Array<{
+    lootdropId: number;
+    probability: number;
+    multiplier: number;
+    items: Array<{ id: number; name: string; href: string; type: string; icon: string; chance: number; globalChance: number }>;
+  }>;
+  sells: Array<{ id: number; name: string; href: string; icon: string; price: string }>;
   spawnGroups: Array<{ id: number; name: string; href: string }>;
+  spawnZones: Array<{ shortName: string; longName: string; href: string }>;
+  factionHits: {
+    lowers: Array<{ id: number; name: string; href: string; value: number }>;
+    raises: Array<{ id: number; name: string; href: string; value: number }>;
+  };
 };
 
 export type ZoneSummary = {

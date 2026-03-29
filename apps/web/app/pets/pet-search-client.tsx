@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import type { PetSummary } from "@eq-alla/data";
 import { Button } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
-import { SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../components/catalog-shell";
+import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../components/catalog-shell";
 import { SpellIcon } from "../../components/spell-icon";
 
 type PetSearchClientProps = {
@@ -25,7 +25,7 @@ type PetCacheEntry = {
   touchedAt: number;
 };
 
-const petSearchDebounceMs = 300;
+const petResultsPerPage = 20;
 const petSearchCacheTtlMs = 180_000;
 const petSearchCacheMaxEntries = 12;
 const petSearchSessionStorageKey = "eq-pet-search-cache";
@@ -122,7 +122,8 @@ export function PetSearchClient({ initialClassName }: PetSearchClientProps) {
   const [isFetching, setIsFetching] = useState(hasQuery(initialClassName));
   const [displayKey, setDisplayKey] = useState("");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
-  const [submitCount, setSubmitCount] = useState(0);
+  const [submitCount, setSubmitCount] = useState(hasQuery(initialClassName) ? 1 : 0);
+  const [page, setPage] = useState(1);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(buildSearchKey(initialClassName));
   const lastHandledSubmitRef = useRef(0);
@@ -146,85 +147,113 @@ export function PetSearchClient({ initialClassName }: PetSearchClientProps) {
   };
 
   useEffect(() => {
-    const isForcedSearch = submitCount !== lastHandledSubmitRef.current;
-    const timer = window.setTimeout(() => {
-      if (isForcedSearch) lastHandledSubmitRef.current = submitCount;
-      const nextKey = buildSearchKey(className);
-      const nextHref = nextKey ? `${pathname}?class=${encodeURIComponent(nextKey)}` : pathname;
-      if (nextKey !== currentUrlKeyRef.current) {
-        currentUrlKeyRef.current = nextKey;
-        startTransition(() => router.replace(nextHref, { scroll: false }));
-      }
-      if (nextKey === displayKey && !isForcedSearch) return;
+    if (submitCount === 0 || submitCount === lastHandledSubmitRef.current) {
+      return;
+    }
 
-      abortRef.current?.abort();
+    lastHandledSubmitRef.current = submitCount;
+    const nextKey = buildSearchKey(className);
+    const nextHref = nextKey ? `${pathname}?class=${encodeURIComponent(nextKey)}` : pathname;
+    if (nextKey !== currentUrlKeyRef.current) {
+      currentUrlKeyRef.current = nextKey;
+      startTransition(() => router.replace(nextHref, { scroll: false }));
+    }
 
-      if (!nextKey) {
-        setResults([]);
-        setError(null);
-        setDisplayKey(nextKey);
-        setIsFetching(false);
-        setResolutionMeta(null);
-        return;
-      }
+    abortRef.current?.abort();
 
-      const startedAt = performance.now();
-      const cached = getCachedPets(nextKey);
-      if (cached) {
-        setResults(cached);
-        setDisplayKey(nextKey);
-        setError(null);
-        setIsFetching(false);
-        setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "cache" });
-        return;
-      }
-
-      const controller = new AbortController();
-      abortRef.current = controller;
-      setIsFetching(true);
+    if (!nextKey) {
+      setResults([]);
       setError(null);
+      setDisplayKey(nextKey);
+      setIsFetching(false);
+      setResolutionMeta(null);
+      return;
+    }
 
-      void (async () => {
-        try {
-          const response = await fetch(`/api/pets?class=${encodeURIComponent(nextKey)}`, { signal: controller.signal });
-          if (!response.ok) throw new Error(`Search failed with ${response.status}`);
-          const payload = (await response.json()) as { data?: PetSummary[] };
-          if (controller.signal.aborted) return;
-          setResults(payload.data ?? []);
-          setDisplayKey(nextKey);
-          setCachedPets(nextKey, payload.data ?? []);
-          setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "network" });
-        } catch (searchError) {
-          if (controller.signal.aborted) return;
-          console.error(searchError);
-          setError("Could not refresh pet results. Showing the last successful search.");
-        } finally {
-          if (abortRef.current === controller) {
-            abortRef.current = null;
-            setIsFetching(false);
-          }
+    const startedAt = performance.now();
+    const cached = getCachedPets(nextKey);
+    if (cached) {
+      setResults(cached);
+      setDisplayKey(nextKey);
+      setError(null);
+      setIsFetching(false);
+      setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "cache" });
+      return;
+    }
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setIsFetching(true);
+    setError(null);
+
+    void (async () => {
+      try {
+        const response = await fetch(`/api/pets?class=${encodeURIComponent(nextKey)}`, { signal: controller.signal });
+        if (!response.ok) throw new Error(`Search failed with ${response.status}`);
+        const payload = (await response.json()) as { data?: PetSummary[] };
+        if (controller.signal.aborted) return;
+        setResults(payload.data ?? []);
+        setDisplayKey(nextKey);
+        setCachedPets(nextKey, payload.data ?? []);
+        setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "network" });
+      } catch (searchError) {
+        if (controller.signal.aborted) return;
+        console.error(searchError);
+        setError("Could not refresh pet results. Showing the last successful search.");
+      } finally {
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+          setIsFetching(false);
         }
-      })();
-    }, hasQuery(className) ? (submitCount === 0 ? petSearchDebounceMs : 0) : 0);
+      }
+    })();
+  }, [className, pathname, router, submitCount]);
 
-    return () => window.clearTimeout(timer);
-  }, [className, displayKey, pathname, router, submitCount]);
+  const resetSearch = () => {
+    abortRef.current?.abort();
+    setClassName("");
+    setResults([]);
+    setError(null);
+    setDisplayKey("");
+    setIsFetching(false);
+    setResolutionMeta(null);
+    setPage(1);
+    currentUrlKeyRef.current = "";
+    startTransition(() => router.replace(pathname, { scroll: false }));
+  };
 
   const showResults = hasQuery(className) || isFetching || displayKey.length > 0;
+  const totalPages = Math.max(1, Math.ceil(results.length / petResultsPerPage));
+  const visiblePage = Math.min(page, totalPages);
+  const pagedResults = results.slice((visiblePage - 1) * petResultsPerPage, visiblePage * petResultsPerPage);
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading pets" : `${results.length} pets`) : "Results";
-  const statusLabel = error ? error : isFetching ? "Refreshing results..." : "Search updates automatically";
+  const draftKey = buildSearchKey(className);
+  const statusLabel = error ? error : isFetching ? "Refreshing results..." : draftKey === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
   const resolvedTiming =
     resolutionMeta && resolutionMeta.key === displayKey && !isFetching
       ? `Loaded in ${formatDuration(resolutionMeta.durationMs)}${resolutionMeta.source === "cache" ? " from cache" : ""}`
       : null;
 
+  useEffect(() => {
+    setPage(1);
+  }, [displayKey]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
   return (
     <>
       <SectionCard title="Choose a class" right={<p className="text-xs font-medium text-[#ccb594]">{statusLabel}</p>}>
-        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
           <SelectField label="Class" name="class" value={className} onChange={setClassName} options={petClassOptions} />
-          <div className="flex items-end">
-            <Button type="button" variant="outline" className="w-full" onClick={() => setClassName("")}>
+          <div className="flex items-end gap-3">
+            <Button type="button" className="w-full sm:w-auto" onClick={submitSearch}>
+              Search
+            </Button>
+            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={resetSearch}>
               Clear
             </Button>
           </div>
@@ -232,27 +261,36 @@ export function PetSearchClient({ initialClassName }: PetSearchClientProps) {
       </SectionCard>
       <SectionCard title={resultTitle}>
         {showResults && results.length > 0 ? (
-          <SimpleTable
-            columns={["Level", "Icon", "Spell name", "Details", "Race", "Pet level", "Pet class", "HP", "Mana", "AC", "Min damage", "Max damage"]}
-            rows={results.map((pet) => [
-              pet.spellLevel,
-              <SpellIcon key={`${pet.id}-icon`} icon={pet.spellIcon} name={pet.spellName} />,
-              <Link key={`${pet.id}-spell`} href={`/spells/${pet.spellId}`} className="font-medium hover:underline">
-                {pet.spellName}
-              </Link>,
-              <Link key={`${pet.id}-detail`} href={`/pets/${pet.id}`} className="font-medium hover:underline">
-                View
-              </Link>,
-              pet.race,
-              pet.petLevel,
-              pet.petClass,
-              pet.hp,
-              pet.mana,
-              pet.ac,
-              pet.minDamage,
-              pet.maxDamage
-            ])}
-          />
+          <>
+            <SimpleTable
+              columns={["Level", "Icon", "Spell name", "Details", "Race", "Pet level", "Pet class", "HP", "Mana", "AC", "Min damage", "Max damage"]}
+              rows={pagedResults.map((pet) => [
+                pet.spellLevel,
+                <SpellIcon key={`${pet.id}-icon`} icon={pet.spellIcon} name={pet.spellName} />,
+                <Link key={`${pet.id}-spell`} href={`/spells/${pet.spellId}`} className="font-medium hover:underline">
+                  {pet.spellName}
+                </Link>,
+                <Link key={`${pet.id}-detail`} href={`/pets/${pet.id}`} className="font-medium hover:underline">
+                  View
+                </Link>,
+                pet.race,
+                pet.petLevel,
+                pet.petClass,
+                pet.hp,
+                pet.mana,
+                pet.ac,
+                pet.minDamage,
+                pet.maxDamage
+              ])}
+            />
+            <PaginationControls
+              currentPage={visiblePage}
+              totalPages={totalPages}
+              totalItems={results.length}
+              pageSize={petResultsPerPage}
+              onPageChange={setPage}
+            />
+          </>
         ) : showResults ? (
           isFetching ? (
             <ClassLoadingIndicator message="Loading pets" detail="Calling companions and familiars to the roster." />

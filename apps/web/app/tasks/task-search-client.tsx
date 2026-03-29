@@ -4,9 +4,9 @@ import Link from "next/link";
 import { startTransition, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { TaskDetail } from "@eq-alla/data";
-import { Input } from "@eq-alla/ui";
+import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
-import { SearchPrompt, SectionCard, SimpleTable } from "../../components/catalog-shell";
+import { PaginationControls, SearchPrompt, SectionCard, SimpleTable } from "../../components/catalog-shell";
 
 type TaskSearchClientProps = {
   initialQuery: string;
@@ -26,6 +26,7 @@ type TaskCacheEntry = {
 
 const taskSearchDebounceMs = 500;
 const taskSearchAutoQueryMinLength = 3;
+const taskResultsPerPage = 20;
 const taskSearchCacheTtlMs = 180_000;
 const taskSearchCacheMaxEntries = 12;
 const taskSearchSessionStorageKey = "eq-task-search-cache";
@@ -127,6 +128,7 @@ export function TaskSearchClient({ initialQuery }: TaskSearchClientProps) {
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
   const [submitCount, setSubmitCount] = useState(0);
   const [awaitingManualSubmit, setAwaitingManualSubmit] = useState(false);
+  const [page, setPage] = useState(1);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(buildSearchKey(initialQuery));
   const lastHandledSubmitRef = useRef(0);
@@ -227,6 +229,9 @@ export function TaskSearchClient({ initialQuery }: TaskSearchClientProps) {
   }, [displayKey, pathname, query, router, submitCount]);
 
   const activeQuery = buildSearchKey(query);
+  const totalPages = Math.max(1, Math.ceil(results.length / taskResultsPerPage));
+  const visiblePage = Math.min(page, totalPages);
+  const pagedResults = results.slice((visiblePage - 1) * taskResultsPerPage, visiblePage * taskResultsPerPage);
   const hasShortQuery = activeQuery.length > 0 && activeQuery.length < taskSearchAutoQueryMinLength;
   const showResults = activeQuery.length > 0 || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading tasks" : `${results.length} tasks`) : "Results";
@@ -235,6 +240,16 @@ export function TaskSearchClient({ initialQuery }: TaskSearchClientProps) {
     resolutionMeta && resolutionMeta.key === displayKey && !isFetching
       ? `Loaded in ${formatDuration(resolutionMeta.durationMs)}${resolutionMeta.source === "cache" ? " from cache" : ""}`
       : null;
+
+  useEffect(() => {
+    setPage(1);
+  }, [displayKey]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   return (
     <>
@@ -253,24 +268,33 @@ export function TaskSearchClient({ initialQuery }: TaskSearchClientProps) {
             }}
             placeholder="Ledger..."
           />
-          <button type="button" onClick={submitSearch} className="h-11 rounded-full bg-[var(--accent)] px-5 text-sm font-medium text-[var(--accent-foreground)]">
+          <Button type="button" onClick={submitSearch}>
             Search
-          </button>
+          </Button>
         </div>
       </SectionCard>
       <SectionCard title={resultTitle}>
         {showResults && results.length > 0 ? (
-          <SimpleTable
-            columns={["Task", "Zone", "Levels", "Reward"]}
-            rows={results.map((task) => [
-              <Link key={task.id} href={`/tasks/${task.id}`} className="font-medium hover:underline">
-                {task.title}
-              </Link>,
-              task.zone.longName,
-              task.levelRange,
-              task.reward
-            ])}
-          />
+          <>
+            <SimpleTable
+              columns={["Task", "Zone", "Levels", "Reward"]}
+              rows={pagedResults.map((task) => [
+                <Link key={task.id} href={`/tasks/${task.id}`} className="font-medium hover:underline">
+                  {task.title}
+                </Link>,
+                task.zone.longName,
+                task.levelRange,
+                task.reward
+              ])}
+            />
+            <PaginationControls
+              currentPage={visiblePage}
+              totalPages={totalPages}
+              totalItems={results.length}
+              pageSize={taskResultsPerPage}
+              onPageChange={setPage}
+            />
+          </>
         ) : showResults ? (
           isFetching ? (
             <ClassLoadingIndicator message="Loading tasks" detail="Reviewing quests, zones, and rewards." />

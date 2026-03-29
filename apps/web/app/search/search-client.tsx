@@ -4,9 +4,9 @@ import Link from "next/link";
 import { startTransition, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { SearchHit } from "@eq-alla/data";
-import { Input } from "@eq-alla/ui";
+import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
-import { SearchPrompt, SectionCard } from "../../components/catalog-shell";
+import { PaginationControls, SearchPrompt, SectionCard } from "../../components/catalog-shell";
 import { ItemIcon } from "../../components/item-icon";
 import { SpellIcon } from "../../components/spell-icon";
 
@@ -31,6 +31,7 @@ const globalSearchAutoQueryMinLength = 3;
 const searchCacheTtlMs = 180_000;
 const searchCacheMaxEntries = 12;
 const searchSessionStorageKey = "eq-global-search-cache";
+const globalSearchResultsPerPage = 12;
 
 const searchResultCache = new Map<string, SearchCacheEntry>();
 let searchCacheHydrated = false;
@@ -177,6 +178,7 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
   const [submitCount, setSubmitCount] = useState(0);
   const [awaitingManualSubmit, setAwaitingManualSubmit] = useState(false);
   const [activeType, setActiveType] = useState<SearchHit["type"] | null>(null);
+  const [page, setPage] = useState(1);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(buildSearchKey(initialQuery));
   const lastHandledSubmitRef = useRef(0);
@@ -328,6 +330,9 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
     .filter((entry) => entry.hits.length > 0);
   const visibleType = groupedHits.some((entry) => entry.type === activeType) ? activeType : groupedHits[0]?.type ?? null;
   const visibleHits = groupedHits.find((entry) => entry.type === visibleType)?.hits ?? [];
+  const totalPages = Math.max(1, Math.ceil(visibleHits.length / globalSearchResultsPerPage));
+  const visiblePage = Math.min(page, totalPages);
+  const pagedVisibleHits = visibleHits.slice((visiblePage - 1) * globalSearchResultsPerPage, visiblePage * globalSearchResultsPerPage);
   const hasShortQuery = activeQuery.length > 0 && activeQuery.length < globalSearchAutoQueryMinLength;
   const showResults = activeQuery.length > 0 || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && hits.length === 0 ? "Loading matches" : `${hits.length} matches`) : "Results";
@@ -347,6 +352,16 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
     }
   }, [groupedHits, visibleType]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [displayKey, visibleType]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
   return (
     <>
       <SectionCard title="Query" right={<p className="text-xs font-medium text-[#ccb594]">{statusLabel}</p>}>
@@ -364,13 +379,9 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
             }}
             placeholder="Search for zones, NPCs, items..."
           />
-          <button
-            type="button"
-            onClick={submitSearch}
-            className="h-11 rounded-full bg-[var(--accent)] px-5 text-sm font-medium text-[var(--accent-foreground)]"
-          >
+          <Button type="button" onClick={submitSearch}>
             Search
-          </button>
+          </Button>
         </div>
       </SectionCard>
 
@@ -396,7 +407,7 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
 
             <div className="rounded-2xl border border-[#7b603b]/20 bg-[linear-gradient(180deg,rgba(35,30,27,0.86),rgba(18,20,24,0.84))] px-4 py-4 shadow-[0_18px_44px_rgba(0,0,0,0.24)] backdrop-blur-md">
               <ul className="space-y-2">
-                {visibleHits.map((hit) => (
+                {pagedVisibleHits.map((hit) => (
                   <li key={hit.href} className="text-left text-sm text-[#e8dfcf]">
                     <Link href={hit.href} className="inline-flex items-center gap-2 font-medium hover:underline">
                       {hit.type === "item" && hit.icon ? <ItemIcon icon={hit.icon} name={hit.title} size="xs" /> : null}
@@ -412,6 +423,13 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
                 ))}
               </ul>
             </div>
+            <PaginationControls
+              currentPage={visiblePage}
+              totalPages={totalPages}
+              totalItems={visibleHits.length}
+              pageSize={globalSearchResultsPerPage}
+              onPageChange={setPage}
+            />
           </div>
         ) : showResults ? (
           isFetching ? (

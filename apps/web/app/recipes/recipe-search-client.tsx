@@ -4,9 +4,9 @@ import Link from "next/link";
 import { startTransition, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { RecipeSummary } from "@eq-alla/data";
-import { Input } from "@eq-alla/ui";
+import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
-import { SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../components/catalog-shell";
+import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../components/catalog-shell";
 
 type RecipeSearchClientProps = {
   initialQuery: string;
@@ -36,6 +36,7 @@ type RecipeCacheEntry = {
 
 const recipeSearchDebounceMs = 500;
 const recipeSearchAutoQueryMinLength = 3;
+const recipeResultsPerPage = 25;
 const recipeSearchCacheTtlMs = 180_000;
 const recipeSearchCacheMaxEntries = 12;
 const recipeSearchSessionStorageKey = "eq-recipe-search-cache";
@@ -59,9 +60,6 @@ function hasQuery(filters: RecipeFilters) {
 }
 
 function hasAutoSearchableQuery(filters: RecipeFilters) {
-  if (filters.q.trim().length === 0) {
-    return hasQuery(filters);
-  }
   return filters.q.trim().length >= recipeSearchAutoQueryMinLength;
 }
 
@@ -152,8 +150,11 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
   );
   const [displayKey, setDisplayKey] = useState("");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
-  const [submitCount, setSubmitCount] = useState(0);
+  const [submitCount, setSubmitCount] = useState(
+    hasQuery({ q: initialQuery, tradeskill: initialTradeskill, minTrivial: initialMinTrivial, maxTrivial: initialMaxTrivial }) ? 1 : 0
+  );
   const [awaitingManualSubmit, setAwaitingManualSubmit] = useState(false);
+  const [page, setPage] = useState(1);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(
     buildSearchParams({ q: initialQuery, tradeskill: initialTradeskill, minTrivial: initialMinTrivial, maxTrivial: initialMaxTrivial }).toString()
@@ -180,6 +181,15 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
   const submitSearch = () => {
     if (!hasQuery(filters)) return;
     setSubmitCount((current) => current + 1);
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      q: "",
+      tradeskill: "",
+      minTrivial: "",
+      maxTrivial: ""
+    });
   };
 
   useEffect(() => {
@@ -260,14 +270,27 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
   }, [displayKey, filters, pathname, router, submitCount]);
 
   const activeQuery = filters.q.trim();
+  const totalPages = Math.max(1, Math.ceil(results.length / recipeResultsPerPage));
+  const visiblePage = Math.min(page, totalPages);
+  const pagedResults = results.slice((visiblePage - 1) * recipeResultsPerPage, visiblePage * recipeResultsPerPage);
   const hasShortQuery = activeQuery.length > 0 && activeQuery.length < recipeSearchAutoQueryMinLength;
   const showResults = hasQuery(filters) || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading recipes" : `${results.length} recipes`) : "Results";
-  const statusLabel = error ? error : isFetching ? "Refreshing results..." : "Search updates automatically";
+  const statusLabel = error ? error : isFetching ? "Refreshing results..." : buildSearchParams(filters).toString() === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
   const resolvedTiming =
     resolutionMeta && resolutionMeta.key === displayKey && !isFetching
       ? `Loaded in ${formatDuration(resolutionMeta.durationMs)}${resolutionMeta.source === "cache" ? " from cache" : ""}`
       : null;
+
+  useEffect(() => {
+    setPage(1);
+  }, [displayKey]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   return (
     <>
@@ -304,26 +327,49 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
             <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">Max trivial skill</span>
             <Input name="maxTrivial" value={filters.maxTrivial} onChange={(event) => setFilter("maxTrivial", event.target.value)} placeholder="0" />
           </label>
+          <div className="flex items-end gap-3 md:col-span-2 xl:col-span-4">
+            <Button type="button" className="w-full sm:w-auto" onClick={submitSearch}>
+              Search
+            </Button>
+            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={clearFilters}>
+              Clear filters
+            </Button>
+          </div>
         </div>
       </SectionCard>
       <SectionCard title={resultTitle}>
         {showResults && results.length > 0 ? (
-          <SimpleTable
-            columns={["Recipe", "Recipe ID", "Tradeskill", "Trivial at skill level"]}
-            rows={results.map((recipe) => [
-              <Link key={recipe.id} href={`/recipes/${recipe.id}`} className="font-medium hover:underline">
-                {recipe.name}
-              </Link>,
-              recipe.id,
-              recipe.tradeskill,
-              recipe.trivial
-            ])}
-          />
+          <>
+            <SimpleTable
+              columns={["Recipe", "Recipe ID", "Tradeskill", "Trivial at skill level"]}
+              rows={pagedResults.map((recipe) => [
+                <Link key={recipe.id} href={`/recipes/${recipe.id}`} className="font-medium hover:underline">
+                  {recipe.name}
+                </Link>,
+                recipe.id,
+                recipe.tradeskill,
+                recipe.trivial
+              ])}
+            />
+            <PaginationControls
+              currentPage={visiblePage}
+              totalPages={totalPages}
+              totalItems={results.length}
+              pageSize={recipeResultsPerPage}
+              onPageChange={setPage}
+            />
+          </>
         ) : showResults ? (
           isFetching ? (
             <ClassLoadingIndicator message="Loading recipes" detail="Sifting ingredients, trivials, and results." />
-          ) : awaitingManualSubmit && hasShortQuery ? (
-            <SearchPrompt message={`Type ${recipeSearchAutoQueryMinLength}+ characters to auto-search, or press Enter to search now.`} />
+          ) : awaitingManualSubmit ? (
+            <SearchPrompt
+              message={
+                hasShortQuery
+                  ? `Type ${recipeSearchAutoQueryMinLength}+ characters to auto-search, or press Search to run now.`
+                  : "Press Search to apply these filters."
+              }
+            />
           ) : (
             <SearchPrompt message="No recipes matched this search." />
           )

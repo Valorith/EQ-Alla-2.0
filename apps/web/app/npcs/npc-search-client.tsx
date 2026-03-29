@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import type { NpcSummary } from "@eq-alla/data";
 import { Input, Button } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
-import { SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../components/catalog-shell";
+import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../components/catalog-shell";
 
 type NpcSearchClientProps = {
   mode: "basic" | "advanced";
@@ -45,6 +45,7 @@ type NpcCacheEntry = {
 
 const npcSearchDebounceMs = 500;
 const npcSearchAutoQueryMinLength = 3;
+const npcResultsPerPage = 25;
 const npcSearchCacheTtlMs = 180_000;
 const npcSearchCacheMaxEntries = 12;
 const npcSearchSessionStorageKey = "eq-npc-search-cache";
@@ -67,8 +68,16 @@ function buildSearchParams(filters: NpcFilters, mode: "basic" | "advanced") {
   return params;
 }
 
-function hasQuery(filters: NpcFilters) {
-  return filters.q.trim().length > 0;
+function hasActiveFilters(filters: NpcFilters) {
+  return (
+    filters.q.trim().length > 0 ||
+    filters.zone.length > 0 ||
+    filters.race.length > 0 ||
+    filters.minLevel.length > 0 ||
+    filters.maxLevel.length > 0 ||
+    filters.named.length > 0 ||
+    filters.showLevel.length > 0
+  );
 }
 
 function hasAutoSearchableQuery(filters: NpcFilters) {
@@ -152,11 +161,12 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
   const [filters, setFilters] = useState<NpcFilters>(initialFilters);
   const [results, setResults] = useState<NpcSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [isFetching, setIsFetching] = useState(hasQuery(initialFilters));
+  const [isFetching, setIsFetching] = useState(hasActiveFilters(initialFilters));
   const [displayKey, setDisplayKey] = useState("");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
-  const [submitCount, setSubmitCount] = useState(0);
+  const [submitCount, setSubmitCount] = useState(hasActiveFilters(initialFilters) ? 1 : 0);
   const [awaitingManualSubmit, setAwaitingManualSubmit] = useState(false);
+  const [page, setPage] = useState(1);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(buildSearchParams(initialFilters, mode).toString());
   const lastHandledSubmitRef = useRef(0);
@@ -179,7 +189,7 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
   };
 
   const submitSearch = () => {
-    if (!hasQuery(filters)) return;
+    if (!hasActiveFilters(filters)) return;
     setSubmitCount((current) => current + 1);
   };
 
@@ -209,7 +219,7 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
 
       abortRef.current?.abort();
 
-      if (!hasQuery(filters)) {
+      if (!hasActiveFilters(filters)) {
         setResults([]);
         setError(null);
         setDisplayKey(nextKey);
@@ -273,14 +283,28 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
   }, [displayKey, filters, mode, pathname, router, submitCount]);
 
   const activeQuery = filters.q.trim();
+  const totalPages = Math.max(1, Math.ceil(results.length / npcResultsPerPage));
+  const visiblePage = Math.min(page, totalPages);
+  const pagedResults = results.slice((visiblePage - 1) * npcResultsPerPage, visiblePage * npcResultsPerPage);
   const hasShortQuery = activeQuery.length > 0 && activeQuery.length < npcSearchAutoQueryMinLength;
-  const showResults = activeQuery.length > 0 || isFetching || displayKey.includes(mode === "advanced" ? "name=" : "q=");
+  const draftKey = buildSearchParams(filters, mode).toString();
+  const showResults = hasActiveFilters(filters) || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading NPCs" : `${results.length} ${mode === "advanced" ? "matches" : "matching NPCs"}`) : "Results";
-  const statusLabel = error ? error : isFetching ? "Refreshing results..." : "Search updates automatically";
+  const statusLabel = error ? error : isFetching ? "Refreshing results..." : draftKey === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
   const resolvedTiming =
     resolutionMeta && resolutionMeta.key === displayKey && !isFetching
       ? `Loaded in ${formatDuration(resolutionMeta.durationMs)}${resolutionMeta.source === "cache" ? " from cache" : ""}`
       : null;
+
+  useEffect(() => {
+    setPage(1);
+  }, [displayKey]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   return (
     <>
@@ -325,8 +349,11 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
               <SelectField label="Show level" name="showLevel" value={filters.showLevel} onChange={(value) => setFilter("showLevel", value)} options={["true"]} />
             </>
           )}
-          <div className="flex items-end">
-            <Button type="button" variant="outline" className="w-full" onClick={clearFilters}>
+          <div className="flex items-end gap-3 md:col-span-2 xl:col-span-4">
+            <Button type="button" className="w-full sm:w-auto" onClick={submitSearch}>
+              Search
+            </Button>
+            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={clearFilters}>
               Clear filters
             </Button>
           </div>
@@ -334,29 +361,44 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
       </SectionCard>
       <SectionCard title={resultTitle}>
         {showResults && results.length > 0 ? (
-          <SimpleTable
-            columns={mode === "advanced" && filters.showLevel ? ["Name", "Level"] : mode === "advanced" ? ["Name"] : ["Name", "NPC ID"]}
-            rows={results.map((npc) =>
-              mode === "advanced"
-                ? [
-                    <Link key={npc.id} href={`/npcs/${npc.id}`} className="font-medium hover:underline">
-                      {npc.name}
-                    </Link>,
-                    ...(filters.showLevel ? [npc.level] : [])
-                  ]
-                : [
-                    <Link key={npc.id} href={`/npcs/${npc.id}`} className="font-medium hover:underline">
-                      {npc.name}
-                    </Link>,
-                    npc.id
-                  ]
-            )}
-          />
+          <>
+            <SimpleTable
+              columns={mode === "advanced" && filters.showLevel ? ["Name", "Level"] : mode === "advanced" ? ["Name"] : ["Name", "NPC ID"]}
+              rows={pagedResults.map((npc) =>
+                mode === "advanced"
+                  ? [
+                      <Link key={npc.id} href={`/npcs/${npc.id}`} className="font-medium hover:underline">
+                        {npc.name}
+                      </Link>,
+                      ...(filters.showLevel ? [npc.level] : [])
+                    ]
+                  : [
+                      <Link key={npc.id} href={`/npcs/${npc.id}`} className="font-medium hover:underline">
+                        {npc.name}
+                      </Link>,
+                      npc.id
+                    ]
+              )}
+            />
+            <PaginationControls
+              currentPage={visiblePage}
+              totalPages={totalPages}
+              totalItems={results.length}
+              pageSize={npcResultsPerPage}
+              onPageChange={setPage}
+            />
+          </>
         ) : showResults ? (
           isFetching ? (
             <ClassLoadingIndicator message="Loading NPCs" detail="Checking spawns, zones, and named flags." />
-          ) : awaitingManualSubmit && hasShortQuery ? (
-            <SearchPrompt message={`Type ${npcSearchAutoQueryMinLength}+ characters to auto-search, or press Enter to search now.`} />
+          ) : awaitingManualSubmit ? (
+            <SearchPrompt
+              message={
+                hasShortQuery
+                  ? `Type ${npcSearchAutoQueryMinLength}+ characters to auto-search, or press Search to run now.`
+                  : "Press Search to apply these filters."
+              }
+            />
           ) : (
             <SearchPrompt message="No NPCs matched this search." />
           )

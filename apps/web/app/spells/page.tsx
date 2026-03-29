@@ -10,11 +10,12 @@ export default async function SpellsPage({ searchParams }: SpellsPageProps) {
   const q = typeof params.q === "string" ? params.q : "";
   const className = typeof params.class === "string" ? params.class : "";
   const level = typeof params.level === "string" ? params.level : "";
+  const levelMode = params.levelMode === "min" || params.levelMode === "max" || params.levelMode === "exact" ? params.levelMode : "exact";
 
   return (
     <>
       <PageHero eyebrow="Spells" title="Spell Search" description="Browse spell data with class, level, and role-oriented filters." />
-      <SpellSearchClient initialQuery={q} initialClassName={className} initialLevel={level} />
+      <SpellSearchClient initialQuery={q} initialClassName={className} initialLevel={level} initialLevelMode={levelMode} />
     </>
   );
 }

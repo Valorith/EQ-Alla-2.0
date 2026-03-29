@@ -6,7 +6,9 @@ export async function GET(request: Request) {
   const q = searchParams.get("q") ?? undefined;
   const className = searchParams.get("class") ?? undefined;
   const level = searchParams.get("level") ? Number(searchParams.get("level")) : undefined;
-  const data = await listSpells({ q, className, level });
+  const levelModeParam = searchParams.get("levelMode");
+  const levelMode = levelModeParam === "min" || levelModeParam === "max" || levelModeParam === "exact" ? levelModeParam : undefined;
+  const data = await listSpells({ q, className, level, levelMode });
 
   return NextResponse.json(
     { data },

@@ -2,6 +2,7 @@ import { cacheGet, cacheGetOrResolve } from "./cache";
 import { getDb } from "./db";
 import { useMockData } from "./env";
 import { factions, items, npcs, pets, recipes, spells, spawnGroups, tasks, zones } from "./mock-data";
+import { getSpellEffectName, summarizeSpellEffects } from "./spell-effects";
 import { sql } from "kysely";
 import type {
   CatalogStats,
@@ -236,7 +237,8 @@ const spellSkillNames: Record<number, string> = {
   5: "Alteration",
   14: "Evocation",
   18: "Conjuration",
-  24: "Divination"
+  24: "Divination",
+  98: "Combat Ability"
 };
 
 const resistNames: Record<number, string> = {
@@ -254,13 +256,36 @@ const resistNames: Record<number, string> = {
 
 const targetNames: Record<number, string> = {
   1: "Line of sight",
-  2: "Caster",
-  3: "Group",
-  4: "Point blank AE",
-  5: "Single",
-  6: "Self",
-  8: "Targeted AE",
-  14: "Pet"
+  2: "Area of effect over the caster",
+  3: "Group teleport",
+  4: "Area of effect around the caster",
+  5: "Single target",
+  6: "Self only",
+  8: "Area of effect around the target",
+  9: "Animal",
+  10: "Undead only",
+  11: "Summoned beings",
+  14: "Caster's pet",
+  15: "Target's corpse",
+  16: "Plant",
+  17: "Giant",
+  18: "Dragon",
+  24: "Area of effect on undeads",
+  36: "Area - PC only",
+  40: "Friendly area of effect",
+  41: "Group"
+};
+
+const spellTypeNames: Record<number, string> = {
+  1: "Nuke",
+  2: "Heal",
+  4: "Root",
+  8: "Buff",
+  16: "Escape",
+  32: "Pet",
+  64: "Lifetap",
+  128: "Snare",
+  256: "Dot"
 };
 
 const tradeskillNames: Record<number, string> = {
@@ -464,6 +489,50 @@ function formatItemType(itemClass: number | null | undefined, itemType: number |
   return itemTypes[itemType ?? -1] ?? "Item";
 }
 
+function formatDetailedItemType(itemType: number | null | undefined) {
+  const itemTypes: Record<number, string> = {
+    0: "1HS",
+    1: "2HS",
+    2: "Piercing",
+    3: "1HB",
+    4: "2HB",
+    5: "Archery",
+    7: "Throwing range items",
+    8: "Shield",
+    10: "Armor",
+    11: "Gems",
+    14: "Food",
+    15: "Drink",
+    17: "Combinable",
+    18: "Bandages",
+    19: "Throwing",
+    20: "Scroll",
+    21: "Potion",
+    23: "Wind Instrument",
+    24: "Stringed Instrument",
+    25: "Brass Instrument",
+    26: "Percussion Instrument",
+    27: "Arrow",
+    29: "Jewelry",
+    30: "Skull",
+    31: "Tome",
+    32: "Note",
+    33: "Key",
+    34: "Coin",
+    35: "2H Piercing",
+    36: "Fishing Pole",
+    37: "Fishing Bait",
+    38: "Alcohol",
+    40: "Compass",
+    42: "Poison",
+    45: "Martial",
+    52: "Charm",
+    54: "Augmentation"
+  };
+
+  return itemTypes[itemType ?? -1] ?? "Item";
+}
+
 function formatExpansion(expansion: number | null | undefined) {
   return expansionNames[expansion ?? 0] ?? `Expansion ${expansion ?? 0}`;
 }
@@ -608,6 +677,282 @@ function includesFolded(value: string, query?: string) {
 function numberFromLevelRange(level: string) {
   const digits = level.match(/\d+/g);
   return digits ? Number(digits[0]) : 0;
+}
+
+function formatSeconds(seconds: number) {
+  if (seconds <= 0) {
+    return "Instant";
+  }
+
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds - hours * 3600) / 60);
+  const remainingSeconds = seconds - hours * 3600 - minutes * 60;
+
+  const parts: string[] = [];
+  if (hours > 0) parts.push(hours === 1 ? "1 hour" : `${hours} hours`);
+  if (minutes > 0) parts.push(`${minutes} min`);
+  if (remainingSeconds > 0) parts.push(`${remainingSeconds} sec`);
+
+  return parts.join(" ");
+}
+
+function formatMilliseconds(value: number | null | undefined) {
+  const seconds = Number(value ?? 0) / 1000;
+  if (seconds <= 0) {
+    return "0 sec";
+  }
+
+  return Number.isInteger(seconds) ? `${seconds} sec` : `${seconds.toFixed(1)} sec`;
+}
+
+function calculateBuffDuration(level: number, formula: number, duration: number) {
+  switch (formula) {
+    case 0:
+      return 0;
+    case 1:
+    case 6: {
+      const value = Math.ceil(level / 2);
+      return Math.min(Math.max(value, 1), duration);
+    }
+    case 2: {
+      const value = Math.ceil((duration / 5) * 3);
+      return Math.min(Math.max(value, 1), duration);
+    }
+    case 3: {
+      const value = level * 30;
+      return Math.min(Math.max(value, 1), duration);
+    }
+    case 4:
+    case 11:
+    case 12:
+      return duration;
+    case 5:
+      return Math.min(Math.max(duration, 1), 3);
+    case 7: {
+      const value = level;
+      return Math.min(Math.max(value, 1), duration);
+    }
+    case 8: {
+      const value = level + 10;
+      return Math.min(Math.max(value, 1), duration);
+    }
+    case 9: {
+      const value = level * 2 + 10;
+      return Math.min(Math.max(value, 1), duration);
+    }
+    case 10: {
+      const value = level * 3 + 10;
+      return Math.min(Math.max(value, 1), duration);
+    }
+    case 50:
+      return 72000;
+    case 3600:
+      return duration || 3600;
+    default:
+      return duration;
+  }
+}
+
+function formatSpellDuration(row: Record<string, unknown>, minimumLevel: number) {
+  const duration = calculateBuffDuration(
+    minimumLevel,
+    Number(row.buffdurationformula ?? 0),
+    Number(row.buffduration ?? 0)
+  );
+
+  if (duration === 0) {
+    return "Instant";
+  }
+
+  return `${formatSeconds(duration * 6)} (${duration} ticks)`;
+}
+
+function formatNumericEffectLabel(label: string, value: number) {
+  if (value === 0) {
+    return label;
+  }
+
+  let nextLabel = label;
+  if (label.includes("In/Decrease")) {
+    nextLabel = label.replace("In/Decrease", value < 0 ? "Decrease" : "Increase");
+  } else if (label.startsWith("Increase") && value < 0) {
+    nextLabel = label.replace("Increase", "Decrease");
+  } else if (label.startsWith("Decrease") && value < 0) {
+    nextLabel = label.replace("Decrease", "Increase");
+  }
+
+  return `${nextLabel} by ${Math.abs(value)}`;
+}
+
+function describeSpellEffectSlot(row: Record<string, unknown>, slot: number) {
+  const effectId = Number(row[`effectid${slot}`] ?? 254);
+  if (!Number.isFinite(effectId) || effectId === 10 || effectId === 254) {
+    return undefined;
+  }
+
+  const label = getSpellEffectName(effectId);
+  const base = Number(row[`effect_base_value${slot}`] ?? 0);
+  const limit = Number(row[`effect_limit_value${slot}`] ?? 0);
+  const max = Number(row[`max${slot}`] ?? 0);
+  const teleportZone = normalizeText(String(row.teleport_zone ?? "")) ?? "";
+
+  switch (effectId) {
+    case 21:
+      return `${label} (${Math.abs(base) / 1000} sec)`;
+    case 22:
+    case 23:
+    case 31:
+      return max > 0 ? `${label} up to level ${max}` : label;
+    case 33:
+    case 71:
+    case 106:
+    case 108:
+    case 113:
+    case 152:
+      return teleportZone ? `${label} ${teleportZone}` : label;
+    case 81:
+      return base !== 0 ? `${label} and restore ${Math.abs(base)}% experience` : label;
+    case 83:
+    case 88:
+    case 145:
+      return teleportZone ? `${label} ${teleportZone}` : label;
+    case 85:
+    case 289:
+    case 323:
+      return base > 0 ? `${label} spell ${base}` : label;
+    case 91:
+      return Math.abs(base || max) > 0 ? `${label} (max level ${Math.abs(base || max)})` : label;
+    case 136: {
+      const targetId = Math.abs(base || limit || max);
+      return targetId > 0 ? `${label} (${formatTarget(targetId)})` : label;
+    }
+    case 139:
+      return Math.abs(base) > 0 ? `${label} spell ${Math.abs(base)}` : label;
+    case 140:
+      return Math.abs(base) > 0 ? `${label} (${Math.abs(base) * 6} sec)` : label;
+    default:
+      if (base !== 0) {
+        return formatNumericEffectLabel(label, base);
+      }
+      if (limit !== 0) {
+        return `${label} (${limit})`;
+      }
+      if (max !== 0) {
+        return `${label} (${max})`;
+      }
+      return label;
+  }
+}
+
+function describeSpellEffects(row: Record<string, unknown>) {
+  const effects: Array<{ slot: number; text: string }> = [];
+
+  for (let slot = 1; slot <= 12; slot += 1) {
+    const text = describeSpellEffectSlot(row, slot);
+    if (text) {
+      effects.push({ slot, text });
+    }
+  }
+
+  return effects;
+}
+
+function formatNpcSpellType(type: number | null | undefined) {
+  return spellTypeNames[type ?? -1] ?? `Type ${type ?? 0}`;
+}
+
+function formatCoinString(price: number | null | undefined) {
+  const parts = formatCoinValue(price);
+  const formatted = [
+    parts.pp > 0 ? `${parts.pp}p` : "",
+    parts.gp > 0 ? `${parts.gp}g` : "",
+    parts.sp > 0 ? `${parts.sp}s` : "",
+    parts.cp > 0 ? `${parts.cp}c` : ""
+  ].filter(Boolean);
+
+  return formatted.join(" ") || "0c";
+}
+
+function formatAttackSpeed(attackSpeed: number | null | undefined) {
+  const value = Number(attackSpeed ?? 0);
+  return value === 0 ? "Normal (100%)" : `${100 + value}%`;
+}
+
+function decodeNpcSpecialAttacks(raw: string | null | undefined) {
+  const names: Record<string, string> = {
+    A: "Immune to melee",
+    B: "Immune to magic",
+    C: "Uncharmable",
+    D: "Unfearable",
+    E: "Enrage",
+    F: "Flurry",
+    f: "Immune to fleeing",
+    I: "Unsnarable",
+    M: "Unmezzable",
+    N: "Unstunable",
+    O: "Immune to melee except bane",
+    Q: "Quadruple Attack",
+    R: "Rampage",
+    S: "Summon",
+    T: "Triple Attack",
+    U: "Unslowable",
+    W: "Immune to melee except magical"
+  };
+
+  return [...new Set(String(raw ?? "").split("").map((flag) => names[flag]).filter(Boolean))];
+}
+
+function buildSpellDetailFallback(id: number): SpellDetail | undefined {
+  const spell = spells.find((entry) => entry.id === id);
+  if (!spell) return undefined;
+
+  return {
+    ...spell,
+    description: `${spell.skill} spell`,
+    classLevels: spell.classes.map((className, index) => ({ className, level: index === 0 ? spell.level : spell.level })),
+    messages: [],
+    castTime: "0 sec",
+    recoveryTime: "0 sec",
+    recastTime: "0 sec",
+    range: "Unknown",
+    duration: "Instant",
+    resist: "Unknown",
+    resistAdjust: 0,
+    interruptible: true,
+    hateGenerated: 0,
+    aoeRange: 0,
+    aoeMaxTargets: 0,
+    aoeDuration: "Instant",
+    reagents: [],
+    effects: spell.effect ? [{ slot: 1, text: spell.effect }] : [],
+    itemSources: []
+  };
+}
+
+function buildNpcDetailFallback(id: number): NpcDetail | undefined {
+  const npc = npcs.find((entry) => entry.id === id);
+  if (!npc) return undefined;
+
+  return {
+    ...npc,
+    fullName: npc.name,
+    hp: 0,
+    mana: 0,
+    damage: "0 to 0",
+    faction: "Unknown",
+    mainFaction: null,
+    attackSpeed: "Normal (100%)",
+    specialAttacks: [],
+    spells: [],
+    drops: [],
+    sells: [],
+    spawnGroups: [],
+    spawnZones: npc.zone && npc.zone !== "Unknown" ? [{ shortName: npc.zone, longName: npc.zone, href: "#" }] : [],
+    factionHits: {
+      lowers: [],
+      raises: []
+    }
+  };
 }
 
 async function spellNamesById(ids: number[]) {
@@ -773,6 +1118,7 @@ function summarizeSpells(): SpellSummary[] {
     name,
     icon,
     classes,
+    className: classes[0] ?? "Unknown",
     classLevel,
     level,
     skill,
@@ -780,6 +1126,20 @@ function summarizeSpells(): SpellSummary[] {
     mana,
     target
   }));
+}
+
+function sortSpellResults(results: SpellSummary[], filters: SpellFilters) {
+  const sorted = [...results];
+
+  sorted.sort((left, right) => {
+    if (filters.className && left.level !== right.level) {
+      return left.level - right.level;
+    }
+
+    return left.name.localeCompare(right.name);
+  });
+
+  return sorted;
 }
 
 function summarizeNpcs(): NpcSummary[] {
@@ -1332,16 +1692,55 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
 
 export async function listSpells(filters: SpellFilters = {}) {
   return withDatabaseFallback(async () => {
+    const clauses = [];
+    const classId = classIdFromName(filters.className);
+
+    if (filters.q) {
+      clauses.push(sql`
+        (
+          name like ${like(filters.q)}
+          or cast_on_you like ${like(filters.q)}
+          or cast_on_other like ${like(filters.q)}
+          or you_cast like ${like(filters.q)}
+          or spell_fades like ${like(filters.q)}
+        )
+      `);
+    }
+
+    if (classId > 0) {
+      const classColumn = sql.raw(`classes${classId}`);
+      clauses.push(sql`${classColumn} > 0 and ${classColumn} < 255`);
+
+      if (filters.level) {
+        if (filters.levelMode === "min") clauses.push(sql`${classColumn} >= ${filters.level}`);
+        else if (filters.levelMode === "max") clauses.push(sql`${classColumn} <= ${filters.level}`);
+        else clauses.push(sql`${classColumn} = ${filters.level}`);
+      }
+    } else if (filters.level) {
+      const levelClauses = classNames.map((_, index) => {
+        const classColumn = sql.raw(`classes${index + 1}`);
+        if (filters.levelMode === "min") return sql`(${classColumn} >= ${filters.level} and ${classColumn} < 255)`;
+        if (filters.levelMode === "max") return sql`(${classColumn} > 0 and ${classColumn} <= ${filters.level})`;
+        return sql`${classColumn} = ${filters.level}`;
+      });
+
+      clauses.push(sql`(${sql.join(levelClauses, sql` or `)})`);
+    }
+
+    const whereClause = clauses.length > 0 ? sql`where ${sql.join(clauses, sql` and `)}` : sql``;
+    const orderByClause = classId > 0 ? sql`order by ${sql.raw(`classes${classId}`)} asc, name asc` : sql`order by name asc`;
+
     const rows = await sql<Record<string, unknown>>`
-      select id, name, new_icon, skill, effectid1, cast_on_you, mana, targettype, classes1, classes2, classes3, classes4, classes5, classes6, classes7, classes8,
+      select id, name, new_icon, skill, effectid1, effectid2, effectid3, effectid4, effectid5, effectid6, effectid7, effectid8, effectid9, effectid10, effectid11, effectid12,
+             cast_on_you, cast_on_other, you_cast, spell_fades, mana, targettype, classes1, classes2, classes3, classes4, classes5, classes6, classes7, classes8,
              classes9, classes10, classes11, classes12, classes13, classes14, classes15, classes16
       from spells_new
-      where name like ${like(filters.q)}
-      order by name asc
-      limit 100
+      ${whereClause}
+      ${orderByClause}
+      limit 5000
     `.execute(db!);
 
-    return rows.rows
+    const results = rows.rows
       .map((row) => {
         const classes = spellClassesFromRow(row);
         const primaryClass =
@@ -1351,10 +1750,11 @@ export async function listSpells(filters: SpellFilters = {}) {
           name: String(row.name),
           icon: String(row.new_icon ?? 0),
           classes: classes.map((entry) => entry.klass),
+          className: primaryClass?.klass ?? "Unknown",
           classLevel: primaryClass ? `${primaryClass.klass} ${primaryClass.level}` : "Unknown",
           level: primaryClass?.level ?? Math.min(...classes.map((entry) => entry.level), 255),
           skill: formatSpellSkill(Number(row.skill ?? 0)),
-          effect: String(row.cast_on_you || `Effect ${Number(row.effectid1 ?? 0)}`),
+          effect: summarizeSpellEffects(row),
           mana: Number(row.mana ?? 0),
           target: formatTarget(Number(row.targettype ?? 0))
         };
@@ -1368,22 +1768,53 @@ export async function listSpells(filters: SpellFilters = {}) {
         }
         return true;
       });
-  }, () => summarizeSpells().filter((spell) => {
-    if (!includesFolded(spell.name, filters.q)) return false;
-    if (filters.className && !spell.classes.some((klass) => includesFolded(klass, filters.className))) return false;
-    if (filters.level) {
-      if (filters.levelMode === "min" && spell.level < filters.level) return false;
-      else if (filters.levelMode === "max" && spell.level > filters.level) return false;
-      else if ((!filters.levelMode || filters.levelMode === "exact") && spell.level !== filters.level) return false;
-    }
-    return true;
-  }));
+    return sortSpellResults(results, filters);
+  }, () => {
+    const results = spells
+      .filter((spell) => {
+        if (!includesFolded(spell.name, filters.q) && !includesFolded(spell.effect, filters.q) && !includesFolded(spell.description, filters.q)) {
+          return false;
+        }
+        if (filters.className && !spell.classes.some((klass) => includesFolded(klass, filters.className))) return false;
+        if (filters.level) {
+          if (filters.levelMode === "min" && spell.level < filters.level) return false;
+          else if (filters.levelMode === "max" && spell.level > filters.level) return false;
+          else if ((!filters.levelMode || filters.levelMode === "exact") && spell.level !== filters.level) return false;
+        }
+        return true;
+      })
+      .map((spell) => ({
+        id: spell.id,
+        name: spell.name,
+        icon: spell.icon,
+        classes: spell.classes,
+        className: filters.className && spell.classes.some((klass) => includesFolded(klass, filters.className)) ? filters.className : spell.classes[0] ?? "Unknown",
+        classLevel: spell.classLevel,
+        level: spell.level,
+        skill: spell.skill,
+        effect: spell.effect,
+        mana: spell.mana,
+        target: spell.target
+      }));
+
+    return sortSpellResults(results, filters);
+  });
 }
 
 export async function getSpellDetail(id: number): Promise<SpellDetail | undefined> {
   return withDatabaseFallback(async () => {
     const result = await sql<Record<string, unknown>>`
-      select id, name, new_icon, skill, effectid1, mana, targettype, buffduration, resisttype, cast_on_you,
+      select id, name, new_icon, skill, teleport_zone, mana, targettype, resisttype, cast_on_you, cast_on_other, you_cast, other_casts, spell_fades,
+             cast_time, recovery_time, recast_time, \`range\`, aoerange, aemaxtargets, AEDuration, buffdurationformula, buffduration,
+             uninterruptable, ResistDiff, HateAdded, bonushate,
+             components1, component_counts1, components2, component_counts2, components3, component_counts3, components4, component_counts4,
+             effectid1, effectid2, effectid3, effectid4, effectid5, effectid6, effectid7, effectid8, effectid9, effectid10, effectid11, effectid12,
+             effect_base_value1, effect_base_value2, effect_base_value3, effect_base_value4, effect_base_value5, effect_base_value6,
+             effect_base_value7, effect_base_value8, effect_base_value9, effect_base_value10, effect_base_value11, effect_base_value12,
+             effect_limit_value1, effect_limit_value2, effect_limit_value3, effect_limit_value4, effect_limit_value5, effect_limit_value6,
+             effect_limit_value7, effect_limit_value8, effect_limit_value9, effect_limit_value10, effect_limit_value11, effect_limit_value12,
+             max1, max2, max3, max4, max5, max6, max7, max8, max9, max10, max11, max12,
+             formula1, formula2, formula3, formula4, formula5, formula6, formula7, formula8, formula9, formula10, formula11, formula12,
              classes1, classes2, classes3, classes4, classes5, classes6, classes7, classes8,
              classes9, classes10, classes11, classes12, classes13, classes14, classes15, classes16
       from spells_new
@@ -1395,22 +1826,86 @@ export async function getSpellDetail(id: number): Promise<SpellDetail | undefine
     if (!row) return undefined;
 
     const classes = spellClassesFromRow(row);
+    const minimumLevel = classes.length > 0 ? Math.min(...classes.map((entry) => entry.level)) : 70;
+    const componentIds = Array.from(
+      new Set(
+        Array.from({ length: 4 }, (_, index) => Number(row[`components${index + 1}`] ?? 0)).filter((componentId) => componentId > 0)
+      )
+    );
+    const [componentResult, itemSourceResult] = await Promise.all([
+      componentIds.length > 0
+        ? sql<{ id: number; name: string }>`
+            select id, Name as name
+            from items
+            where id in (${sql.join(componentIds)})
+          `.execute(db!)
+        : Promise.resolve({ rows: [] as Array<{ id: number; name: string }> }),
+      sql<{ id: number; name: string; icon: number }>`
+        select id, Name as name, icon
+        from items
+        where scrolleffect = ${id}
+        order by Name asc
+      `.execute(db!)
+    ]);
+
+    const componentNames = new Map(componentResult.rows.map((entry) => [entry.id, entry.name]));
+    const messages = [
+      { label: "When you cast", text: normalizeText(String(row.you_cast ?? "")) },
+      { label: "When others cast", text: normalizeText(String(row.other_casts ?? "")) },
+      { label: "When cast on you", text: normalizeText(String(row.cast_on_you ?? "")) },
+      { label: "When cast on other", text: normalizeText(String(row.cast_on_other ?? "")) },
+      { label: "When fading", text: normalizeText(String(row.spell_fades ?? "")) }
+    ].filter((entry): entry is { label: string; text: string } => Boolean(entry.text));
+
     return {
       id: Number(row.id),
       name: String(row.name),
       icon: String(row.new_icon ?? 0),
       classes: classes.map((entry) => entry.klass),
-      classLevel: classes[0] ? `${classes[0].klass} ${classes[0].level}` : "Unknown",
-      level: Math.min(...classes.map((entry) => entry.level), 255),
+      className: classes[0]?.klass ?? "NPC",
+      classLevel: classes[0] ? `${classes[0].klass} ${classes[0].level}` : "NPC only",
+      level: classes.length > 0 ? Math.min(...classes.map((entry) => entry.level)) : 0,
       skill: formatSpellSkill(Number(row.skill ?? 0)),
-      effect: String(row.cast_on_you || `Effect ${Number(row.effectid1 ?? 0)}`),
+      effect: summarizeSpellEffects(row),
       mana: Number(row.mana ?? 0),
       target: formatTarget(Number(row.targettype ?? 0)),
-      duration: Number(row.buffduration ?? 0) > 0 ? `${row.buffduration} ticks` : "Instant",
+      description: messages[0]?.text ?? `${formatSpellSkill(Number(row.skill ?? 0))} spell`,
+      classLevels: classes.map((entry) => ({ className: entry.klass, level: entry.level })),
+      messages,
+      castTime: formatMilliseconds(Number(row.cast_time ?? 0)),
+      recoveryTime: formatMilliseconds(Number(row.recovery_time ?? 0)),
+      recastTime: formatMilliseconds(Number(row.recast_time ?? 0)),
+      range: Number(row.range ?? 0) > 0 ? String(row.range) : "0",
+      duration: formatSpellDuration(row, minimumLevel),
       resist: formatResist(Number(row.resisttype ?? 255)),
-      description: String(row.cast_on_you || `Spell effect ${row.effectid1 ?? 0}`)
+      resistAdjust: Number(row.ResistDiff ?? 0),
+      interruptible: Number(row.uninterruptable ?? 0) === 0,
+      hateGenerated: Number(row.HateAdded ?? 0) + Number(row.bonushate ?? 0),
+      aoeRange: Number(row.aoerange ?? 0),
+      aoeMaxTargets: Number(row.aemaxtargets ?? 0),
+      aoeDuration: Number(row.AEDuration ?? 0) >= 1000 ? formatMilliseconds(Number(row.AEDuration ?? 0)) : "Instant",
+      reagents: Array.from({ length: 4 }, (_, index) => {
+        const reagentId = Number(row[`components${index + 1}`] ?? 0);
+        if (reagentId <= 0) {
+          return undefined;
+        }
+
+        return {
+          id: reagentId,
+          name: componentNames.get(reagentId) ?? `Item ${reagentId}`,
+          count: Number(row[`component_counts${index + 1}`] ?? 1),
+          href: `/items/${reagentId}`
+        };
+      }).filter((entry): entry is { id: number; name: string; count: number; href: string } => Boolean(entry)),
+      effects: describeSpellEffects(row),
+      itemSources: itemSourceResult.rows.map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        href: `/items/${entry.id}`,
+        icon: String(entry.icon ?? 0)
+      }))
     };
-  }, () => spells.find((spell) => spell.id === id));
+  }, () => buildSpellDetailFallback(id));
 }
 
 export async function listNpcs(filters: NpcFilters = {}) {
@@ -1421,7 +1916,11 @@ export async function listNpcs(filters: NpcFilters = {}) {
       left join spawnentry se on se.npcID = nt.id
       left join spawngroup sg on sg.id = se.spawngroupID
       left join spawn2 s2 on s2.spawngroupID = sg.id
-      left join zone z on z.short_name = s2.zone and z.version = s2.version
+      left join (
+        select short_name, min(long_name) as long_name
+        from zone
+        group by short_name
+      ) z on z.short_name = s2.zone
       where nt.name like ${like(filters.q)}
       group by nt.id, nt.name, nt.race, nt.level, nt.class
       order by nt.level desc, nt.name asc
@@ -1463,39 +1962,208 @@ export async function listNpcs(filters: NpcFilters = {}) {
 
 export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
   return withDatabaseFallback(async () => {
-    const result = await sql<{ id: number; name: string; race: number; level: number; class: number; hp: number; mindmg: number; maxdmg: number; npc_faction_id: number | null; zone_name: string | null }>`
-      select nt.id, nt.name, nt.race, nt.level, nt.class, nt.hp, nt.mindmg, nt.maxdmg, nt.npc_faction_id, min(z.long_name) as zone_name
+    const result = await sql<{
+      id: number;
+      name: string;
+      lastname: string | null;
+      race: number;
+      level: number;
+      class: number;
+      hp: number;
+      mana: number;
+      mindmg: number;
+      maxdmg: number;
+      npc_faction_id: number | null;
+      npc_spells_id: number | null;
+      loottable_id: number | null;
+      merchant_id: number | null;
+      npcspecialattks: string | null;
+      attack_speed: number | null;
+      zone_name: string | null;
+      primary_faction_id: number | null;
+      primary_faction_name: string | null;
+    }>`
+      select nt.id, nt.name, nt.lastname, nt.race, nt.level, nt.class, nt.hp, nt.mana, nt.mindmg, nt.maxdmg,
+             nt.npc_faction_id, nt.npc_spells_id, nt.loottable_id, nt.merchant_id, nt.npcspecialattks, nt.attack_speed,
+             min(z.long_name) as zone_name, fl.id as primary_faction_id, fl.name as primary_faction_name
       from npc_types nt
+      left join npc_faction nf on nf.id = nt.npc_faction_id
+      left join faction_list fl on fl.id = nf.primaryfaction
       left join spawnentry se on se.npcID = nt.id
       left join spawngroup sg on sg.id = se.spawngroupID
       left join spawn2 s2 on s2.spawngroupID = sg.id
-      left join zone z on z.short_name = s2.zone and z.version = s2.version
+      left join (
+        select short_name, min(long_name) as long_name
+        from zone
+        group by short_name
+      ) z on z.short_name = s2.zone
       where nt.id = ${id}
-      group by nt.id, nt.name, nt.race, nt.level, nt.class, nt.hp, nt.mindmg, nt.maxdmg, nt.npc_faction_id
+      group by nt.id, nt.name, nt.lastname, nt.race, nt.level, nt.class, nt.hp, nt.mana, nt.mindmg, nt.maxdmg,
+               nt.npc_faction_id, nt.npc_spells_id, nt.loottable_id, nt.merchant_id, nt.npcspecialattks, nt.attack_speed,
+               fl.id, fl.name
     `.execute(db!);
 
     const row = result.rows[0];
 
     if (!row) return undefined;
 
+    const [spellRows, dropRows, sellRows, spawnZoneRows, factionRows] = await Promise.all([
+      row.npc_spells_id
+        ? sql<{ spellid: number; type: number; name: string; new_icon: number }>`
+            select nse.spellid, nse.type, s.name, s.new_icon
+            from npc_spells_entries nse
+            join spells_new s on s.id = nse.spellid
+            where nse.npc_spells_id = ${row.npc_spells_id}
+              and nse.minlevel <= ${row.level}
+              and nse.maxlevel >= ${row.level}
+            order by nse.priority desc, s.name asc
+          `.execute(db!)
+        : Promise.resolve({ rows: [] as Array<{ spellid: number; type: number; name: string; new_icon: number }> }),
+      row.loottable_id
+        ? sql<{
+            lootdrop_id: number;
+            probability: number;
+            multiplier: number;
+            item_id: number;
+            chance: number;
+            name: string;
+            itemtype: number;
+            icon: number;
+          }>`
+            select lte.lootdrop_id, lte.probability, lte.multiplier, lde.item_id, lde.chance,
+                   i.Name as name, i.itemtype, i.icon
+            from loottable_entries lte
+            join lootdrop_entries lde on lde.lootdrop_id = lte.lootdrop_id
+            join items i on i.id = lde.item_id
+            where lte.loottable_id = ${row.loottable_id}
+            order by lte.lootdrop_id asc, i.Name asc
+          `.execute(db!)
+        : Promise.resolve({
+            rows: [] as Array<{
+              lootdrop_id: number;
+              probability: number;
+              multiplier: number;
+              item_id: number;
+              chance: number;
+              name: string;
+              itemtype: number;
+              icon: number;
+            }>
+          }),
+      row.merchant_id
+        ? sql<{ id: number; name: string; icon: number; price: number; ldonprice: number }>`
+            select i.id, i.Name as name, i.icon, i.price, i.ldonprice
+            from merchantlist ml
+            join items i on i.id = ml.item
+            where ml.merchantid = ${row.merchant_id}
+            order by ml.slot asc
+          `.execute(db!)
+        : Promise.resolve({ rows: [] as Array<{ id: number; name: string; icon: number; price: number; ldonprice: number }> }),
+      sql<{ short_name: string; long_name: string | null }>`
+        select distinct s2.zone as short_name, z.long_name
+        from spawnentry se
+        join spawngroup sg on sg.id = se.spawngroupID
+        join spawn2 s2 on s2.spawngroupID = sg.id
+        left join (
+          select short_name, min(long_name) as long_name
+          from zone
+          group by short_name
+        ) z on z.short_name = s2.zone
+        where se.npcID = ${id}
+        order by short_name asc
+      `.execute(db!),
+      row.npc_faction_id
+        ? sql<{ id: number; name: string; value: number }>`
+            select fl.id, fl.name, nfe.value
+            from npc_faction_entries nfe
+            join faction_list fl on fl.id = nfe.faction_id
+            where nfe.npc_faction_id = ${row.npc_faction_id}
+            order by nfe.value desc, fl.name asc
+          `.execute(db!)
+        : Promise.resolve({ rows: [] as Array<{ id: number; name: string; value: number }> })
+    ]);
+
+    const dropGroups = new Map<
+      number,
+      {
+        lootdropId: number;
+        probability: number;
+        multiplier: number;
+        items: Array<{ id: number; name: string; href: string; type: string; icon: string; chance: number; globalChance: number }>;
+      }
+    >();
+
+    for (const entry of dropRows.rows) {
+      if (!dropGroups.has(entry.lootdrop_id)) {
+        dropGroups.set(entry.lootdrop_id, {
+          lootdropId: entry.lootdrop_id,
+          probability: Number(entry.probability ?? 0),
+          multiplier: Number(entry.multiplier ?? 1),
+          items: []
+        });
+      }
+
+      dropGroups.get(entry.lootdrop_id)?.items.push({
+        id: entry.item_id,
+        name: entry.name,
+        href: `/items/${entry.item_id}`,
+        type: formatDetailedItemType(entry.itemtype),
+        icon: String(entry.icon ?? 0),
+        chance: Number(entry.chance ?? 0),
+        globalChance: (Number(entry.chance ?? 0) * Number(entry.probability ?? 0)) / 100
+      });
+    }
+
     const detail: NpcDetail = {
       id: row.id,
       name: formatNpcName(row.name),
+      fullName: [formatNpcName(row.name), normalizeText(row.lastname ?? "")].filter(Boolean).join(" "),
       race: formatRace(row.race),
       level: String(row.level),
       zone: row.zone_name ?? "Unknown",
       named: isNamedNpcName(row.name),
       klass: formatNpcClass(row.class),
       hp: Number(row.hp ?? 0),
+      mana: Number(row.mana ?? 0),
       damage: `${row.mindmg ?? 0} - ${row.maxdmg ?? 0}`,
-      faction: row.npc_faction_id ? `Faction ${row.npc_faction_id}` : "Unknown",
-      spells: [],
-      drops: [],
-      sells: [],
-      spawnGroups: []
+      faction: row.primary_faction_name ?? "Unknown",
+      mainFaction: row.primary_faction_id && row.primary_faction_name
+        ? { id: row.primary_faction_id, name: row.primary_faction_name, href: `/factions/${row.primary_faction_id}` }
+        : null,
+      attackSpeed: formatAttackSpeed(row.attack_speed),
+      specialAttacks: decodeNpcSpecialAttacks(row.npcspecialattks),
+      spells: spellRows.rows.map((entry) => ({
+        id: entry.spellid,
+        name: String(entry.name),
+        href: `/spells/${entry.spellid}`,
+        type: formatNpcSpellType(entry.type),
+        icon: String(entry.new_icon ?? 0)
+      })),
+      drops: [...dropGroups.values()],
+      sells: sellRows.rows.map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        href: `/items/${entry.id}`,
+        icon: String(entry.icon ?? 0),
+        price: row.class === 61 ? `${entry.ldonprice ?? 0} points` : formatCoinString(entry.price)
+      })),
+      spawnGroups: [],
+      spawnZones: spawnZoneRows.rows.map((entry) => ({
+        shortName: entry.short_name,
+        longName: entry.long_name ?? entry.short_name,
+        href: `/zones/${entry.short_name}`
+      })),
+      factionHits: {
+        lowers: factionRows.rows
+          .filter((entry) => Number(entry.value) < 0)
+          .map((entry) => ({ id: entry.id, name: entry.name, href: `/factions/${entry.id}`, value: Number(entry.value) })),
+        raises: factionRows.rows
+          .filter((entry) => Number(entry.value) > 0)
+          .map((entry) => ({ id: entry.id, name: entry.name, href: `/factions/${entry.id}`, value: Number(entry.value) }))
+      }
     };
     return detail;
-  }, () => npcs.find((npc) => npc.id === id));
+  }, () => buildNpcDetailFallback(id));
 }
 
 export async function listZones(filters: ZoneFilters = {}) {

@@ -4,9 +4,9 @@ import Link from "next/link";
 import { startTransition, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { FactionSummary } from "@eq-alla/data";
-import { Input } from "@eq-alla/ui";
+import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
-import { SearchPrompt, SectionCard, SimpleTable } from "../../components/catalog-shell";
+import { PaginationControls, SearchPrompt, SectionCard, SimpleTable } from "../../components/catalog-shell";
 
 type FactionSearchClientProps = {
   initialQuery: string;
@@ -26,6 +26,7 @@ type FactionCacheEntry = {
 
 const factionSearchDebounceMs = 500;
 const factionSearchAutoQueryMinLength = 3;
+const factionResultsPerPage = 25;
 const factionSearchCacheTtlMs = 180_000;
 const factionSearchCacheMaxEntries = 12;
 const factionSearchSessionStorageKey = "eq-faction-search-cache";
@@ -127,6 +128,7 @@ export function FactionSearchClient({ initialQuery }: FactionSearchClientProps) 
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
   const [submitCount, setSubmitCount] = useState(0);
   const [awaitingManualSubmit, setAwaitingManualSubmit] = useState(false);
+  const [page, setPage] = useState(1);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(buildSearchKey(initialQuery));
   const lastHandledSubmitRef = useRef(0);
@@ -229,6 +231,9 @@ export function FactionSearchClient({ initialQuery }: FactionSearchClientProps) 
   }, [displayKey, pathname, query, router, submitCount]);
 
   const activeQuery = buildSearchKey(query);
+  const totalPages = Math.max(1, Math.ceil(results.length / factionResultsPerPage));
+  const visiblePage = Math.min(page, totalPages);
+  const pagedResults = results.slice((visiblePage - 1) * factionResultsPerPage, visiblePage * factionResultsPerPage);
   const hasShortQuery = activeQuery.length > 0 && activeQuery.length < factionSearchAutoQueryMinLength;
   const showResults = activeQuery.length > 0 || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading factions" : `${results.length} factions`) : "Results";
@@ -237,6 +242,16 @@ export function FactionSearchClient({ initialQuery }: FactionSearchClientProps) 
     resolutionMeta && resolutionMeta.key === displayKey && !isFetching
       ? `Loaded in ${formatDuration(resolutionMeta.durationMs)}${resolutionMeta.source === "cache" ? " from cache" : ""}`
       : null;
+
+  useEffect(() => {
+    setPage(1);
+  }, [displayKey]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   return (
     <>
@@ -255,22 +270,31 @@ export function FactionSearchClient({ initialQuery }: FactionSearchClientProps) 
             }}
             placeholder="Mayong..."
           />
-          <button type="button" onClick={submitSearch} className="h-11 rounded-full bg-[var(--accent)] px-5 text-sm font-medium text-[var(--accent-foreground)]">
+          <Button type="button" onClick={submitSearch}>
             Search
-          </button>
+          </Button>
         </div>
       </SectionCard>
       <SectionCard title={resultTitle}>
         {showResults && results.length > 0 ? (
-          <SimpleTable
-            columns={["Name", "Faction ID"]}
-            rows={results.map((faction) => [
-              <Link key={faction.id} href={`/factions/${faction.id}`} className="font-medium hover:underline">
-                {faction.name}
-              </Link>,
-              faction.id
-            ])}
-          />
+          <>
+            <SimpleTable
+              columns={["Name", "Faction ID"]}
+              rows={pagedResults.map((faction) => [
+                <Link key={faction.id} href={`/factions/${faction.id}`} className="font-medium hover:underline">
+                  {faction.name}
+                </Link>,
+                faction.id
+              ])}
+            />
+            <PaginationControls
+              currentPage={visiblePage}
+              totalPages={totalPages}
+              totalItems={results.length}
+              pageSize={factionResultsPerPage}
+              onPageChange={setPage}
+            />
+          </>
         ) : showResults ? (
           isFetching ? (
             <ClassLoadingIndicator message="Loading factions" detail="Resolving alliances and rivalries." />

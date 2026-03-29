@@ -4,9 +4,9 @@ import Link from "next/link";
 import { startTransition, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { ZoneSummary } from "@eq-alla/data";
-import { Input } from "@eq-alla/ui";
+import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
-import { SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../components/catalog-shell";
+import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../components/catalog-shell";
 
 type ZoneSearchClientProps = {
   initialQuery: string;
@@ -32,6 +32,7 @@ type ZoneCacheEntry = {
 
 const zoneSearchDebounceMs = 500;
 const zoneSearchAutoQueryMinLength = 3;
+const zoneResultsPerPage = 20;
 const zoneSearchCacheTtlMs = 180_000;
 const zoneSearchCacheMaxEntries = 12;
 const zoneSearchSessionStorageKey = "eq-zone-search-cache";
@@ -47,8 +48,8 @@ function buildSearchParams(filters: ZoneFilters) {
   return params;
 }
 
-function hasQuery(filters: ZoneFilters) {
-  return filters.q.trim().length > 0;
+function hasActiveFilters(filters: ZoneFilters) {
+  return filters.q.trim().length > 0 || filters.era.length > 0;
 }
 
 function hasAutoSearchableQuery(filters: ZoneFilters) {
@@ -132,11 +133,12 @@ export function ZoneSearchClient({ initialQuery, initialEra }: ZoneSearchClientP
   const [filters, setFilters] = useState<ZoneFilters>({ q: initialQuery, era: initialEra });
   const [results, setResults] = useState<ZoneSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [isFetching, setIsFetching] = useState(hasQuery({ q: initialQuery, era: initialEra }));
+  const [isFetching, setIsFetching] = useState(hasActiveFilters({ q: initialQuery, era: initialEra }));
   const [displayKey, setDisplayKey] = useState("");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
-  const [submitCount, setSubmitCount] = useState(0);
+  const [submitCount, setSubmitCount] = useState(hasActiveFilters({ q: initialQuery, era: initialEra }) ? 1 : 0);
   const [awaitingManualSubmit, setAwaitingManualSubmit] = useState(false);
+  const [page, setPage] = useState(1);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(buildSearchParams({ q: initialQuery, era: initialEra }).toString());
   const lastHandledSubmitRef = useRef(0);
@@ -159,8 +161,12 @@ export function ZoneSearchClient({ initialQuery, initialEra }: ZoneSearchClientP
   };
 
   const submitSearch = () => {
-    if (!hasQuery(filters)) return;
+    if (!hasActiveFilters(filters)) return;
     setSubmitCount((current) => current + 1);
+  };
+
+  const clearFilters = () => {
+    setFilters({ q: "", era: "" });
   };
 
   useEffect(() => {
@@ -177,7 +183,7 @@ export function ZoneSearchClient({ initialQuery, initialEra }: ZoneSearchClientP
 
       abortRef.current?.abort();
 
-      if (!hasQuery(filters)) {
+      if (!hasActiveFilters(filters)) {
         setResults([]);
         setError(null);
         setDisplayKey(nextKey);
@@ -241,14 +247,28 @@ export function ZoneSearchClient({ initialQuery, initialEra }: ZoneSearchClientP
   }, [displayKey, filters, pathname, router, submitCount]);
 
   const activeQuery = filters.q.trim();
+  const totalPages = Math.max(1, Math.ceil(results.length / zoneResultsPerPage));
+  const visiblePage = Math.min(page, totalPages);
+  const pagedResults = results.slice((visiblePage - 1) * zoneResultsPerPage, visiblePage * zoneResultsPerPage);
   const hasShortQuery = activeQuery.length > 0 && activeQuery.length < zoneSearchAutoQueryMinLength;
-  const showResults = activeQuery.length > 0 || isFetching || displayKey.includes("q=");
+  const draftKey = buildSearchParams(filters).toString();
+  const showResults = hasActiveFilters(filters) || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading zones" : `${results.length} zones`) : "Results";
-  const statusLabel = error ? error : isFetching ? "Refreshing results..." : "Search updates automatically";
+  const statusLabel = error ? error : isFetching ? "Refreshing results..." : draftKey === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
   const resolvedTiming =
     resolutionMeta && resolutionMeta.key === displayKey && !isFetching
       ? `Loaded in ${formatDuration(resolutionMeta.durationMs)}${resolutionMeta.source === "cache" ? " from cache" : ""}`
       : null;
+
+  useEffect(() => {
+    setPage(1);
+  }, [displayKey]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   return (
     <>
@@ -281,26 +301,49 @@ export function ZoneSearchClient({ initialQuery, initialEra }: ZoneSearchClientP
             />
           </label>
           <SelectField label="Era" name="era" value={filters.era} onChange={(value) => setFilter("era", value)} options={["Classic", "Planes of Power"]} />
+          <div className="flex items-end gap-3 md:col-span-2 xl:col-span-4">
+            <Button type="button" className="w-full sm:w-auto" onClick={submitSearch}>
+              Search
+            </Button>
+            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={clearFilters}>
+              Clear filters
+            </Button>
+          </div>
         </div>
       </SectionCard>
       <SectionCard title={resultTitle}>
         {showResults && results.length > 0 ? (
-          <SimpleTable
-            columns={["Name", "Short name", "ID", "Spawn points"]}
-            rows={results.map((zone) => [
-              <Link key={zone.shortName} href={`/zones/${zone.shortName}`} className="font-medium hover:underline">
-                {zone.longName}
-              </Link>,
-              zone.shortName,
-              zone.id,
-              zone.spawns
-            ])}
-          />
+          <>
+            <SimpleTable
+              columns={["Name", "Short name", "ID", "Spawn points"]}
+              rows={pagedResults.map((zone) => [
+                <Link key={zone.shortName} href={`/zones/${zone.shortName}`} className="font-medium hover:underline">
+                  {zone.longName}
+                </Link>,
+                zone.shortName,
+                zone.id,
+                zone.spawns
+              ])}
+            />
+            <PaginationControls
+              currentPage={visiblePage}
+              totalPages={totalPages}
+              totalItems={results.length}
+              pageSize={zoneResultsPerPage}
+              onPageChange={setPage}
+            />
+          </>
         ) : showResults ? (
           isFetching ? (
             <ClassLoadingIndicator message="Loading zones" detail="Surveying eras, levels, and populations." />
-          ) : awaitingManualSubmit && hasShortQuery ? (
-            <SearchPrompt message={`Type ${zoneSearchAutoQueryMinLength}+ characters to auto-search, or press Enter to search now.`} />
+          ) : awaitingManualSubmit ? (
+            <SearchPrompt
+              message={
+                hasShortQuery
+                  ? `Type ${zoneSearchAutoQueryMinLength}+ characters to auto-search, or press Search to run now.`
+                  : "Press Search to apply these filters."
+              }
+            />
           ) : (
             <SearchPrompt message="No zones matched this search." />
           )

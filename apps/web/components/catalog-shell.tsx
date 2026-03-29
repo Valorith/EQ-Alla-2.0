@@ -151,6 +151,77 @@ export function SimpleTable({
   );
 }
 
+function buildPageList(currentPage: number, totalPages: number) {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  if (currentPage <= 3) {
+    return [1, 2, 3, 4, "end-gap", totalPages];
+  }
+
+  if (currentPage >= totalPages - 2) {
+    return [1, "start-gap", totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  }
+
+  return [1, "start-gap", currentPage - 1, currentPage, currentPage + 1, "end-gap", totalPages];
+}
+
+export function PaginationControls({
+  currentPage,
+  totalPages,
+  totalItems,
+  pageSize,
+  onPageChange
+}: {
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+}) {
+  if (totalItems <= pageSize || totalPages <= 1) {
+    return null;
+  }
+
+  const start = (currentPage - 1) * pageSize + 1;
+  const end = Math.min(currentPage * pageSize, totalItems);
+  const pageList = buildPageList(currentPage, totalPages);
+
+  return (
+    <div className="flex flex-col gap-3 pt-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-xs font-medium uppercase tracking-[0.16em] text-[#9f8e79]">
+        Showing {start}-{end} of {totalItems}
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="outline" onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1}>
+          Previous
+        </Button>
+        {pageList.map((entry) =>
+          typeof entry === "number" ? (
+            <Button
+              key={entry}
+              type="button"
+              variant={entry === currentPage ? "default" : "outline"}
+              onClick={() => onPageChange(entry)}
+              aria-current={entry === currentPage ? "page" : undefined}
+            >
+              {entry}
+            </Button>
+          ) : (
+            <span key={entry} className="px-1 text-sm text-[#9f8e79]">
+              ...
+            </span>
+          )
+        )}
+        <Button type="button" variant="outline" onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages}>
+          Next
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function SearchPrompt({
   message = "Enter a search term to load results."
 }: {

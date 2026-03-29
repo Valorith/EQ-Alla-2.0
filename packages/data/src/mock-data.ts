@@ -170,45 +170,105 @@ export const spells: SpellDetail[] = [
     name: "Spirit of Wolf",
     icon: "638",
     classes: ["Druid", "Shaman"],
+    className: "Druid",
     classLevel: "Druid 9",
     level: 9,
     skill: "Alteration",
     effect: "Movement speed increase",
     mana: 10,
-    target: "Single",
+    target: "Single target",
+    description: "A classic run-speed buff with long duration.",
+    classLevels: [
+      { className: "Druid", level: 9 },
+      { className: "Shaman", level: 14 }
+    ],
+    messages: [{ label: "When cast on you", text: "You feel your feet quicken." }],
+    castTime: "3 sec",
+    recoveryTime: "2.5 sec",
+    recastTime: "0 sec",
+    range: "100",
     duration: "36 min",
     resist: "Beneficial",
-    description: "A classic run-speed buff with long duration."
+    resistAdjust: 0,
+    interruptible: true,
+    hateGenerated: 0,
+    aoeRange: 0,
+    aoeMaxTargets: 0,
+    aoeDuration: "Instant",
+    reagents: [],
+    effects: [{ slot: 1, text: "Increase Movement by 45" }],
+    itemSources: []
   },
   {
     id: 2002,
     name: "Complete Heal",
     icon: "18",
     classes: ["Cleric"],
+    className: "Cleric",
     classLevel: "Cleric 39",
     level: 39,
     skill: "Alteration",
     effect: "Restores target to full health",
     mana: 400,
-    target: "Single",
+    target: "Single target",
+    description: "The defining cleric heal for group and raid play.",
+    classLevels: [{ className: "Cleric", level: 39 }],
+    messages: [{ label: "When cast on you", text: "You are completely healed." }],
+    castTime: "10 sec",
+    recoveryTime: "2.5 sec",
+    recastTime: "0 sec",
+    range: "100",
     duration: "Instant",
     resist: "Beneficial",
-    description: "The defining cleric heal for group and raid play."
+    resistAdjust: 0,
+    interruptible: true,
+    hateGenerated: 0,
+    aoeRange: 0,
+    aoeMaxTargets: 0,
+    aoeDuration: "Instant",
+    reagents: [],
+    effects: [{ slot: 1, text: "Complete Heal (with duration)" }],
+    itemSources: []
   },
   {
     id: 2003,
     name: "Archivist's Ember",
     icon: "546",
     classes: ["Wizard", "Magician"],
+    className: "Wizard",
     classLevel: "Wizard 54",
     level: 54,
     skill: "Evocation",
     effect: "Fire damage over time",
     mana: 225,
-    target: "Single",
+    target: "Single target",
+    description: "A modernized sample nuke and DoT entry used by the mock catalog.",
+    classLevels: [
+      { className: "Wizard", level: 54 },
+      { className: "Magician", level: 58 }
+    ],
+    messages: [
+      { label: "When cast on you", text: "Cinders cling to your skin." },
+      { label: "When fading", text: "The ember aura gutters out." }
+    ],
+    castTime: "4 sec",
+    recoveryTime: "2.5 sec",
+    recastTime: "6 sec",
+    range: "200",
     duration: "24 sec",
     resist: "Fire",
-    description: "A modernized sample nuke and DoT entry used by the mock catalog."
+    resistAdjust: -20,
+    interruptible: true,
+    hateGenerated: 0,
+    aoeRange: 0,
+    aoeMaxTargets: 0,
+    aoeDuration: "Instant",
+    reagents: [{ id: 1003, name: "Traveler's Restorative Draught", count: 1, href: "/items/1003" }],
+    effects: [
+      { slot: 1, text: "Decrease Hitpoints by 600" },
+      { slot: 2, text: "Decrease Fire Resist by 35" }
+    ],
+    itemSources: [{ id: 1002, name: "Midnight Archivist's Staff", href: "/items/1002", icon: "staff" }]
   }
 ];
 
@@ -234,53 +294,117 @@ export const npcs: NpcDetail[] = [
   {
     id: 3001,
     name: "a mistmoore guard",
+    fullName: "a mistmoore guard",
     race: "Dark Elf",
     level: "35 - 38",
     zone: "Castle Mistmoore",
     named: false,
     klass: "Warrior",
     hp: 9200,
+    mana: 0,
     damage: "78 - 165",
     faction: "Mayong's Retainers",
+    mainFaction: { id: 4001, name: "Mayong's Retainers", href: "/factions/4001" },
+    attackSpeed: "Normal (100%)",
+    specialAttacks: [],
     spells: [],
-    drops: [{ id: 1001, name: "Runed Mithril Bracer", href: "/items/1001" }],
+    drops: [
+      {
+        lootdropId: 1,
+        probability: 100,
+        multiplier: 1,
+        items: [
+          {
+            id: 1001,
+            name: "Runed Mithril Bracer",
+            href: "/items/1001",
+            type: "Armor",
+            icon: "bracer",
+            chance: 25,
+            globalChance: 25
+          }
+        ]
+      }
+    ],
     sells: [],
-    spawnGroups: [{ id: 7001, name: "Castle Hallway Patrol", href: "/spawngroups/7001" }]
+    spawnGroups: [{ id: 7001, name: "Castle Hallway Patrol", href: "/spawngroups/7001" }],
+    spawnZones: [{ shortName: "mistmoore", longName: "Castle Mistmoore", href: "/zones/mistmoore" }],
+    factionHits: {
+      lowers: [{ id: 4001, name: "Mayong's Retainers", href: "/factions/4001", value: -25 }],
+      raises: []
+    }
   },
   {
     id: 3002,
     name: "Matron V'Lyra",
+    fullName: "Matron V'Lyra",
     race: "Dark Elf",
     level: "52",
     zone: "Castle Mistmoore",
     named: true,
     klass: "Cleric",
     hp: 24000,
+    mana: 14000,
     damage: "160 - 260",
     faction: "Mayong's Retainers",
+    mainFaction: { id: 4001, name: "Mayong's Retainers", href: "/factions/4001" },
+    attackSpeed: "115%",
+    specialAttacks: ["Enrage"],
     spells: [
-      { id: 2002, name: "Complete Heal", href: "/spells/2002" },
-      { id: 2003, name: "Archivist's Ember", href: "/spells/2003" }
+      { id: 2002, name: "Complete Heal", href: "/spells/2002", type: "Heal", icon: "18" },
+      { id: 2003, name: "Archivist's Ember", href: "/spells/2003", type: "Dot", icon: "546" }
     ],
-    drops: [{ id: 1002, name: "Midnight Archivist's Staff", href: "/items/1002" }],
+    drops: [
+      {
+        lootdropId: 2,
+        probability: 100,
+        multiplier: 1,
+        items: [
+          {
+            id: 1002,
+            name: "Midnight Archivist's Staff",
+            href: "/items/1002",
+            type: "2HB",
+            icon: "staff",
+            chance: 10,
+            globalChance: 10
+          }
+        ]
+      }
+    ],
     sells: [],
-    spawnGroups: [{ id: 7001, name: "Castle Hallway Patrol", href: "/spawngroups/7001" }]
+    spawnGroups: [{ id: 7001, name: "Castle Hallway Patrol", href: "/spawngroups/7001" }],
+    spawnZones: [{ shortName: "mistmoore", longName: "Castle Mistmoore", href: "/zones/mistmoore" }],
+    factionHits: {
+      lowers: [{ id: 4001, name: "Mayong's Retainers", href: "/factions/4001", value: -100 }],
+      raises: []
+    }
   },
   {
     id: 3003,
     name: "Scholar Alquen",
+    fullName: "Scholar Alquen",
     race: "Human",
     level: "60",
     zone: "The Plane of Knowledge",
     named: true,
     klass: "Merchant",
     hp: 100000,
+    mana: 0,
     damage: "0 - 0",
     faction: "Keepers of the Knowledge",
+    mainFaction: { id: 4002, name: "Keepers of the Knowledge", href: "/factions/4002" },
+    attackSpeed: "Normal (100%)",
+    specialAttacks: [],
     spells: [],
     drops: [],
-    sells: [{ id: 1003, name: "Traveler's Restorative Draught", href: "/items/1003" }],
-    spawnGroups: []
+    sells: [{ id: 1003, name: "Traveler's Restorative Draught", href: "/items/1003", icon: "potion", price: "1p 2g 3s 4c" }],
+    spawnGroups: [],
+    spawnZones: [{ shortName: "poknowledge", longName: "The Plane of Knowledge", href: "/zones/poknowledge" }],
+    factionHits: {
+      lowers: [],
+      raises: [{ id: 4002, name: "Keepers of the Knowledge", href: "/factions/4002", value: 10 }]
+    }
   }
 ];
 
