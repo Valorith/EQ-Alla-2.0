@@ -1,3 +1,13 @@
+<img width="1650" height="654" alt="image" src="https://github.com/user-attachments/assets/6f2d678a-ea3c-40ff-a2c9-b68b228354b5" />
+
+<img width="1668" height="801" alt="image" src="https://github.com/user-attachments/assets/f64de775-d764-462e-bb42-802863f23d4a" />
+
+<img width="1643" height="843" alt="image" src="https://github.com/user-attachments/assets/29c561d7-e4d6-4d11-812b-c8a33071f77d" />
+
+<img width="1660" height="838" alt="image" src="https://github.com/user-attachments/assets/c7970b09-4028-4905-8f94-850942a8e0ee" />
+
+
+
 # EQ Alla 2.0
 
 Modern EverQuest encyclopedia scaffold built as a monorepo around `Next.js 15`, `React 19`, `TypeScript`, `Tailwind CSS v4`, and shared data/UI packages.
