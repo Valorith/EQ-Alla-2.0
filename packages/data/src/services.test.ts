@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getCatalogStats, getZoneDetail, listItems, resolveLegacyRoute, searchCatalog } from "./index";
+import { getCatalogStats, getZoneDetail, getZonesByEra, listItems, listZoneEras, resolveLegacyRoute, searchCatalog } from "./index";
 
 describe("catalog services", () => {
   it("filters items by tradeable flag", async () => {
@@ -22,6 +22,21 @@ describe("catalog services", () => {
   it("maps legacy item routes", () => {
     const target = resolveLegacyRoute("/", new URLSearchParams("a=item&id=1001"));
     expect(target).toBe("/items/1001");
+  });
+
+  it("exposes the legacy zone era list from the clone", async () => {
+    const eras = await listZoneEras();
+    expect(eras).toContain("Faydwer");
+    expect(eras).toContain("The Planes of Power");
+    expect(eras).toContain("Veil of Alaris");
+  });
+
+  it("resolves clone-style zone era filters and slugs", async () => {
+    const faydwerZones = await getZonesByEra("Faydwer");
+    const powerZones = await getZonesByEra("power");
+
+    expect(faydwerZones.some((zone) => zone.shortName === "mistmoore")).toBe(true);
+    expect(powerZones.some((zone) => zone.shortName === "poknowledge")).toBe(true);
   });
 
   it("exposes stats and zone detail", async () => {

@@ -7,12 +7,18 @@ type PetsPageProps = {
 
 export default async function PetsPage({ searchParams }: PetsPageProps) {
   const params = await searchParams;
-  const className = typeof params.class === "string" ? params.class : "";
+  const classesParam = typeof params.classes === "string" ? params.classes : "";
+  const legacyClassName = typeof params.class === "string" ? params.class : "";
+  const initialClasses = classesParam
+    ? classesParam.split(",").map((entry) => entry.trim()).filter(Boolean)
+    : legacyClassName
+      ? [legacyClassName]
+      : [];
 
   return (
     <>
-      <PageHero eyebrow="Pets" title="Pet Search" description="A compact pet browser aligned to the legacy pet section." />
-      <PetSearchClient initialClassName={className} />
+      <PageHero eyebrow="Pets" title="Pet Search" description="Browse summoned pets by owner class, then drill into spell and stat details." />
+      <PetSearchClient initialClasses={initialClasses} />
     </>
   );
 }

@@ -1,16 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { PetSummary } from "@eq-alla/data";
 import { Button } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
-import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../components/catalog-shell";
+import { PaginationControls, SearchPrompt, SectionCard, SimpleTable } from "../../components/catalog-shell";
 import { SpellIcon } from "../../components/spell-icon";
 
 type PetSearchClientProps = {
-  initialClassName: string;
+  initialClasses: string[];
 };
 
 type SearchResolutionMeta = {
@@ -25,21 +25,50 @@ type PetCacheEntry = {
   touchedAt: number;
 };
 
+type PetClassOption = {
+  name: string;
+  iconSrc: string;
+};
+
 const petResultsPerPage = 20;
 const petSearchCacheTtlMs = 180_000;
 const petSearchCacheMaxEntries = 12;
 const petSearchSessionStorageKey = "eq-pet-search-cache";
-const petClassOptions = ["Beastlord", "Cleric", "Druid", "Enchanter", "Magician", "Necromancer", "Shadow Knight", "Shaman", "Wizard"];
+const petClassOptions: PetClassOption[] = [
+  { name: "Beastlord", iconSrc: "/assets/icons/beastlord.gif" },
+  { name: "Cleric", iconSrc: "/assets/icons/cleric.gif" },
+  { name: "Druid", iconSrc: "/assets/icons/druid.gif" },
+  { name: "Enchanter", iconSrc: "/assets/icons/enchanter.gif" },
+  { name: "Magician", iconSrc: "/assets/icons/magician.gif" },
+  { name: "Necromancer", iconSrc: "/assets/icons/necromancer.gif" },
+  { name: "Shadow Knight", iconSrc: "/assets/icons/shadowknight.gif" },
+  { name: "Shaman", iconSrc: "/assets/icons/shaman.gif" },
+  { name: "Wizard", iconSrc: "/assets/icons/wizard.gif" }
+];
 
 const petResultCache = new Map<string, PetCacheEntry>();
 let petCacheHydrated = false;
 
-function buildSearchKey(className: string) {
-  return className.trim();
+function normalizeSelectedClasses(classNames: string[]) {
+  const optionOrder = new Map(petClassOptions.map((entry, index) => [entry.name.toLowerCase(), index]));
+
+  return [...new Set(
+    classNames
+      .map((entry) => petClassOptions.find((option) => option.name.toLowerCase() === entry.trim().toLowerCase())?.name)
+      .filter((entry): entry is string => Boolean(entry))
+  )].sort((left, right) => (optionOrder.get(left.toLowerCase()) ?? 0) - (optionOrder.get(right.toLowerCase()) ?? 0));
 }
 
-function hasQuery(className: string) {
-  return buildSearchKey(className).length > 0;
+function buildSearchKey(classNames: string[]) {
+  return normalizeSelectedClasses(classNames).join("|");
+}
+
+function buildQueryValue(classNames: string[]) {
+  return normalizeSelectedClasses(classNames).join(",");
+}
+
+function hasQuery(classNames: string[]) {
+  return buildSearchKey(classNames).length > 0;
 }
 
 function formatDuration(durationMs: number) {
@@ -113,49 +142,89 @@ function setCachedPets(key: string, results: PetSummary[]) {
   persistPetCache();
 }
 
-export function PetSearchClient({ initialClassName }: PetSearchClientProps) {
+function ClassSelector({
+  selectedClasses,
+  onToggle
+}: {
+  selectedClasses: string[];
+  onToggle: (className: string) => void;
+}) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {petClassOptions.map((option) => {
+        const isSelected = selectedClasses.includes(option.name);
+
+        return (
+          <button
+            key={option.name}
+            type="button"
+            onClick={() => onToggle(option.name)}
+            aria-pressed={isSelected}
+            className={`group flex items-center gap-3 rounded-[18px] border px-4 py-3 text-left transition ${
+              isSelected
+                ? "border-[#d7a45f]/55 bg-[linear-gradient(180deg,rgba(215,164,95,0.2),rgba(25,27,34,0.9))] shadow-[0_16px_34px_rgba(0,0,0,0.2)]"
+                : "border-white/10 bg-[linear-gradient(180deg,rgba(19,23,31,0.92),rgba(10,14,21,0.9))] hover:border-[#c5a869]/38 hover:bg-[linear-gradient(180deg,rgba(32,38,49,0.95),rgba(14,18,25,0.92))]"
+            }`}
+          >
+            <div className={`rounded-[14px] border p-2 ${isSelected ? "border-[#d7a45f]/40 bg-black/25" : "border-white/10 bg-black/20"}`}>
+              <img src={option.iconSrc} alt="" aria-hidden="true" className="size-8 object-contain" />
+            </div>
+            <div className="min-w-0">
+              <p className={`text-[15px] font-semibold ${isSelected ? "text-white" : "text-[#e8decd] group-hover:text-white"}`}>{option.name}</p>
+              <p className={`mt-0.5 text-[11px] font-semibold uppercase tracking-[0.18em] ${isSelected ? "text-[#efd091]" : "text-[#9f8e79]"}`}>
+                {isSelected ? "Included" : "Add filter"}
+              </p>
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const [className, setClassName] = useState(initialClassName);
+  const [selectedClasses, setSelectedClasses] = useState(() => normalizeSelectedClasses(initialClasses));
   const [results, setResults] = useState<PetSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [isFetching, setIsFetching] = useState(hasQuery(initialClassName));
+  const [isFetching, setIsFetching] = useState(hasQuery(initialClasses));
   const [displayKey, setDisplayKey] = useState("");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
-  const [submitCount, setSubmitCount] = useState(hasQuery(initialClassName) ? 1 : 0);
   const [page, setPage] = useState(1);
   const abortRef = useRef<AbortController | null>(null);
-  const currentUrlKeyRef = useRef(buildSearchKey(initialClassName));
-  const lastHandledSubmitRef = useRef(0);
-
-  useEffect(() => {
-    const key = buildSearchKey(initialClassName);
-    if (!key) return;
-    const cached = getCachedPets(key);
-    if (!cached) return;
-    setResults(cached);
-    setDisplayKey(key);
-    setIsFetching(false);
-    setResolutionMeta({ key, durationMs: 0, source: "cache" });
-  }, [initialClassName]);
+  const currentUrlValueRef = useRef(buildQueryValue(initialClasses));
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  const submitSearch = () => {
-    if (!hasQuery(className)) return;
-    setSubmitCount((current) => current + 1);
+  const toggleClass = (className: string) => {
+    setSelectedClasses((current) =>
+      current.includes(className)
+        ? current.filter((entry) => entry !== className)
+        : normalizeSelectedClasses([...current, className])
+    );
+  };
+
+  const clearSelection = () => {
+    abortRef.current?.abort();
+    setSelectedClasses([]);
+    setResults([]);
+    setError(null);
+    setDisplayKey("");
+    setIsFetching(false);
+    setResolutionMeta(null);
+    setPage(1);
+    currentUrlValueRef.current = "";
+    startTransition(() => router.replace(pathname, { scroll: false }));
   };
 
   useEffect(() => {
-    if (submitCount === 0 || submitCount === lastHandledSubmitRef.current) {
-      return;
-    }
+    const nextQueryValue = buildQueryValue(selectedClasses);
+    const nextKey = buildSearchKey(selectedClasses);
+    const nextHref = nextQueryValue ? `${pathname}?classes=${encodeURIComponent(nextQueryValue)}` : pathname;
 
-    lastHandledSubmitRef.current = submitCount;
-    const nextKey = buildSearchKey(className);
-    const nextHref = nextKey ? `${pathname}?class=${encodeURIComponent(nextKey)}` : pathname;
-    if (nextKey !== currentUrlKeyRef.current) {
-      currentUrlKeyRef.current = nextKey;
+    if (nextQueryValue !== currentUrlValueRef.current) {
+      currentUrlValueRef.current = nextQueryValue;
       startTransition(() => router.replace(nextHref, { scroll: false }));
     }
 
@@ -164,7 +233,7 @@ export function PetSearchClient({ initialClassName }: PetSearchClientProps) {
     if (!nextKey) {
       setResults([]);
       setError(null);
-      setDisplayKey(nextKey);
+      setDisplayKey("");
       setIsFetching(false);
       setResolutionMeta(null);
       return;
@@ -188,7 +257,7 @@ export function PetSearchClient({ initialClassName }: PetSearchClientProps) {
 
     void (async () => {
       try {
-        const response = await fetch(`/api/pets?class=${encodeURIComponent(nextKey)}`, { signal: controller.signal });
+        const response = await fetch(`/api/pets?classes=${encodeURIComponent(nextQueryValue)}`, { signal: controller.signal });
         if (!response.ok) throw new Error(`Search failed with ${response.status}`);
         const payload = (await response.json()) as { data?: PetSummary[] };
         if (controller.signal.aborted) return;
@@ -207,28 +276,20 @@ export function PetSearchClient({ initialClassName }: PetSearchClientProps) {
         }
       }
     })();
-  }, [className, pathname, router, submitCount]);
+  }, [pathname, router, selectedClasses]);
 
-  const resetSearch = () => {
-    abortRef.current?.abort();
-    setClassName("");
-    setResults([]);
-    setError(null);
-    setDisplayKey("");
-    setIsFetching(false);
-    setResolutionMeta(null);
-    setPage(1);
-    currentUrlKeyRef.current = "";
-    startTransition(() => router.replace(pathname, { scroll: false }));
-  };
-
-  const showResults = hasQuery(className) || isFetching || displayKey.length > 0;
+  const showResults = hasQuery(selectedClasses) || isFetching || displayKey.length > 0;
   const totalPages = Math.max(1, Math.ceil(results.length / petResultsPerPage));
   const visiblePage = Math.min(page, totalPages);
   const pagedResults = results.slice((visiblePage - 1) * petResultsPerPage, visiblePage * petResultsPerPage);
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading pets" : `${results.length} pets`) : "Results";
-  const draftKey = buildSearchKey(className);
-  const statusLabel = error ? error : isFetching ? "Refreshing results..." : draftKey === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
+  const statusLabel = error
+    ? error
+    : isFetching
+      ? "Refreshing results..."
+      : selectedClasses.length > 0
+        ? `${selectedClasses.length} class${selectedClasses.length === 1 ? "" : "es"} selected`
+        : "Select one or more classes";
   const resolvedTiming =
     resolutionMeta && resolutionMeta.key === displayKey && !isFetching
       ? `Loaded in ${formatDuration(resolutionMeta.durationMs)}${resolutionMeta.source === "cache" ? " from cache" : ""}`
@@ -246,31 +307,40 @@ export function PetSearchClient({ initialClassName }: PetSearchClientProps) {
 
   return (
     <>
-      <SectionCard title="Choose a class" right={<p className="text-xs font-medium text-[#ccb594]">{statusLabel}</p>}>
-        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
-          <SelectField label="Class" name="class" value={className} onChange={setClassName} options={petClassOptions} />
-          <div className="flex items-end gap-3">
-            <Button type="button" className="w-full sm:w-auto" onClick={submitSearch}>
-              Search
-            </Button>
-            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={resetSearch}>
-              Clear
-            </Button>
+      <SectionCard
+        title="Browse by class"
+        right={
+          <div className="flex items-center gap-3">
+            <p className="text-xs font-medium text-[#ccb594]">{statusLabel}</p>
+            {selectedClasses.length > 0 ? (
+              <Button type="button" variant="outline" className="px-3 py-2 text-xs uppercase tracking-[0.14em]" onClick={clearSelection}>
+                Clear
+              </Button>
+            ) : null}
           </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="max-w-3xl text-sm leading-7 text-[#d7ccbb]">
+            Choose one or more owner classes to pull their summoned pets into the roster below.
+          </div>
+          <ClassSelector selectedClasses={selectedClasses} onToggle={toggleClass} />
         </div>
       </SectionCard>
+
       <SectionCard title={resultTitle}>
         {showResults && results.length > 0 ? (
           <>
             <SimpleTable
-              columns={["Level", "Icon", "Spell name", "Details", "Race", "Pet level", "Pet class", "HP", "Mana", "AC", "Min damage", "Max damage"]}
+              columns={["Class", "Level", "Icon", "Spell name", "Details", "Race", "Pet level", "Pet class", "HP", "Mana", "AC", "Min damage", "Max damage"]}
               rows={pagedResults.map((pet) => [
+                pet.ownerClass,
                 pet.spellLevel,
-                <SpellIcon key={`${pet.id}-icon`} icon={pet.spellIcon} name={pet.spellName} />,
-                <Link key={`${pet.id}-spell`} href={`/spells/${pet.spellId}`} className="font-medium hover:underline">
+                <SpellIcon key={`${pet.id}-${pet.ownerClassId}-icon`} icon={pet.spellIcon} name={pet.spellName} />,
+                <Link key={`${pet.id}-${pet.ownerClassId}-spell`} href={`/spells/${pet.spellId}`} className="font-medium hover:underline">
                   {pet.spellName}
                 </Link>,
-                <Link key={`${pet.id}-detail`} href={`/pets/${pet.id}`} className="font-medium hover:underline">
+                <Link key={`${pet.id}-${pet.ownerClassId}-detail`} href={`/pets/${pet.id}`} className="font-medium hover:underline">
                   View
                 </Link>,
                 pet.race,
@@ -295,10 +365,10 @@ export function PetSearchClient({ initialClassName }: PetSearchClientProps) {
           isFetching ? (
             <ClassLoadingIndicator message="Loading pets" detail="Calling companions and familiars to the roster." />
           ) : (
-            <SearchPrompt message="No pets matched this class selection." />
+            <SearchPrompt message="No pets matched the selected classes." />
           )
         ) : (
-          <SearchPrompt message="Choose a class to browse pet statistics." />
+          <SearchPrompt message="Choose one or more class icons to browse pet statistics." />
         )}
         {resolvedTiming ? <p className="pt-1 text-right text-[11px] uppercase tracking-[0.16em] text-[#9f8e79]">{resolvedTiming}</p> : null}
       </SectionCard>

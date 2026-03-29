@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getZonesByEra } from "@eq-alla/data";
+import { getZonesByEra, resolveZoneEraLabel } from "@eq-alla/data";
 import { PageHero, SectionCard, SimpleTable } from "../../../../components/catalog-shell";
 
 type ZonesByEraDetailPageProps = {
@@ -15,7 +15,7 @@ function titleCase(input: string) {
 
 export default async function ZonesByEraDetailPage({ params }: ZonesByEraDetailPageProps) {
   const { era } = await params;
-  const normalizedEra = titleCase(era);
+  const normalizedEra = resolveZoneEraLabel(era) || titleCase(era);
   const zones = await getZonesByEra(normalizedEra);
 
   return (

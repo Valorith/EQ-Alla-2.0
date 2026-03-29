@@ -1,24 +1,27 @@
-import Link from "next/link";
 import { getZonesByLevel } from "@eq-alla/data";
-import { PageHero, SectionCard, SimpleTable } from "../../../components/catalog-shell";
+import { PageHero, SectionCard } from "../../../components/catalog-shell";
+import { ZonesByLevelMatrix } from "./zones-by-level-matrix";
 
 export default async function ZonesByLevelPage() {
   const zones = await getZonesByLevel();
 
   return (
     <>
-      <PageHero eyebrow="Zones" title="Zones by Level" description="A progression-oriented view for leveling and content planning." />
-      <SectionCard title="Zone progression">
-        <SimpleTable
-          columns={["Zone", "Level range", "Era"]}
-          rows={zones.map((zone) => [
-            <Link key={zone.shortName} href={`/zones/${zone.shortName}`} className="font-medium hover:underline">
-              {zone.longName}
-            </Link>,
-            zone.levelRange,
-            zone.era
-          ])}
-        />
+      <PageHero
+        eyebrow="Zones"
+        title="Zones by Level"
+        description="Approximate hunting bands based on the distinct creature types found in each zone. This view bins live NPC levels into 5-level ranges so mixed-service zones like East Commons read more cleanly than a raw min/max field."
+      />
+
+      <SectionCard
+        title="Zone progression"
+        right={
+          <p className="max-w-xl text-sm leading-6 text-[#b8ab94]">
+            Numbers show distinct NPC types in each 5-level band. Level 1 trigger NPCs and invisible men are excluded to keep the table closer to actual playable content.
+          </p>
+        }
+      >
+        <ZonesByLevelMatrix zones={zones} />
       </SectionCard>
     </>
   );

@@ -11,6 +11,7 @@ import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable
 type ZoneSearchClientProps = {
   initialQuery: string;
   initialEra: string;
+  eraOptions: string[];
 };
 
 type SearchResolutionMeta = {
@@ -127,7 +128,7 @@ function setCachedZones(key: string, results: ZoneSummary[]) {
   persistZoneCache();
 }
 
-export function ZoneSearchClient({ initialQuery, initialEra }: ZoneSearchClientProps) {
+export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneSearchClientProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [filters, setFilters] = useState<ZoneFilters>({ q: initialQuery, era: initialEra });
@@ -300,7 +301,7 @@ export function ZoneSearchClient({ initialQuery, initialEra }: ZoneSearchClientP
               placeholder="Mistmoore..."
             />
           </label>
-          <SelectField label="Era" name="era" value={filters.era} onChange={(value) => setFilter("era", value)} options={["Classic", "Planes of Power"]} />
+          <SelectField label="Era" name="era" value={filters.era} onChange={(value) => setFilter("era", value)} options={eraOptions} />
           <div className="flex items-end gap-3 md:col-span-2 xl:col-span-4">
             <Button type="button" className="w-full sm:w-auto" onClick={submitSearch}>
               Search

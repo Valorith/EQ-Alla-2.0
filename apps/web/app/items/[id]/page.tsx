@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { getItemDetail } from "@eq-alla/data";
 import { ItemIcon } from "../../../components/item-icon";
+import { PaginatedRelatedSection } from "../../../components/paginated-related-section";
 
 type ItemDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -358,17 +359,17 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
         />
 
         <div className="grid gap-6 lg:grid-cols-3">
-          <RelatedSection
+          <PaginatedRelatedSection
             title="Dropped by NPCs"
             items={item.droppedBy.map((entry) => ({ href: entry.href, label: entry.name }))}
             emptyText="No NPC drop data recorded."
           />
-          <RelatedSection
+          <PaginatedRelatedSection
             title="Sold by merchants"
             items={item.soldBy.map((entry) => ({ href: entry.href, label: entry.name }))}
             emptyText="This item is not sold by merchants."
           />
-          <RelatedSection
+          <PaginatedRelatedSection
             title="Used in recipes"
             items={item.usedInRecipes.map((entry) => ({ href: entry.href, label: entry.name }))}
             emptyText="This item is not used in recorded recipes."

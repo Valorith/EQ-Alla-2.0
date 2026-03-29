@@ -34,14 +34,10 @@ export function resolveLegacyRoute(
       return searchParams.get("id") ? `/spells/${searchParams.get("id")}` : "/spells";
     case "npcs":
       return withQuery("/npcs", searchParams, ["q", "zone"]);
-    case "advanced_npcs":
-      return withQuery("/npcs/advanced", searchParams, [
-        "name",
-        "minLevel",
-        "maxLevel",
-        "race",
-        "named"
-      ]);
+    case "advanced_npcs": {
+      const query = searchParams.get("name");
+      return query ? `/npcs?q=${encodeURIComponent(query)}` : "/npcs";
+    }
     case "npc": {
       const id = searchParams.get("id");
       const name = searchParams.get("name");

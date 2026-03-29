@@ -1,8 +1,8 @@
 import { cacheGet, cacheGetOrResolve } from "./cache";
 import { getDb } from "./db";
-import { useMockData } from "./env";
 import { factions, items, npcs, pets, recipes, spells, spawnGroups, tasks, zones } from "./mock-data";
 import { getSpellEffectName, summarizeSpellEffects } from "./spell-effects";
+import { formatExpansion, getZoneEraLabels, matchesZoneEraFilter } from "./zone-eras";
 import { sql } from "kysely";
 import type {
   CatalogStats,
@@ -21,7 +21,9 @@ import type {
   SpellSummary,
   SpawnGroupDetail,
   TaskDetail,
+  ZoneByLevelSummary,
   ZoneDetail,
+  ZoneLevelBand,
   ZoneSummary
 } from "./types";
 
@@ -38,7 +40,7 @@ type SpellFilters = { q?: string; className?: string; level?: number; levelMode?
 type NpcFilters = { q?: string; zone?: string; minLevel?: number; maxLevel?: number; race?: string; named?: boolean };
 type ZoneFilters = { q?: string; era?: string };
 type RecipeFilters = { q?: string; tradeskill?: string; minTrivial?: number; maxTrivial?: number };
-type PetFilters = { className?: string };
+type PetFilters = { className?: string; classNames?: string[] };
 
 type ItemSearchRow = {
   id: number;
@@ -58,11 +60,15 @@ type ItemSearchRow = {
   icon: number;
 };
 
-const sourceMode = useMockData() ? "mock" : "hybrid";
 const db = getDb();
-const databaseEnabled = !useMockData() && Boolean(db);
+const sourceMode = db ? "live" : "database-unavailable";
+const databaseEnabled = Boolean(db);
 const itemSearchLimit = 100;
 const itemSearchCacheTtlSeconds = 60;
+const zoneLevelBandSize = 5;
+const zoneLevelBandMaximum = 110;
+const zoneLevelBandSignificanceFloor = 5;
+const merchantNpcClasses = [40, 41, 59, 61, 67, 68, 70] as const;
 
 const classNames = [
   "Warrior",
@@ -126,21 +132,6 @@ const slotFlags: Array<[number, string]> = [
   [1048576, "Waist"],
   [2097152, "Ammo"]
 ];
-
-const expansionNames: Record<number, string> = {
-  0: "Classic",
-  1: "Ruins of Kunark",
-  2: "Scars of Velious",
-  3: "Shadows of Luclin",
-  4: "Planes of Power",
-  5: "Legacy of Ykesha",
-  6: "Lost Dungeons of Norrath",
-  7: "Gates of Discord",
-  8: "Omens of War",
-  9: "Dragons of Norrath",
-  10: "Depths of Darkhollow",
-  11: "Prophecy of Ro"
-};
 
 const raceNames: Record<number, string> = {
   1: "Human",
@@ -288,17 +279,25 @@ const spellTypeNames: Record<number, string> = {
   256: "Dot"
 };
 
-const tradeskillNames: Record<number, string> = {
-  56: "Baking",
-  57: "Tailoring",
-  58: "Blacksmithing",
-  59: "Fletching",
-  60: "Brewing",
-  63: "Jewelry",
-  64: "Pottery",
-  65: "Research",
-  68: "Alchemy",
-  69: "Tinkering"
+const recipeTradeskillNames: Record<number, string> = {
+  55: "Fishing",
+  56: "Poison",
+  57: "Tinkering",
+  58: "Research",
+  59: "Alchemy",
+  60: "Baking",
+  61: "Tailoring",
+  63: "Blacksmithing",
+  64: "Fletching",
+  65: "Brewing",
+  68: "Jewelry",
+  69: "Pottery",
+  75: "Poison"
+};
+
+const staticTradeskillContainers: Record<number, { name: string; icon: string }> = {
+  15: { name: "Mixing Bowl", icon: "" },
+  17: { name: "Forge", icon: "" }
 };
 
 function like(query?: string) {
@@ -533,10 +532,6 @@ function formatDetailedItemType(itemType: number | null | undefined) {
   return itemTypes[itemType ?? -1] ?? "Item";
 }
 
-function formatExpansion(expansion: number | null | undefined) {
-  return expansionNames[expansion ?? 0] ?? `Expansion ${expansion ?? 0}`;
-}
-
 function formatWeight(weight: number | null | undefined) {
   const normalized = Number(weight ?? 0) / 10;
   return normalized % 1 === 0 ? String(normalized.toFixed(0)) : String(normalized);
@@ -622,7 +617,15 @@ function formatTarget(target: number | null | undefined) {
 }
 
 function formatTradeskill(tradeskill: number | null | undefined) {
-  return tradeskillNames[tradeskill ?? -1] ?? `Tradeskill ${tradeskill ?? 0}`;
+  return recipeTradeskillNames[tradeskill ?? -1] ?? `Tradeskill ${tradeskill ?? 0}`;
+}
+
+function resolveRecipeTradeskillIds(tradeskill?: string) {
+  if (!tradeskill) return [];
+
+  return Object.entries(recipeTradeskillNames)
+    .filter(([, name]) => includesFolded(name, tradeskill))
+    .map(([id]) => Number(id));
 }
 
 function classIdFromName(className?: string) {
@@ -632,15 +635,31 @@ function classIdFromName(className?: string) {
 }
 
 function formatLevelRange(minLevel: number | null | undefined, maxLevel: number | null | undefined) {
-  if (minLevel && maxLevel && minLevel !== maxLevel) return `${minLevel} - ${maxLevel}`;
-  if (minLevel) return String(minLevel);
-  if (maxLevel) return String(maxLevel);
+  const min = Number(minLevel ?? 0);
+  const max = Number(maxLevel ?? 0);
+  const hasMin = min > 0;
+  const hasFiniteMax = max > 0 && max < 255;
+
+  if (hasMin && hasFiniteMax && min !== max) return `${min} - ${max}`;
+  if (hasMin && hasFiniteMax) return String(min);
+  if (hasMin) return `${min}+`;
+  if (hasFiniteMax) return `Up to ${max}`;
   return "All levels";
 }
 
 function isNamedNpcName(name: string) {
   const lower = name.trim().toLowerCase();
   return !(lower.startsWith("a ") || lower.startsWith("an ") || lower.startsWith("the "));
+}
+
+function formatNpcClassification(name: string) {
+  if (name.startsWith("###")) return "Boss";
+  if (name.startsWith("##")) return "Mini-Boss";
+  if (name.startsWith("#")) return "Named";
+  if (name.startsWith("~")) return "Quest NPC";
+  if (name.startsWith("!")) return "Hidden";
+  if (name.startsWith("_")) return "Event Spawned";
+  return "Normal";
 }
 
 function formatNpcName(name: string) {
@@ -657,16 +676,20 @@ function spellClassesFromRow(row: Record<string, unknown>) {
     .filter((entry) => entry.level > 0 && entry.level < 255);
 }
 
-async function withDatabaseFallback<T>(run: () => Promise<T>, fallback: () => T | Promise<T>) {
+function discoveredItemClause(columnRef: string) {
+  return sql`exists (
+    select 1
+    from discovered_items di
+    where di.item_id = ${sql.ref(columnRef)}
+  )`;
+}
+
+async function withDatabaseFallback<T>(run: () => Promise<T>, _fallback: () => T | Promise<T>) {
   if (!databaseEnabled || !db) {
-    return fallback();
+    throw new Error("Database connection is required. Mock data fallback has been disabled.");
   }
 
-  try {
-    return await run();
-  } catch {
-    return fallback();
-  }
+  return run();
 }
 
 function includesFolded(value: string, query?: string) {
@@ -677,6 +700,73 @@ function includesFolded(value: string, query?: string) {
 function numberFromLevelRange(level: string) {
   const digits = level.match(/\d+/g);
   return digits ? Number(digits[0]) : 0;
+}
+
+function buildZoneLevelBandDefinitions(maximumLevel = zoneLevelBandMaximum) {
+  const totalBands = Math.ceil(maximumLevel / zoneLevelBandSize);
+  return Array.from({ length: totalBands }, (_, index) => {
+    const minLevel = index * zoneLevelBandSize + 1;
+    const maxLevel = Math.min((index + 1) * zoneLevelBandSize, maximumLevel);
+    return {
+      index,
+      minLevel,
+      maxLevel,
+      label: `${minLevel} - ${maxLevel}`
+    };
+  });
+}
+
+function roundToZoneLevelBand(level: number, maximumLevel = zoneLevelBandMaximum) {
+  const safeLevel = Math.max(1, Math.min(maximumLevel, Math.round(level)));
+  const bandIndex = Math.floor((safeLevel - 1) / zoneLevelBandSize);
+  const minLevel = bandIndex * zoneLevelBandSize + 1;
+  const maxLevel = Math.min((bandIndex + 1) * zoneLevelBandSize, maximumLevel);
+  return `${minLevel} - ${maxLevel}`;
+}
+
+function createZoneLevelBands(
+  bucketCounts: Map<number, number>,
+  maximumLevel = zoneLevelBandMaximum
+): ZoneLevelBand[] {
+  return buildZoneLevelBandDefinitions(maximumLevel).map((band) => {
+    const npcCount = bucketCounts.get(band.index) ?? 0;
+    return {
+      label: band.label,
+      minLevel: band.minLevel,
+      maxLevel: band.maxLevel,
+      npcCount,
+      isSignificant: npcCount >= zoneLevelBandSignificanceFloor
+    };
+  });
+}
+
+function calculateSuggestedZoneLevel(bands: ZoneLevelBand[]) {
+  const significantBands = bands.filter((band) => band.isSignificant);
+
+  if (significantBands.length === 0) {
+    const fallbackBand = bands.find((band) => band.npcCount > 0);
+    return fallbackBand ? fallbackBand.label : "Unknown";
+  }
+
+  const totalWeight = significantBands.reduce((sum, band) => sum + band.npcCount, 0);
+  const weightedMidpoint = significantBands.reduce(
+    (sum, band) => sum + ((band.minLevel + band.maxLevel) / 2) * band.npcCount,
+    0
+  );
+
+  return roundToZoneLevelBand(weightedMidpoint / Math.max(totalWeight, 1));
+}
+
+function sortValueForZoneLevelBands(bands: ZoneLevelBand[]) {
+  const significantBands = bands.filter((band) => band.isSignificant);
+  const sortableBands = significantBands.length > 0 ? significantBands : bands.filter((band) => band.npcCount > 0);
+
+  if (sortableBands.length === 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const totalWeight = sortableBands.reduce((sum, band) => sum + band.npcCount, 0);
+  return sortableBands.reduce((sum, band) => sum + band.maxLevel * band.npcCount, 0) / Math.max(totalWeight, 1);
 }
 
 function formatSeconds(seconds: number) {
@@ -873,11 +963,6 @@ function formatCoinString(price: number | null | undefined) {
   return formatted.join(" ") || "0c";
 }
 
-function formatAttackSpeed(attackSpeed: number | null | undefined) {
-  const value = Number(attackSpeed ?? 0);
-  return value === 0 ? "Normal (100%)" : `${100 + value}%`;
-}
-
 function decodeNpcSpecialAttacks(raw: string | null | undefined) {
   const names: Record<string, string> = {
     A: "Immune to melee",
@@ -936,12 +1021,13 @@ function buildNpcDetailFallback(id: number): NpcDetail | undefined {
   return {
     ...npc,
     fullName: npc.name,
+    appearance: npc.appearance,
     hp: 0,
     mana: 0,
     damage: "0 to 0",
     faction: "Unknown",
     mainFaction: null,
-    attackSpeed: "Normal (100%)",
+    attackDelay: 0,
     specialAttacks: [],
     spells: [],
     drops: [],
@@ -1063,10 +1149,11 @@ async function fetchItemCandidateIds(filters: ItemFilters, limit: number) {
   }
 
   const result = await sql<{ id: number }>`
-    select id
-    from items
-    where ${sql.join(clauses, sql` and `)}
-    order by ${filters.q ? sql`Name asc` : sql`id asc`}
+    select i.id
+    from items i
+    where ${discoveredItemClause("i.id")}
+      and ${sql.join(clauses, sql` and `)}
+    order by ${filters.q ? sql`Name asc` : sql`i.id asc`}
     limit ${limit}
   `.execute(db);
 
@@ -1079,9 +1166,10 @@ async function fetchItemsByIds(ids: number[]) {
   }
 
   const rows = await sql<ItemSearchRow>`
-    select id, Name as name, itemclass, itemtype, slots, classes, nodrop, reqlevel, damage, delay, source, ac, hp, mana, icon
-    from items
-    where id in (${sql.join(ids)})
+    select i.id, i.Name as name, i.itemclass, i.itemtype, i.slots, i.classes, i.nodrop, i.reqlevel, i.damage, i.delay, i.source, i.ac, i.hp, i.mana, i.icon
+    from items i
+    where ${discoveredItemClause("i.id")}
+      and i.id in (${sql.join(ids)})
   `.execute(db);
 
   const byId = new Map(rows.rows.map((row) => [row.id, mapItemRowToSummary(row)]));
@@ -1202,7 +1290,7 @@ export async function getCatalogStats(): Promise<CatalogStats> {
       tasks: number;
     }>`
       select
-        (select count(*) from items) as items,
+        (select count(*) from items i where ${discoveredItemClause("i.id")}) as items,
         (select count(*) from spells_new) as spells,
         (select count(*) from npc_types) as npcs,
         (select count(*) from zone) as zones,
@@ -1249,8 +1337,9 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
       const [itemRows, spellRows, npcRows, zoneRows, factionRows, recipeRows] = await Promise.all([
         sql<{ id: number; name: string; icon: number; itemclass: number; itemtype: number; slots: number; damage: number }>`
           select id, Name as name, icon, itemclass, itemtype, slots, damage
-          from items
-          where Name like ${like(query)}
+          from items i
+          where ${discoveredItemClause("i.id")}
+            and Name like ${like(query)}
           order by Name asc
           limit 8
         `.execute(db!),
@@ -1506,7 +1595,9 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
              augslot4type, augslot4visible, augslot5type, augslot5visible, augslot6type, augslot6visible,
              proceffect, proclevel2, procrate, worneffect, wornlevel, focuseffect, focuslevel, clickeffect, clicklevel2, clicktype,
              lore, source, size, weight, light, price, icon
-      from items where id = ${id}
+      from items i
+      where i.id = ${id}
+        and ${discoveredItemClause("i.id")}
     `.execute(db!);
 
     const row = result.rows[0];
@@ -1835,16 +1926,18 @@ export async function getSpellDetail(id: number): Promise<SpellDetail | undefine
     const [componentResult, itemSourceResult] = await Promise.all([
       componentIds.length > 0
         ? sql<{ id: number; name: string }>`
-            select id, Name as name
-            from items
-            where id in (${sql.join(componentIds)})
+            select i.id, i.Name as name
+            from items i
+            where ${discoveredItemClause("i.id")}
+              and i.id in (${sql.join(componentIds)})
           `.execute(db!)
         : Promise.resolve({ rows: [] as Array<{ id: number; name: string }> }),
       sql<{ id: number; name: string; icon: number }>`
-        select id, Name as name, icon
-        from items
-        where scrolleffect = ${id}
-        order by Name asc
+        select i.id, i.Name as name, i.icon
+        from items i
+        where ${discoveredItemClause("i.id")}
+          and i.scrolleffect = ${id}
+        order by i.Name asc
       `.execute(db!)
     ]);
 
@@ -1890,9 +1983,14 @@ export async function getSpellDetail(id: number): Promise<SpellDetail | undefine
           return undefined;
         }
 
+        const reagentName = componentNames.get(reagentId);
+        if (!reagentName) {
+          return undefined;
+        }
+
         return {
           id: reagentId,
-          name: componentNames.get(reagentId) ?? `Item ${reagentId}`,
+          name: reagentName,
           count: Number(row[`component_counts${index + 1}`] ?? 1),
           href: `/items/${reagentId}`
         };
@@ -1967,6 +2065,9 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
       name: string;
       lastname: string | null;
       race: number;
+      gender: number | null;
+      texture: number | null;
+      helmtexture: number | null;
       level: number;
       class: number;
       hp: number;
@@ -1978,13 +2079,13 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
       loottable_id: number | null;
       merchant_id: number | null;
       npcspecialattks: string | null;
-      attack_speed: number | null;
+      attack_delay: number | null;
       zone_name: string | null;
       primary_faction_id: number | null;
       primary_faction_name: string | null;
     }>`
-      select nt.id, nt.name, nt.lastname, nt.race, nt.level, nt.class, nt.hp, nt.mana, nt.mindmg, nt.maxdmg,
-             nt.npc_faction_id, nt.npc_spells_id, nt.loottable_id, nt.merchant_id, nt.npcspecialattks, nt.attack_speed,
+      select nt.id, nt.name, nt.lastname, nt.race, nt.gender, nt.texture, nt.helmtexture, nt.level, nt.class, nt.hp, nt.mana, nt.mindmg, nt.maxdmg,
+             nt.npc_faction_id, nt.npc_spells_id, nt.loottable_id, nt.merchant_id, nt.npcspecialattks, nt.attack_delay,
              min(z.long_name) as zone_name, fl.id as primary_faction_id, fl.name as primary_faction_name
       from npc_types nt
       left join npc_faction nf on nf.id = nt.npc_faction_id
@@ -1998,8 +2099,8 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
         group by short_name
       ) z on z.short_name = s2.zone
       where nt.id = ${id}
-      group by nt.id, nt.name, nt.lastname, nt.race, nt.level, nt.class, nt.hp, nt.mana, nt.mindmg, nt.maxdmg,
-               nt.npc_faction_id, nt.npc_spells_id, nt.loottable_id, nt.merchant_id, nt.npcspecialattks, nt.attack_speed,
+      group by nt.id, nt.name, nt.lastname, nt.race, nt.gender, nt.texture, nt.helmtexture, nt.level, nt.class, nt.hp, nt.mana, nt.mindmg, nt.maxdmg,
+               nt.npc_faction_id, nt.npc_spells_id, nt.loottable_id, nt.merchant_id, nt.npcspecialattks, nt.attack_delay,
                fl.id, fl.name
     `.execute(db!);
 
@@ -2036,6 +2137,7 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
             join lootdrop_entries lde on lde.lootdrop_id = lte.lootdrop_id
             join items i on i.id = lde.item_id
             where lte.loottable_id = ${row.loottable_id}
+              and ${discoveredItemClause("i.id")}
             order by lte.lootdrop_id asc, i.Name asc
           `.execute(db!)
         : Promise.resolve({
@@ -2056,6 +2158,7 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
             from merchantlist ml
             join items i on i.id = ml.item
             where ml.merchantid = ${row.merchant_id}
+              and ${discoveredItemClause("i.id")}
             order by ml.slot asc
           `.execute(db!)
         : Promise.resolve({ rows: [] as Array<{ id: number; name: string; icon: number; price: number; ldonprice: number }> }),
@@ -2118,6 +2221,12 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
       id: row.id,
       name: formatNpcName(row.name),
       fullName: [formatNpcName(row.name), normalizeText(row.lastname ?? "")].filter(Boolean).join(" "),
+      appearance: {
+        raceId: Number(row.race ?? 0),
+        gender: Number(row.gender ?? 0),
+        texture: Number(row.texture ?? 0),
+        helmTexture: Number(row.helmtexture ?? 0)
+      },
       race: formatRace(row.race),
       level: String(row.level),
       zone: row.zone_name ?? "Unknown",
@@ -2130,7 +2239,7 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
       mainFaction: row.primary_faction_id && row.primary_faction_name
         ? { id: row.primary_faction_id, name: row.primary_faction_name, href: `/factions/${row.primary_faction_id}` }
         : null,
-      attackSpeed: formatAttackSpeed(row.attack_speed),
+      attackDelay: Number(row.attack_delay ?? 0),
       specialAttacks: decodeNpcSpecialAttacks(row.npcspecialattks),
       spells: spellRows.rows.map((entry) => ({
         id: entry.spellid,
@@ -2172,10 +2281,11 @@ export async function listZones(filters: ZoneFilters = {}) {
       select z.short_name, z.long_name, z.zoneidnumber, z.expansion, z.min_level, z.max_level, z.note, count(s2.id) as spawns
       from zone z
       left join spawn2 s2 on s2.zone = z.short_name and s2.version = z.version
-      where z.short_name like ${like(filters.q)} or z.long_name like ${like(filters.q)}
+      where coalesce(z.version, 0) = 0
+        and coalesce(z.min_status, 0) <= 1
+        and (z.short_name like ${like(filters.q)} or z.long_name like ${like(filters.q)})
       group by z.short_name, z.long_name, z.zoneidnumber, z.expansion, z.min_level, z.max_level, z.note
       order by z.long_name asc
-      limit 200
     `.execute(db!);
 
     return rows.rows
@@ -2188,42 +2298,155 @@ export async function listZones(filters: ZoneFilters = {}) {
         levelRange: formatLevelRange(row.min_level, row.max_level),
         population: row.note?.trim() || "Live zone data"
       }))
-      .filter((zone) => {
-        if (filters.era && !includesFolded(zone.era, filters.era)) return false;
-        return true;
-      });
+      .filter((zone) => matchesZoneEraFilter(zone, filters.era));
   }, () => summarizeZones().filter((zone) => {
     if (!includesFolded(zone.longName, filters.q) && !includesFolded(zone.shortName, filters.q)) return false;
-    if (filters.era && !includesFolded(zone.era, filters.era)) return false;
+    if (!matchesZoneEraFilter(zone, filters.era)) return false;
     return true;
   }));
 }
 
 export async function listZoneEras() {
-  return withDatabaseFallback(async () => {
-    const rows = await sql<{ expansion: number }>`
-      select distinct expansion from zone order by expansion asc
-    `.execute(db!);
-    return rows.rows.map((row) => formatExpansion(row.expansion));
-  }, () => [...new Set(zones.map((zone) => zone.era))]);
+  return getZoneEraLabels();
 }
 
 export async function getZonesByEra(era: string) {
   const all = await listZones();
-  return all.filter((zone) => zone.era.toLowerCase() === era.toLowerCase());
+  return all.filter((zone) => matchesZoneEraFilter(zone, era));
 }
 
 export async function getZonesByLevel() {
-  const all = await listZones();
-  return all.slice().sort((a, b) => a.levelRange.localeCompare(b.levelRange));
+  return withDatabaseFallback(async () => {
+    const rows = await sql<{
+      zoneidnumber: number;
+      short_name: string;
+      long_name: string;
+      expansion: number;
+      hotzone: number;
+      bucket: number | null;
+      npc_count: number;
+    }>`
+      select
+        z.zoneidnumber,
+        z.short_name,
+        z.long_name,
+        z.expansion,
+        z.hotzone,
+        floor((nt.level - 1) / ${zoneLevelBandSize}) as bucket,
+        count(distinct nt.id) as npc_count
+      from zone z
+      left join spawn2 s2 on s2.zone = z.short_name and s2.version = z.version
+      left join spawngroup sg on sg.id = s2.spawngroupID
+      left join spawnentry se on se.spawngroupID = sg.id
+      left join npc_types nt on nt.id = se.npcID
+        and nt.level > 1
+        and nt.level <= ${zoneLevelBandMaximum}
+        and nt.race not in (127, 240)
+      where coalesce(z.version, 0) = 0
+        and coalesce(z.min_status, 0) <= 0
+      group by z.zoneidnumber, z.short_name, z.long_name, z.expansion, z.hotzone, bucket
+      order by z.long_name asc, bucket asc
+    `.execute(db!);
+
+    const zonesById = new Map<number, ZoneByLevelSummary>();
+
+    for (const row of rows.rows) {
+      let zone = zonesById.get(row.zoneidnumber);
+      if (!zone) {
+        zone = {
+          id: row.zoneidnumber,
+          shortName: row.short_name,
+          longName: row.long_name,
+          era: formatExpansion(row.expansion),
+          hotzone: Number(row.hotzone ?? 0) > 0,
+          suggestedLevel: "Unknown",
+          bands: createZoneLevelBands(new Map())
+        };
+        zonesById.set(row.zoneidnumber, zone);
+      }
+
+      if (row.bucket === null) {
+        continue;
+      }
+
+      const band = zone.bands[row.bucket];
+      if (band) {
+        band.npcCount = Number(row.npc_count ?? 0);
+        band.isSignificant = band.npcCount >= zoneLevelBandSignificanceFloor;
+      }
+    }
+
+    const zones = Array.from(zonesById.values()).map((zone) => ({
+      ...zone,
+      suggestedLevel: calculateSuggestedZoneLevel(zone.bands)
+    }));
+
+    zones.sort((left, right) => {
+      const sortDelta = sortValueForZoneLevelBands(left.bands) - sortValueForZoneLevelBands(right.bands);
+      if (sortDelta !== 0) return sortDelta;
+      return left.longName.localeCompare(right.longName);
+    });
+
+    return zones;
+  }, () => {
+    return summarizeZones()
+      .map<ZoneByLevelSummary>((zone) => {
+        const bucketCounts = new Map<number, number>();
+        const digits = zone.levelRange.match(/\d+/g)?.map(Number) ?? [];
+        const minLevel = digits[0] ?? 1;
+        const maxLevel = digits[1] ?? digits[0] ?? zoneLevelBandSize;
+
+        if (Number.isFinite(minLevel) && Number.isFinite(maxLevel)) {
+          const startBand = Math.max(0, Math.floor((Math.max(1, minLevel) - 1) / zoneLevelBandSize));
+          const endBand = Math.max(startBand, Math.floor((Math.max(minLevel, maxLevel) - 1) / zoneLevelBandSize));
+          for (let band = startBand; band <= endBand; band += 1) {
+            bucketCounts.set(band, zoneLevelBandSignificanceFloor);
+          }
+        }
+
+        const bands = createZoneLevelBands(bucketCounts);
+
+        return {
+          id: zone.id,
+          shortName: zone.shortName,
+          longName: zone.longName,
+          era: zone.era,
+          hotzone: false,
+          suggestedLevel: zone.levelRange,
+          bands
+        };
+      })
+      .sort((left, right) => {
+        const sortDelta = sortValueForZoneLevelBands(left.bands) - sortValueForZoneLevelBands(right.bands);
+        if (sortDelta !== 0) return sortDelta;
+        return left.longName.localeCompare(right.longName);
+      });
+  });
 }
 
 export async function getZoneDetail(shortName: string): Promise<ZoneDetail | undefined> {
   return withDatabaseFallback(async () => {
-    const result = await sql<{ short_name: string; long_name: string; zoneidnumber: number; expansion: number; min_level: number; max_level: number; note: string | null; safe_x: number; safe_y: number; safe_z: number }>`
-      select short_name, long_name, zoneidnumber, expansion, min_level, max_level, note, safe_x, safe_y, safe_z
+    const result = await sql<{
+      short_name: string;
+      long_name: string;
+      zoneidnumber: number;
+      expansion: number;
+      min_level: number;
+      max_level: number;
+      note: string | null;
+      safe_x: number;
+      safe_y: number;
+      safe_z: number;
+      hotzone: number;
+      canbind: number;
+      canlevitate: number;
+      castoutdoor: number;
+    }>`
+      select short_name, long_name, zoneidnumber, expansion, min_level, max_level, note, safe_x, safe_y, safe_z,
+             hotzone, canbind, canlevitate, castoutdoor
       from zone
       where short_name = ${shortName}
+        and version = 0
       limit 1
     `.execute(db!);
 
@@ -2231,38 +2454,266 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
 
     if (!zone) return undefined;
 
-    const npcsInZone = await sql<{ id: number; name: string }>`
-      select distinct nt.id, nt.name
-      from npc_types nt
-      join spawnentry se on se.npcID = nt.id
-      join spawngroup sg on sg.id = se.spawngroupID
-      join spawn2 s2 on s2.spawngroupID = sg.id
-      where s2.zone = ${shortName}
-      order by nt.name asc
-      limit 25
-    `.execute(db!);
+    const [bestiaryRows, itemRows, forageRows, spawnLocationRows, spawnEntryRows] = await Promise.all([
+      sql<{
+        id: number;
+        raw_name: string;
+        min_level: number;
+        max_level: number;
+        race: number;
+        class: number;
+        variants: number;
+      }>`
+        select min(nt.id) as id,
+               nt.name as raw_name,
+               min(nt.level) as min_level,
+               max(coalesce(nullif(nt.maxlevel, 0), nt.level)) as max_level,
+               min(nt.race) as race,
+               min(nt.class) as class,
+               count(distinct nt.id) as variants
+        from npc_types nt
+        join spawnentry se on se.npcID = nt.id
+        join spawngroup sg on sg.id = se.spawngroupID
+        join spawn2 s2 on s2.spawngroupID = sg.id
+        where s2.zone = ${shortName}
+          and s2.version = 0
+          and nt.trackable > 0
+          and nt.race not in (127, 240)
+        group by nt.name
+        order by nt.name asc
+      `.execute(db!),
+      sql<{
+        id: number;
+        name: string;
+        icon: number;
+        itemclass: number;
+        itemtype: number;
+        damage: number;
+      }>`
+        select distinct i.id, i.Name as name, i.icon, i.itemclass, i.itemtype, i.damage
+        from items i
+        join lootdrop_entries lde on lde.item_id = i.id
+        join loottable_entries lte on lte.lootdrop_id = lde.lootdrop_id
+        join npc_types nt on nt.loottable_id = lte.loottable_id
+        join spawnentry se on se.npcID = nt.id
+        join spawngroup sg on sg.id = se.spawngroupID
+        join spawn2 s2 on s2.spawngroupID = sg.id
+        where s2.zone = ${shortName}
+          and s2.version = 0
+          and ${discoveredItemClause("i.id")}
+          and nt.class not in (${sql.join(merchantNpcClasses.map((value) => sql`${value}`), sql`, `)})
+        order by i.Name asc
+      `.execute(db!),
+      sql<{
+        id: number;
+        name: string;
+        icon: number;
+        level: number;
+        chance: number;
+      }>`
+        select i.id,
+               i.Name as name,
+               i.icon,
+               max(f.level) as level,
+               max(f.chance) as chance
+        from forage f
+        join zone z on z.zoneidnumber = f.zoneid and z.version = 0
+        join items i on i.id = f.Itemid
+        where z.short_name = ${shortName}
+          and ${discoveredItemClause("i.id")}
+        group by i.id, i.Name, i.icon
+        order by i.Name asc
+      `.execute(db!),
+      sql<{
+        id: number;
+        name: string;
+        x: number;
+        y: number;
+        z: number;
+        respawntime: number;
+      }>`
+        select sg.id, sg.name, s2.x, s2.y, s2.z, s2.respawntime
+        from spawn2 s2
+        join spawngroup sg on sg.id = s2.spawngroupID
+        where s2.zone = ${shortName}
+          and s2.version = 0
+        order by sg.name asc, s2.id asc
+      `.execute(db!),
+      sql<{
+        spawngroupID: number;
+        id: number;
+        name: string;
+        chance: number;
+      }>`
+        select distinct se.spawngroupID, nt.id, nt.name, se.chance
+        from spawnentry se
+        join npc_types nt on nt.id = se.npcID
+        join spawn2 s2 on s2.spawngroupID = se.spawngroupID
+        where s2.zone = ${shortName}
+          and s2.version = 0
+        order by se.spawngroupID asc, nt.name asc
+      `.execute(db!)
+    ]);
 
-    const bestiary = npcsInZone.rows.map((row) => ({ id: row.id, name: row.name, href: `/npcs/${row.id}` }));
+    const bestiary = bestiaryRows.rows
+      .map((row) => {
+        const name = formatNpcName(row.raw_name);
+
+        return {
+          id: row.id,
+          name,
+          href: `/npcs/${row.id}`,
+          levelRange: formatLevelRange(row.min_level, row.max_level),
+          race: formatRace(row.race),
+          klass: formatNpcClass(row.class),
+          classification: formatNpcClassification(row.raw_name),
+          named: isNamedNpcName(name),
+          variants: Number(row.variants ?? 1)
+        };
+      })
+      .filter((entry) => entry.name.length > 0);
+
+    const encounterLevels = bestiaryRows.rows.flatMap((row) => {
+      const levels = [Number(row.min_level ?? 0), Number(row.max_level ?? 0)].filter((value) => value > 0);
+      return levels;
+    });
+    const encounterRange =
+      encounterLevels.length > 0
+        ? formatLevelRange(Math.min(...encounterLevels), Math.max(...encounterLevels))
+        : formatLevelRange(zone.min_level, zone.max_level);
+
+    const recommendedRange = formatLevelRange(zone.min_level, zone.max_level);
+    const displayRange = recommendedRange === "All levels" ? encounterRange : recommendedRange;
+
+    const namedNpcs = bestiary
+      .filter((entry) => entry.named)
+      .map((entry) => ({ id: entry.id, name: entry.name, href: entry.href }));
+
+    const itemDrops = itemRows.rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      href: `/items/${row.id}`,
+      icon: String(row.icon ?? ""),
+      type: formatDetailedItemType(row.itemtype ?? row.itemclass)
+    }));
+
+    const forage = forageRows.rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      href: `/items/${row.id}`,
+      icon: String(row.icon ?? ""),
+      chance: Number(row.chance ?? 0),
+      skill: Number(row.level ?? 0)
+    }));
+
+    const spawnGroupMap = new Map<number, SpawnGroupDetail>();
+
+    for (const row of spawnLocationRows.rows) {
+      if (!spawnGroupMap.has(row.id)) {
+        spawnGroupMap.set(row.id, {
+          id: row.id,
+          name: row.name,
+          zone: { shortName: zone.short_name, longName: zone.long_name, href: `/zones/${zone.short_name}` },
+          respawn: formatSeconds(Number(row.respawntime ?? 0)),
+          locations: [],
+          entries: []
+        });
+      }
+
+      const group = spawnGroupMap.get(row.id);
+      const location = `${Math.round(Number(row.y ?? 0))} / ${Math.round(Number(row.x ?? 0))} / ${Math.round(Number(row.z ?? 0))}`;
+      if (group && !group.locations.includes(location)) {
+        group.locations.push(location);
+      }
+    }
+
+    for (const row of spawnEntryRows.rows) {
+      const group = spawnGroupMap.get(row.spawngroupID);
+      if (!group) continue;
+
+      if (!group.entries.some((entry) => entry.id === row.id)) {
+        group.entries.push({
+          id: row.id,
+          name: formatNpcName(row.name),
+          chance: `${Number(row.chance ?? 0)}%`,
+          href: `/npcs/${row.id}`
+        });
+      }
+    }
+
+    const spawnGroups = [...spawnGroupMap.values()];
+    const rules = [
+      Number(zone.canbind ?? 0) > 0 ? "Binding allowed" : "No binding",
+      Number(zone.canlevitate ?? 0) > 0 ? "Levitate allowed" : "Levitate blocked",
+      Number(zone.castoutdoor ?? 0) > 0 ? "Outdoor casting" : "Indoor casting rules"
+    ];
+    if (Number(zone.hotzone ?? 0) > 0) {
+      rules.unshift("Hotzone bonus");
+    }
+
+    const resources = [
+      {
+        label: "Bestiary",
+        href: `/zones/${shortName}?mode=npcs`,
+        count: bestiary.length,
+        description: "Creature roster, level spread, and dispositions.",
+        mode: "npcs" as const
+      },
+      ...(namedNpcs.length > 0
+        ? [
+            {
+              label: "Named mobs",
+              href: `/zones/${shortName}?mode=named`,
+              count: namedNpcs.length,
+              description: "Focused named encounter list.",
+              mode: "named" as const
+            }
+          ]
+        : []),
+      ...(itemDrops.length > 0
+        ? [
+            {
+              label: "Equipment",
+              href: `/zones/${shortName}?mode=items`,
+              count: itemDrops.length,
+              description: "Distinct items dropped in the zone.",
+              mode: "items" as const
+            }
+          ]
+        : []),
+      ...(forage.length > 0
+        ? [
+            {
+              label: "Forage",
+              href: `/zones/${shortName}?mode=forage`,
+              count: forage.length,
+              description: "Gatherables and forage table entries.",
+              mode: "forage" as const
+            }
+          ]
+        : [])
+    ];
 
     const detail: ZoneDetail = {
       id: zone.zoneidnumber,
       shortName: zone.short_name,
       longName: zone.long_name,
       spawns: bestiary.length,
+      hotzone: Number(zone.hotzone ?? 0) > 0,
       era: formatExpansion(zone.expansion),
-      levelRange: formatLevelRange(zone.min_level, zone.max_level),
-      population: zone.note?.trim() || "Live zone data",
-      safePoint: `${zone.safe_x}, ${zone.safe_y}, ${zone.safe_z}`,
-      resources: [
-        { label: "Bestiary", href: `/zones/${shortName}?mode=npcs` },
-        { label: "Named mobs", href: `/zones/${shortName}/named` }
-      ],
+      levelRange: displayRange,
+      population: zone.note?.trim() || `${bestiary.length} creatures indexed across ${spawnLocationRows.rows.length} spawn points.`,
+      safePoint: `${Math.floor(zone.safe_x ?? 0)} / ${Math.floor(zone.safe_y ?? 0)} / ${Math.floor(zone.safe_z ?? 0)}`,
+      encounterRange,
+      spawnPoints: spawnLocationRows.rows.length,
+      rules,
+      resources,
       bestiary,
-      namedNpcs: bestiary.filter((entry) => isNamedNpcName(entry.name)),
-      itemDrops: [],
-      forage: [],
+      namedNpcs,
+      itemDrops,
+      forage,
       tasks: [],
-      spawnGroups: []
+      spawnGroups
     };
     return detail;
   }, () => zones.find((zone) => zone.shortName === shortName));
@@ -2287,23 +2738,102 @@ export async function listFactions(q?: string) {
   }, () => summarizeFactions().filter((faction) => includesFolded(faction.name, q)));
 }
 
-export function getFactionDetail(id: number): FactionDetail | undefined {
-  return factions.find((faction) => faction.id === id);
+export async function getFactionDetail(id: number): Promise<FactionDetail | undefined> {
+  return withDatabaseFallback(async () => {
+    const factionResult = await sql<{ id: number; name: string }>`
+      select id, name
+      from faction_list
+      where id = ${id}
+      limit 1
+    `.execute(db!);
+
+    const row = factionResult.rows[0];
+    if (!row) {
+      return undefined;
+    }
+
+    const [zoneRows, raisedRows, loweredRows] = await Promise.all([
+      sql<{ zone_name: string | null }>`
+        select min(z.long_name) as zone_name
+        from npc_faction nf
+        join npc_types nt on nt.npc_faction_id = nf.id
+        join spawnentry se on se.npcID = nt.id
+        join spawngroup sg on sg.id = se.spawngroupID
+        join spawn2 s2 on s2.spawngroupID = sg.id
+        left join (
+          select short_name, min(long_name) as long_name
+          from zone
+          group by short_name
+        ) z on z.short_name = s2.zone
+        where nf.primaryfaction = ${id}
+      `.execute(db!),
+      sql<{ id: number; name: string }>`
+        select distinct nt.id, nt.name
+        from npc_faction_entries nfe
+        join npc_faction nf on nf.id = nfe.npc_faction_id
+        join npc_types nt on nt.npc_faction_id = nf.id
+        where nfe.faction_id = ${id} and nfe.value > 0
+        order by nt.name asc
+      `.execute(db!),
+      sql<{ id: number; name: string }>`
+        select distinct nt.id, nt.name
+        from npc_faction_entries nfe
+        join npc_faction nf on nf.id = nfe.npc_faction_id
+        join npc_types nt on nt.npc_faction_id = nf.id
+        where nfe.faction_id = ${id} and nfe.value < 0
+        order by nt.name asc
+      `.execute(db!)
+    ]);
+
+    const alignedZone = zoneRows.rows[0]?.zone_name ?? "—";
+
+    return {
+      id: row.id,
+      name: row.name,
+      category: "Faction",
+      alignedZone,
+      overview:
+        alignedZone !== "—"
+          ? `${row.name} is a tracked faction with NPC presence aligned to ${alignedZone}.`
+          : `${row.name} is a tracked faction in the EQEmu data set.`,
+      raisedBy: raisedRows.rows.map((entry) => ({ id: entry.id, name: entry.name, href: `/npcs/${entry.id}` })),
+      loweredBy: loweredRows.rows.map((entry) => ({ id: entry.id, name: entry.name, href: `/npcs/${entry.id}` }))
+    };
+  }, () => factions.find((faction) => faction.id === id));
 }
 
 export async function listRecipes(filters: RecipeFilters = {}) {
   return withDatabaseFallback(async () => {
     const clauses = [sql`1 = 1`];
+    const isPoisonSearch = includesFolded("Poison", filters.tradeskill);
 
     if (filters.q) {
       clauses.push(sql`name like ${like(filters.q)}`);
     }
 
-    const tradeskillId = filters.tradeskill
-      ? Object.entries(tradeskillNames).find(([, name]) => includesFolded(name, filters.tradeskill))?.[0]
-      : undefined;
-    if (tradeskillId) {
-      clauses.push(sql`tradeskill = ${Number(tradeskillId)}`);
+    const tradeskillIds = resolveRecipeTradeskillIds(filters.tradeskill);
+    if (isPoisonSearch) {
+      clauses.push(sql`
+        (
+          tradeskill = 56
+          or (
+            tradeskill = 75
+            and exists (
+              select 1
+              from tradeskill_recipe_entries poison_entries
+              join items poison_items on poison_items.id = poison_entries.item_id
+              where poison_entries.recipe_id = tradeskill_recipe.id
+                and poison_entries.iscontainer = 1
+                and ${discoveredItemClause("poison_items.id")}
+                and poison_items.Name like '%Poison%'
+            )
+          )
+        )
+      `);
+    } else if (tradeskillIds.length === 1) {
+      clauses.push(sql`tradeskill = ${tradeskillIds[0]}`);
+    } else if (tradeskillIds.length > 1) {
+      clauses.push(sql`tradeskill in (${sql.join(tradeskillIds.map((id) => sql`${id}`), sql`, `)})`);
     }
 
     if (filters.minTrivial) {
@@ -2340,73 +2870,183 @@ export async function listRecipes(filters: RecipeFilters = {}) {
   );
 }
 
-export function getRecipeDetail(id: number): RecipeDetail | undefined {
-  return recipes.find((recipe) => recipe.id === id);
+export async function getRecipeDetail(id: number): Promise<RecipeDetail | undefined> {
+  return withDatabaseFallback(async () => {
+    const recipeResult = await sql<{
+      id: number;
+      name: string;
+      tradeskill: number;
+      trivial: number;
+      notes: string | null;
+    }>`
+      select id, name, tradeskill, trivial, notes
+      from tradeskill_recipe
+      where id = ${id}
+      limit 1
+    `.execute(db!);
+
+    const row = recipeResult.rows[0];
+    if (!row) {
+      return undefined;
+    }
+
+    const entryRows = await sql<{
+      item_id: number;
+      successcount: number;
+      componentcount: number;
+      iscontainer: number;
+      item_name: string | null;
+      item_icon: number | null;
+    }>`
+      select tre.item_id, tre.successcount, tre.componentcount, tre.iscontainer, i.Name as item_name, i.icon as item_icon
+      from tradeskill_recipe_entries tre
+      left join items i on i.id = tre.item_id
+        and ${discoveredItemClause("i.id")}
+      where tre.recipe_id = ${id}
+      order by tre.id asc
+    `.execute(db!);
+
+    const rawContainers = entryRows.rows
+      .filter((entry) => Number(entry.iscontainer ?? 0) === 1)
+      .reduce<Array<{ id: number; name: string; href?: string; icon: string }>>((accumulator, entry) => {
+        if (accumulator.some((container) => container.id === entry.item_id)) {
+          return accumulator;
+        }
+
+        accumulator.push({
+          id: entry.item_id,
+          name: entry.item_name?.trim() || staticTradeskillContainers[entry.item_id]?.name || `Item ${entry.item_id}`,
+          href: entry.item_name ? `/items/${entry.item_id}` : undefined,
+          icon: String(entry.item_icon ?? staticTradeskillContainers[entry.item_id]?.icon ?? "")
+        });
+
+        return accumulator;
+      }, []);
+    const resolvedContainers = rawContainers.filter((entry) => entry.href || entry.icon);
+    const containers = resolvedContainers.length > 0 ? resolvedContainers : rawContainers;
+
+    const creates = entryRows.rows
+      .filter((entry) => Number(entry.successcount ?? 0) > 0 && Boolean(entry.item_name))
+      .map((entry) => ({
+        id: entry.item_id,
+        name: entry.item_name?.trim() || `Item ${entry.item_id}`,
+        href: `/items/${entry.item_id}`,
+        count: Number(entry.successcount ?? 0),
+        icon: String(entry.item_icon ?? "")
+      }));
+
+    const ingredients = entryRows.rows
+      .filter((entry) => Number(entry.componentcount ?? 0) > 0 && Boolean(entry.item_name))
+      .map((entry) => ({
+        id: entry.item_id,
+        name: entry.item_name?.trim() || `Item ${entry.item_id}`,
+        href: `/items/${entry.item_id}`,
+        count: Number(entry.componentcount ?? 0),
+        icon: String(entry.item_icon ?? "")
+      }));
+
+    return {
+      id: row.id,
+      name: row.name,
+      tradeskill: formatTradeskill(row.tradeskill),
+      trivial: Number(row.trivial ?? 0),
+      result: creates.length > 0 ? creates.map((entry) => `${entry.name}${entry.count > 1 ? ` x${entry.count}` : ""}`).join(", ") : "—",
+      container: containers.length > 0 ? containers.map((entry) => entry.name).join(", ") : "Unknown",
+      notes: row.notes?.trim() || "No notes are recorded for this recipe.",
+      containers,
+      creates,
+      ingredients
+    };
+  }, () => recipes.find((recipe) => recipe.id === id));
 }
 
 export async function listPets(filters: PetFilters = {}): Promise<PetSummary[]> {
   return withDatabaseFallback(async () => {
-    const classId = classIdFromName(filters.className);
-    if (!classId) {
+    const requestedClasses = (filters.classNames?.length ? filters.classNames : filters.className ? [filters.className] : [])
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    const classIds = [...new Set(requestedClasses.map((entry) => classIdFromName(entry)).filter((entry) => entry > 0))];
+
+    if (classIds.length === 0) {
       return [];
     }
 
-    const classColumn = sql.raw(`classes${classId}`);
-    const rows = await sql<{
-      spell_id: number;
-      spell_name: string;
-      new_icon: number;
-      spell_level: number;
-      race: number;
-      pet_level: number;
-      pet_class: number;
-      hp: number;
-      mana: number;
-      ac: number;
-      mindmg: number;
-      maxdmg: number;
-    }>`
-      select
-        s.id as spell_id,
-        s.name as spell_name,
-        s.new_icon,
-        ${classColumn} as spell_level,
-        nt.race,
-        nt.level as pet_level,
-        nt.class as pet_class,
-        nt.hp,
-        nt.mana,
-        nt.ac,
-        nt.mindmg,
-        nt.maxdmg
-      from spells_new s
-      inner join pets p on p.type = s.teleport_zone
-      inner join npc_types nt on nt.name = s.teleport_zone
-      where ${classColumn} > 0 and ${classColumn} < 255
-      group by s.id, s.name, s.new_icon, spell_level, nt.race, nt.level, nt.class, nt.hp, nt.mana, nt.ac, nt.mindmg, nt.maxdmg
-      order by spell_level asc, s.name asc
-    `.execute(db!);
+    const allRows = await Promise.all(
+      classIds.map(async (classId) => {
+        const classColumn = sql.raw(`classes${classId}`);
+        const rows = await sql<{
+          spell_id: number;
+          spell_name: string;
+          new_icon: number;
+          spell_level: number;
+          race: number;
+          pet_level: number;
+          pet_class: number;
+          hp: number;
+          mana: number;
+          ac: number;
+          mindmg: number;
+          maxdmg: number;
+        }>`
+          select
+            s.id as spell_id,
+            s.name as spell_name,
+            s.new_icon,
+            ${classColumn} as spell_level,
+            nt.race,
+            nt.level as pet_level,
+            nt.class as pet_class,
+            nt.hp,
+            nt.mana,
+            nt.ac,
+            nt.mindmg,
+            nt.maxdmg
+          from spells_new s
+          inner join pets p on p.type = s.teleport_zone
+          inner join npc_types nt on nt.name = s.teleport_zone
+          where ${classColumn} > 0 and ${classColumn} < 255
+          group by s.id, s.name, s.new_icon, spell_level, nt.race, nt.level, nt.class, nt.hp, nt.mana, nt.ac, nt.mindmg, nt.maxdmg
+          order by spell_level asc, s.name asc
+        `.execute(db!);
 
-    return rows.rows.map((row) => ({
-      id: row.spell_id,
-      spellId: row.spell_id,
-      spellName: row.spell_name,
-      spellIcon: String(row.new_icon ?? 0),
-      ownerClass: classNames[classId - 1],
-      ownerClassId: classId,
-      spellLevel: Number(row.spell_level ?? 0),
-      race: formatRace(row.race),
-      petLevel: Number(row.pet_level ?? 0),
-      petClass: formatNpcClass(row.pet_class),
-      hp: Number(row.hp ?? 0),
-      mana: Number(row.mana ?? 0),
-      ac: Number(row.ac ?? 0),
-      minDamage: Number(row.mindmg ?? 0),
-      maxDamage: Number(row.maxdmg ?? 0)
-    }));
+        return rows.rows.map((row) => ({
+          id: row.spell_id,
+          spellId: row.spell_id,
+          spellName: row.spell_name,
+          spellIcon: String(row.new_icon ?? 0),
+          ownerClass: classNames[classId - 1],
+          ownerClassId: classId,
+          spellLevel: Number(row.spell_level ?? 0),
+          race: formatRace(row.race),
+          petLevel: Number(row.pet_level ?? 0),
+          petClass: formatNpcClass(row.pet_class),
+          hp: Number(row.hp ?? 0),
+          mana: Number(row.mana ?? 0),
+          ac: Number(row.ac ?? 0),
+          minDamage: Number(row.mindmg ?? 0),
+          maxDamage: Number(row.maxdmg ?? 0)
+        }));
+      })
+    );
+
+    return [...new Map(
+      allRows
+        .flat()
+        .sort((left, right) =>
+          left.ownerClassId - right.ownerClassId ||
+          left.spellLevel - right.spellLevel ||
+          left.spellName.localeCompare(right.spellName)
+        )
+        .map((entry) => [`${entry.ownerClassId}:${entry.spellId}`, entry])
+    ).values()];
   }, () =>
     pets
-      .filter((pet) => !filters.className || includesFolded(pet.ownerClass, filters.className))
+      .filter((pet) => {
+        if (filters.classNames?.length) {
+          return filters.classNames.some((className) => includesFolded(pet.ownerClass, className));
+        }
+        return !filters.className || includesFolded(pet.ownerClass, filters.className);
+      })
       .map((pet) => ({
         id: pet.id,
         spellId: pet.grantedBy.id,
