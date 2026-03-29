@@ -202,6 +202,17 @@ body.eq-home-page.eq-home-search-focused::before {
   --ring: rgba(215, 164, 95, 0.24);
 }
 
+.eq-recipe-scope {
+  --foreground: #f1e8d8;
+  --muted: #c2b296;
+  --muted-strong: #f6edde;
+  --card: rgba(28, 23, 20, 0.9);
+  --panel: rgba(20, 21, 26, 0.88);
+  --border: rgba(201, 167, 114, 0.14);
+  --border-strong: rgba(201, 167, 114, 0.24);
+  --ring: rgba(215, 164, 95, 0.28);
+}
+
 .eq-item-search-scope input,
 .eq-item-search-scope select {
   background: rgba(27, 24, 24, 0.9);

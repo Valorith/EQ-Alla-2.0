@@ -1,8 +1,8 @@
-import { listZoneEras } from "@eq-alla/data";
+import { listZoneEraDefinitions } from "@eq-alla/data";
 import { LinkList, PageHero, SectionCard } from "../../../components/catalog-shell";
 
 export default async function ZonesByEraPage() {
-  const eras = await listZoneEras();
+  const eras = listZoneEraDefinitions();
 
   return (
     <>
@@ -10,9 +10,9 @@ export default async function ZonesByEraPage() {
       <SectionCard title="Browse eras">
         <LinkList
           items={eras.map((era) => ({
-            href: `/zones/by-era/${encodeURIComponent(era.toLowerCase())}`,
-            label: era,
-            meta: "See zones in this expansion era"
+            href: `/zones/by-era/${encodeURIComponent(era.slug)}`,
+            label: era.label,
+            meta: "See zones in this legacy era bucket"
           }))}
         />
       </SectionCard>

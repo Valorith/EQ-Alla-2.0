@@ -116,12 +116,18 @@ export type NpcSummary = {
 
 export type NpcDetail = NpcSummary & {
   fullName: string;
+  appearance: {
+    raceId: number;
+    gender: number;
+    texture: number;
+    helmTexture: number;
+  };
   hp: number;
   mana: number;
   damage: string;
   faction: string;
   mainFaction: { id: number; name: string; href: string } | null;
-  attackSpeed: string;
+  attackDelay: number;
   specialAttacks: string[];
   spells: Array<{ id: number; name: string; href: string; type: string; icon: string }>;
   drops: Array<{
@@ -147,6 +153,23 @@ export type ZoneSummary = {
   era: string;
   levelRange: string;
   population: string;
+};
+
+export type ZoneLevelBand = {
+  label: string;
+  minLevel: number;
+  maxLevel: number;
+  npcCount: number;
+  isSignificant: boolean;
+};
+
+export type ZoneByLevelSummary = {
+  id: number;
+  shortName: string;
+  longName: string;
+  era: string;
+  suggestedLevel: string;
+  bands: ZoneLevelBand[];
 };
 
 export type SpawnGroupDetail = {
@@ -211,8 +234,9 @@ export type PetSummary = {
 export type RecipeDetail = RecipeSummary & {
   container: string;
   notes: string;
-  creates: Array<{ id: number; name: string; href: string; count: number }>;
-  ingredients: Array<{ id: number; name: string; href: string; count: number }>;
+  containers: Array<{ id: number; name: string; href?: string; icon: string }>;
+  creates: Array<{ id: number; name: string; href: string; count: number; icon: string }>;
+  ingredients: Array<{ id: number; name: string; href: string; count: number; icon: string }>;
 };
 
 export type PetDetail = {

@@ -295,6 +295,12 @@ export const npcs: NpcDetail[] = [
     id: 3001,
     name: "a mistmoore guard",
     fullName: "a mistmoore guard",
+    appearance: {
+      raceId: 6,
+      gender: 0,
+      texture: 0,
+      helmTexture: 0
+    },
     race: "Dark Elf",
     level: "35 - 38",
     zone: "Castle Mistmoore",
@@ -305,7 +311,7 @@ export const npcs: NpcDetail[] = [
     damage: "78 - 165",
     faction: "Mayong's Retainers",
     mainFaction: { id: 4001, name: "Mayong's Retainers", href: "/factions/4001" },
-    attackSpeed: "Normal (100%)",
+    attackDelay: 30,
     specialAttacks: [],
     spells: [],
     drops: [
@@ -338,6 +344,12 @@ export const npcs: NpcDetail[] = [
     id: 3002,
     name: "Matron V'Lyra",
     fullName: "Matron V'Lyra",
+    appearance: {
+      raceId: 6,
+      gender: 1,
+      texture: 0,
+      helmTexture: 0
+    },
     race: "Dark Elf",
     level: "52",
     zone: "Castle Mistmoore",
@@ -348,7 +360,7 @@ export const npcs: NpcDetail[] = [
     damage: "160 - 260",
     faction: "Mayong's Retainers",
     mainFaction: { id: 4001, name: "Mayong's Retainers", href: "/factions/4001" },
-    attackSpeed: "115%",
+    attackDelay: 26,
     specialAttacks: ["Enrage"],
     spells: [
       { id: 2002, name: "Complete Heal", href: "/spells/2002", type: "Heal", icon: "18" },
@@ -384,6 +396,12 @@ export const npcs: NpcDetail[] = [
     id: 3003,
     name: "Scholar Alquen",
     fullName: "Scholar Alquen",
+    appearance: {
+      raceId: 1,
+      gender: 0,
+      texture: 0,
+      helmTexture: 0
+    },
     race: "Human",
     level: "60",
     zone: "The Plane of Knowledge",
@@ -394,7 +412,7 @@ export const npcs: NpcDetail[] = [
     damage: "0 - 0",
     faction: "Keepers of the Knowledge",
     mainFaction: { id: 4002, name: "Keepers of the Knowledge", href: "/factions/4002" },
-    attackSpeed: "Normal (100%)",
+    attackDelay: 30,
     specialAttacks: [],
     spells: [],
     drops: [],
@@ -441,9 +459,10 @@ export const recipes: RecipeDetail[] = [
     result: "Runed Mithril Bracer",
     container: "Forge",
     notes: "A reinforcement step used by castle armorers.",
-    creates: [{ id: 1001, name: "Runed Mithril Bracer", href: "/items/1001", count: 1 }],
+    containers: [{ id: 0, name: "Forge", icon: "" }],
+    creates: [{ id: 1001, name: "Runed Mithril Bracer", href: "/items/1001", count: 1, icon: "bracer" }],
     ingredients: [
-      { id: 1003, name: "Traveler's Restorative Draught", href: "/items/1003", count: 1 }
+      { id: 1003, name: "Traveler's Restorative Draught", href: "/items/1003", count: 1, icon: "potion" }
     ]
   },
   {
@@ -454,7 +473,8 @@ export const recipes: RecipeDetail[] = [
     result: "Traveler's Restorative Draught",
     container: "Medicine Bag",
     notes: "A light utility combine for mock merchant stock.",
-    creates: [{ id: 1003, name: "Traveler's Restorative Draught", href: "/items/1003", count: 2 }],
+    containers: [{ id: 0, name: "Medicine Bag", icon: "" }],
+    creates: [{ id: 1003, name: "Traveler's Restorative Draught", href: "/items/1003", count: 2, icon: "potion" }],
     ingredients: []
   }
 ];

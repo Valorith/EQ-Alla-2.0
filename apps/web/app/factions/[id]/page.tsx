@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getFactionDetail } from "@eq-alla/data";
-import { LinkList, PageHero, SectionCard } from "../../../components/catalog-shell";
+import { PageHero, SectionCard } from "../../../components/catalog-shell";
+import { SearchablePaginatedLinkList } from "../../../components/searchable-paginated-link-list";
 
 type FactionDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -8,7 +9,7 @@ type FactionDetailPageProps = {
 
 export default async function FactionDetailPage({ params }: FactionDetailPageProps) {
   const { id } = await params;
-  const faction = getFactionDetail(Number(id));
+  const faction = await getFactionDetail(Number(id));
 
   if (!faction) notFound();
 
@@ -22,10 +23,18 @@ export default async function FactionDetailPage({ params }: FactionDetailPagePro
       />
       <div className="grid gap-4 xl:grid-cols-2">
         <SectionCard title="Raised by">
-          <LinkList items={faction.raisedBy.map((entry) => ({ href: entry.href, label: entry.name }))} />
+          <SearchablePaginatedLinkList
+            items={faction.raisedBy.map((entry) => ({ href: entry.href, label: entry.name }))}
+            emptyText="No NPCs were found that raise this faction."
+            searchPlaceholder="Search NPCs that raise this faction..."
+          />
         </SectionCard>
         <SectionCard title="Lowered by">
-          <LinkList items={faction.loweredBy.map((entry) => ({ href: entry.href, label: entry.name }))} />
+          <SearchablePaginatedLinkList
+            items={faction.loweredBy.map((entry) => ({ href: entry.href, label: entry.name }))}
+            emptyText="No NPCs were found that lower this faction."
+            searchPlaceholder="Search NPCs that lower this faction..."
+          />
         </SectionCard>
       </div>
     </>
