@@ -2,6 +2,8 @@ import { getZonesByLevel } from "@eq-alla/data";
 import { PageHero, SectionCard } from "../../../components/catalog-shell";
 import { ZonesByLevelMatrix } from "./zones-by-level-matrix";
 
+export const dynamic = "force-dynamic";
+
 export default async function ZonesByLevelPage() {
   const zones = await getZonesByLevel();
 
