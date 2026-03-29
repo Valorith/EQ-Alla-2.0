@@ -182,13 +182,54 @@ export type SpawnGroupDetail = {
   entries: Array<{ id: number; name: string; chance: string; href: string }>;
 };
 
+export type ZoneResourceLink = {
+  label: string;
+  href: string;
+  count: number;
+  description?: string;
+  mode?: "npcs" | "named" | "items" | "forage" | "tasks" | "spawngroups";
+};
+
+export type ZoneBestiaryEntry = {
+  id: number;
+  name: string;
+  href: string;
+  levelRange: string;
+  race: string;
+  klass: string;
+  classification: string;
+  named: boolean;
+  variants: number;
+};
+
+export type ZoneItemDropEntry = {
+  id: number;
+  name: string;
+  href: string;
+  icon: string;
+  type: string;
+};
+
+export type ZoneForageEntry = {
+  id: number;
+  name: string;
+  href: string;
+  icon: string;
+  chance: number;
+  skill: number;
+};
+
 export type ZoneDetail = ZoneSummary & {
+  hotzone: boolean;
   safePoint: string;
-  resources: Array<{ label: string; href: string }>;
-  bestiary: Array<{ id: number; name: string; href: string }>;
+  encounterRange: string;
+  spawnPoints: number;
+  rules: string[];
+  resources: ZoneResourceLink[];
+  bestiary: ZoneBestiaryEntry[];
   namedNpcs: Array<{ id: number; name: string; href: string }>;
-  itemDrops: Array<{ id: number; name: string; href: string }>;
-  forage: Array<{ id: number; name: string; href: string }>;
+  itemDrops: ZoneItemDropEntry[];
+  forage: ZoneForageEntry[];
   tasks: Array<{ id: number; name: string; href: string }>;
   spawnGroups: SpawnGroupDetail[];
 };

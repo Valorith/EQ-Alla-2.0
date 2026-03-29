@@ -527,27 +527,67 @@ export const zones: ZoneDetail[] = [
     shortName: "mistmoore",
     longName: "Castle Mistmoore",
     spawns: 142,
+    hotzone: false,
     era: "Classic",
     levelRange: "30 - 55",
+    encounterRange: "20 - 60",
     population: "Undead, nobles, and castle guards",
     safePoint: "-178 / 44 / 3",
+    spawnPoints: 176,
+    rules: ["No binding", "Levitate allowed", "Indoor casting rules"],
     resources: [
-      { label: "Bestiary", href: "/zones/mistmoore?mode=npcs" },
-      { label: "Named mobs", href: "/zones/mistmoore/named" },
-      { label: "Equipment", href: "/zones/mistmoore?mode=items" },
-      { label: "Spawn groups", href: "/zones/mistmoore?mode=spawngroups" },
-      { label: "Tasks", href: "/zones/mistmoore?mode=tasks" }
+      {
+        label: "Bestiary",
+        href: "/zones/mistmoore?mode=npcs",
+        count: 2,
+        description: "Creature roster, level spread, and dispositions.",
+        mode: "npcs"
+      },
+      {
+        label: "Named mobs",
+        href: "/zones/mistmoore?mode=named",
+        count: 1,
+        description: "Focused named encounter list.",
+        mode: "named"
+      },
+      {
+        label: "Equipment",
+        href: "/zones/mistmoore?mode=items",
+        count: 2,
+        description: "Distinct items dropped in the zone.",
+        mode: "items"
+      }
     ],
     bestiary: [
-      { id: 3001, name: "a mistmoore guard", href: "/npcs/3001" },
-      { id: 3002, name: "Matron V'Lyra", href: "/npcs/3002" }
+      {
+        id: 3001,
+        name: "a mistmoore guard",
+        href: "/npcs/3001",
+        levelRange: "32 - 36",
+        race: "Dark Elf",
+        klass: "Warrior",
+        classification: "Normal",
+        named: false,
+        variants: 3
+      },
+      {
+        id: 3002,
+        name: "Matron V'Lyra",
+        href: "/npcs/3002",
+        levelRange: "55",
+        race: "Dark Elf",
+        klass: "Cleric",
+        classification: "Named",
+        named: true,
+        variants: 1
+      }
     ],
     namedNpcs: [{ id: 3002, name: "Matron V'Lyra", href: "/npcs/3002" }],
     itemDrops: [
-      { id: 1001, name: "Runed Mithril Bracer", href: "/items/1001" },
-      { id: 1002, name: "Midnight Archivist's Staff", href: "/items/1002" }
+      { id: 1001, name: "Runed Mithril Bracer", href: "/items/1001", icon: "1126", type: "Armor" },
+      { id: 1002, name: "Midnight Archivist's Staff", href: "/items/1002", icon: "583", type: "2H Blunt" }
     ],
-    forage: [],
+    forage: [{ id: 13041, name: "Spider Silk", href: "/items/13041", icon: "782", chance: 100, skill: 0 }],
     tasks: [{ id: 6001, name: "The Count's Ledger", href: "/tasks/6001" }],
     spawnGroups
   },
@@ -556,17 +596,45 @@ export const zones: ZoneDetail[] = [
     shortName: "poknowledge",
     longName: "The Plane of Knowledge",
     spawns: 64,
+    hotzone: false,
     era: "Planes of Power",
     levelRange: "1 - 65",
+    encounterRange: "1 - 65",
     population: "Merchants, spell vendors, and portal traffic",
     safePoint: "825 / -65 / -159",
+    spawnPoints: 91,
+    rules: ["Binding allowed", "Levitate allowed", "Outdoor casting"],
     resources: [
-      { label: "Bestiary", href: "/zones/poknowledge?mode=npcs" },
-      { label: "Equipment", href: "/zones/poknowledge?mode=items" }
+      {
+        label: "Bestiary",
+        href: "/zones/poknowledge?mode=npcs",
+        count: 1,
+        description: "Creature roster, level spread, and dispositions.",
+        mode: "npcs"
+      },
+      {
+        label: "Equipment",
+        href: "/zones/poknowledge?mode=items",
+        count: 1,
+        description: "Distinct items dropped in the zone.",
+        mode: "items"
+      }
     ],
-    bestiary: [{ id: 3003, name: "Scholar Alquen", href: "/npcs/3003" }],
+    bestiary: [
+      {
+        id: 3003,
+        name: "Scholar Alquen",
+        href: "/npcs/3003",
+        levelRange: "65",
+        race: "Human",
+        klass: "Wizard",
+        classification: "Normal",
+        named: true,
+        variants: 1
+      }
+    ],
     namedNpcs: [{ id: 3003, name: "Scholar Alquen", href: "/npcs/3003" }],
-    itemDrops: [{ id: 1003, name: "Traveler's Restorative Draught", href: "/items/1003" }],
+    itemDrops: [{ id: 1003, name: "Traveler's Restorative Draught", href: "/items/1003", icon: "potion", type: "Potion" }],
     forage: [],
     tasks: [],
     spawnGroups: []

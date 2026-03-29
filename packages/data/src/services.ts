@@ -1,6 +1,5 @@
 import { cacheGet, cacheGetOrResolve } from "./cache";
 import { getDb } from "./db";
-import { useMockData } from "./env";
 import { factions, items, npcs, pets, recipes, spells, spawnGroups, tasks, zones } from "./mock-data";
 import { getSpellEffectName, summarizeSpellEffects } from "./spell-effects";
 import { formatExpansion, getZoneEraLabels, matchesZoneEraFilter } from "./zone-eras";
@@ -61,14 +60,15 @@ type ItemSearchRow = {
   icon: number;
 };
 
-const sourceMode = useMockData() ? "mock" : "hybrid";
 const db = getDb();
-const databaseEnabled = !useMockData() && Boolean(db);
+const sourceMode = db ? "live" : "database-unavailable";
+const databaseEnabled = Boolean(db);
 const itemSearchLimit = 100;
 const itemSearchCacheTtlSeconds = 60;
 const zoneLevelBandSize = 5;
 const zoneLevelBandMaximum = 110;
 const zoneLevelBandSignificanceFloor = 5;
+const merchantNpcClasses = [40, 41, 59, 61, 67, 68, 70] as const;
 
 const classNames = [
   "Warrior",
@@ -652,6 +652,16 @@ function isNamedNpcName(name: string) {
   return !(lower.startsWith("a ") || lower.startsWith("an ") || lower.startsWith("the "));
 }
 
+function formatNpcClassification(name: string) {
+  if (name.startsWith("###")) return "Boss";
+  if (name.startsWith("##")) return "Mini-Boss";
+  if (name.startsWith("#")) return "Named";
+  if (name.startsWith("~")) return "Quest NPC";
+  if (name.startsWith("!")) return "Hidden";
+  if (name.startsWith("_")) return "Event Spawned";
+  return "Normal";
+}
+
 function formatNpcName(name: string) {
   return name
     .replace(/[#!~]/g, "")
@@ -666,16 +676,12 @@ function spellClassesFromRow(row: Record<string, unknown>) {
     .filter((entry) => entry.level > 0 && entry.level < 255);
 }
 
-async function withDatabaseFallback<T>(run: () => Promise<T>, fallback: () => T | Promise<T>) {
+async function withDatabaseFallback<T>(run: () => Promise<T>, _fallback: () => T | Promise<T>) {
   if (!databaseEnabled || !db) {
-    return fallback();
+    throw new Error("Database connection is required. Mock data fallback has been disabled.");
   }
 
-  try {
-    return await run();
-  } catch {
-    return fallback();
-  }
+  return run();
 }
 
 function includesFolded(value: string, query?: string) {
@@ -2253,7 +2259,9 @@ export async function listZones(filters: ZoneFilters = {}) {
       select z.short_name, z.long_name, z.zoneidnumber, z.expansion, z.min_level, z.max_level, z.note, count(s2.id) as spawns
       from zone z
       left join spawn2 s2 on s2.zone = z.short_name and s2.version = z.version
-      where z.short_name like ${like(filters.q)} or z.long_name like ${like(filters.q)}
+      where coalesce(z.version, 0) = 0
+        and coalesce(z.min_status, 0) <= 1
+        and (z.short_name like ${like(filters.q)} or z.long_name like ${like(filters.q)})
       group by z.short_name, z.long_name, z.zoneidnumber, z.expansion, z.min_level, z.max_level, z.note
       order by z.long_name asc
     `.execute(db!);
@@ -2396,10 +2404,27 @@ export async function getZonesByLevel() {
 
 export async function getZoneDetail(shortName: string): Promise<ZoneDetail | undefined> {
   return withDatabaseFallback(async () => {
-    const result = await sql<{ short_name: string; long_name: string; zoneidnumber: number; expansion: number; min_level: number; max_level: number; note: string | null; safe_x: number; safe_y: number; safe_z: number }>`
-      select short_name, long_name, zoneidnumber, expansion, min_level, max_level, note, safe_x, safe_y, safe_z
+    const result = await sql<{
+      short_name: string;
+      long_name: string;
+      zoneidnumber: number;
+      expansion: number;
+      min_level: number;
+      max_level: number;
+      note: string | null;
+      safe_x: number;
+      safe_y: number;
+      safe_z: number;
+      hotzone: number;
+      canbind: number;
+      canlevitate: number;
+      castoutdoor: number;
+    }>`
+      select short_name, long_name, zoneidnumber, expansion, min_level, max_level, note, safe_x, safe_y, safe_z,
+             hotzone, canbind, canlevitate, castoutdoor
       from zone
       where short_name = ${shortName}
+        and version = 0
       limit 1
     `.execute(db!);
 
@@ -2407,38 +2432,264 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
 
     if (!zone) return undefined;
 
-    const npcsInZone = await sql<{ id: number; name: string }>`
-      select distinct nt.id, nt.name
-      from npc_types nt
-      join spawnentry se on se.npcID = nt.id
-      join spawngroup sg on sg.id = se.spawngroupID
-      join spawn2 s2 on s2.spawngroupID = sg.id
-      where s2.zone = ${shortName}
-      order by nt.name asc
-      limit 25
-    `.execute(db!);
+    const [bestiaryRows, itemRows, forageRows, spawnLocationRows, spawnEntryRows] = await Promise.all([
+      sql<{
+        id: number;
+        raw_name: string;
+        min_level: number;
+        max_level: number;
+        race: number;
+        class: number;
+        variants: number;
+      }>`
+        select min(nt.id) as id,
+               nt.name as raw_name,
+               min(nt.level) as min_level,
+               max(coalesce(nullif(nt.maxlevel, 0), nt.level)) as max_level,
+               min(nt.race) as race,
+               min(nt.class) as class,
+               count(distinct nt.id) as variants
+        from npc_types nt
+        join spawnentry se on se.npcID = nt.id
+        join spawngroup sg on sg.id = se.spawngroupID
+        join spawn2 s2 on s2.spawngroupID = sg.id
+        where s2.zone = ${shortName}
+          and s2.version = 0
+          and nt.trackable > 0
+          and nt.race not in (127, 240)
+        group by nt.name
+        order by nt.name asc
+      `.execute(db!),
+      sql<{
+        id: number;
+        name: string;
+        icon: number;
+        itemclass: number;
+        itemtype: number;
+        damage: number;
+      }>`
+        select distinct i.id, i.Name as name, i.icon, i.itemclass, i.itemtype, i.damage
+        from items i
+        join lootdrop_entries lde on lde.item_id = i.id
+        join loottable_entries lte on lte.lootdrop_id = lde.lootdrop_id
+        join npc_types nt on nt.loottable_id = lte.loottable_id
+        join spawnentry se on se.npcID = nt.id
+        join spawngroup sg on sg.id = se.spawngroupID
+        join spawn2 s2 on s2.spawngroupID = sg.id
+        where s2.zone = ${shortName}
+          and s2.version = 0
+          and nt.class not in (${sql.join(merchantNpcClasses.map((value) => sql`${value}`), sql`, `)})
+        order by i.Name asc
+      `.execute(db!),
+      sql<{
+        id: number;
+        name: string;
+        icon: number;
+        level: number;
+        chance: number;
+      }>`
+        select i.id,
+               i.Name as name,
+               i.icon,
+               max(f.level) as level,
+               max(f.chance) as chance
+        from forage f
+        join zone z on z.zoneidnumber = f.zoneid and z.version = 0
+        join items i on i.id = f.Itemid
+        where z.short_name = ${shortName}
+        group by i.id, i.Name, i.icon
+        order by i.Name asc
+      `.execute(db!),
+      sql<{
+        id: number;
+        name: string;
+        x: number;
+        y: number;
+        z: number;
+        respawntime: number;
+      }>`
+        select sg.id, sg.name, s2.x, s2.y, s2.z, s2.respawntime
+        from spawn2 s2
+        join spawngroup sg on sg.id = s2.spawngroupID
+        where s2.zone = ${shortName}
+          and s2.version = 0
+        order by sg.name asc, s2.id asc
+      `.execute(db!),
+      sql<{
+        spawngroupID: number;
+        id: number;
+        name: string;
+        chance: number;
+      }>`
+        select distinct se.spawngroupID, nt.id, nt.name, se.chance
+        from spawnentry se
+        join npc_types nt on nt.id = se.npcID
+        join spawn2 s2 on s2.spawngroupID = se.spawngroupID
+        where s2.zone = ${shortName}
+          and s2.version = 0
+        order by se.spawngroupID asc, nt.name asc
+      `.execute(db!)
+    ]);
 
-    const bestiary = npcsInZone.rows.map((row) => ({ id: row.id, name: row.name, href: `/npcs/${row.id}` }));
+    const bestiary = bestiaryRows.rows
+      .map((row) => {
+        const name = formatNpcName(row.raw_name);
+
+        return {
+          id: row.id,
+          name,
+          href: `/npcs/${row.id}`,
+          levelRange: formatLevelRange(row.min_level, row.max_level),
+          race: formatRace(row.race),
+          klass: formatNpcClass(row.class),
+          classification: formatNpcClassification(row.raw_name),
+          named: isNamedNpcName(name),
+          variants: Number(row.variants ?? 1)
+        };
+      })
+      .filter((entry) => entry.name.length > 0);
+
+    const encounterLevels = bestiaryRows.rows.flatMap((row) => {
+      const levels = [Number(row.min_level ?? 0), Number(row.max_level ?? 0)].filter((value) => value > 0);
+      return levels;
+    });
+    const encounterRange =
+      encounterLevels.length > 0
+        ? formatLevelRange(Math.min(...encounterLevels), Math.max(...encounterLevels))
+        : formatLevelRange(zone.min_level, zone.max_level);
+
+    const recommendedRange = formatLevelRange(zone.min_level, zone.max_level);
+    const displayRange = recommendedRange === "All levels" ? encounterRange : recommendedRange;
+
+    const namedNpcs = bestiary
+      .filter((entry) => entry.named)
+      .map((entry) => ({ id: entry.id, name: entry.name, href: entry.href }));
+
+    const itemDrops = itemRows.rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      href: `/items/${row.id}`,
+      icon: String(row.icon ?? ""),
+      type: formatDetailedItemType(row.itemtype ?? row.itemclass)
+    }));
+
+    const forage = forageRows.rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      href: `/items/${row.id}`,
+      icon: String(row.icon ?? ""),
+      chance: Number(row.chance ?? 0),
+      skill: Number(row.level ?? 0)
+    }));
+
+    const spawnGroupMap = new Map<number, SpawnGroupDetail>();
+
+    for (const row of spawnLocationRows.rows) {
+      if (!spawnGroupMap.has(row.id)) {
+        spawnGroupMap.set(row.id, {
+          id: row.id,
+          name: row.name,
+          zone: { shortName: zone.short_name, longName: zone.long_name, href: `/zones/${zone.short_name}` },
+          respawn: formatSeconds(Number(row.respawntime ?? 0)),
+          locations: [],
+          entries: []
+        });
+      }
+
+      const group = spawnGroupMap.get(row.id);
+      const location = `${Math.round(Number(row.y ?? 0))} / ${Math.round(Number(row.x ?? 0))} / ${Math.round(Number(row.z ?? 0))}`;
+      if (group && !group.locations.includes(location)) {
+        group.locations.push(location);
+      }
+    }
+
+    for (const row of spawnEntryRows.rows) {
+      const group = spawnGroupMap.get(row.spawngroupID);
+      if (!group) continue;
+
+      if (!group.entries.some((entry) => entry.id === row.id)) {
+        group.entries.push({
+          id: row.id,
+          name: formatNpcName(row.name),
+          chance: `${Number(row.chance ?? 0)}%`,
+          href: `/npcs/${row.id}`
+        });
+      }
+    }
+
+    const spawnGroups = [...spawnGroupMap.values()];
+    const rules = [
+      Number(zone.canbind ?? 0) > 0 ? "Binding allowed" : "No binding",
+      Number(zone.canlevitate ?? 0) > 0 ? "Levitate allowed" : "Levitate blocked",
+      Number(zone.castoutdoor ?? 0) > 0 ? "Outdoor casting" : "Indoor casting rules"
+    ];
+    if (Number(zone.hotzone ?? 0) > 0) {
+      rules.unshift("Hotzone bonus");
+    }
+
+    const resources = [
+      {
+        label: "Bestiary",
+        href: `/zones/${shortName}?mode=npcs`,
+        count: bestiary.length,
+        description: "Creature roster, level spread, and dispositions.",
+        mode: "npcs" as const
+      },
+      ...(namedNpcs.length > 0
+        ? [
+            {
+              label: "Named mobs",
+              href: `/zones/${shortName}?mode=named`,
+              count: namedNpcs.length,
+              description: "Focused named encounter list.",
+              mode: "named" as const
+            }
+          ]
+        : []),
+      ...(itemDrops.length > 0
+        ? [
+            {
+              label: "Equipment",
+              href: `/zones/${shortName}?mode=items`,
+              count: itemDrops.length,
+              description: "Distinct items dropped in the zone.",
+              mode: "items" as const
+            }
+          ]
+        : []),
+      ...(forage.length > 0
+        ? [
+            {
+              label: "Forage",
+              href: `/zones/${shortName}?mode=forage`,
+              count: forage.length,
+              description: "Gatherables and forage table entries.",
+              mode: "forage" as const
+            }
+          ]
+        : [])
+    ];
 
     const detail: ZoneDetail = {
       id: zone.zoneidnumber,
       shortName: zone.short_name,
       longName: zone.long_name,
       spawns: bestiary.length,
+      hotzone: Number(zone.hotzone ?? 0) > 0,
       era: formatExpansion(zone.expansion),
-      levelRange: formatLevelRange(zone.min_level, zone.max_level),
-      population: zone.note?.trim() || "Live zone data",
-      safePoint: `${zone.safe_x}, ${zone.safe_y}, ${zone.safe_z}`,
-      resources: [
-        { label: "Bestiary", href: `/zones/${shortName}?mode=npcs` },
-        { label: "Named mobs", href: `/zones/${shortName}/named` }
-      ],
+      levelRange: displayRange,
+      population: zone.note?.trim() || `${bestiary.length} creatures indexed across ${spawnLocationRows.rows.length} spawn points.`,
+      safePoint: `${Math.floor(zone.safe_x ?? 0)} / ${Math.floor(zone.safe_y ?? 0)} / ${Math.floor(zone.safe_z ?? 0)}`,
+      encounterRange,
+      spawnPoints: spawnLocationRows.rows.length,
+      rules,
+      resources,
       bestiary,
-      namedNpcs: bestiary.filter((entry) => isNamedNpcName(entry.name)),
-      itemDrops: [],
-      forage: [],
+      namedNpcs,
+      itemDrops,
+      forage,
       tasks: [],
-      spawnGroups: []
+      spawnGroups
     };
     return detail;
   }, () => zones.find((zone) => zone.shortName === shortName));

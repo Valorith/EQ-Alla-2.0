@@ -8,15 +8,13 @@ import { ArrowRight, Database, Search, ShieldCheck } from "lucide-react";
 
 const routesWithInlineSearch = new Set([
   "/",
-  "/search",
   "/items",
   "/spells",
   "/npcs",
   "/zones",
   "/factions",
   "/recipes",
-  "/pets",
-  "/tasks"
+  "/pets"
 ]);
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -39,14 +37,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       items: [
         { href: "/factions", label: "Factions" },
         { href: "/recipes", label: "Recipes" },
-        { href: "/pets", label: "Pets" },
-        { href: "/tasks", label: "Tasks" }
+        { href: "/pets", label: "Pets" }
       ]
     },
     {
       label: "Browse",
       items: [
-        { href: "/search", label: "Global Search" },
         { href: "/zones/by-level", label: "Zones by Level" },
         { href: "/zones/by-era", label: "Zones by Era" }
       ]
@@ -72,7 +68,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </div>
 
               {showSidebarSearch ? (
-                <form action="/search" className="space-y-3">
+                <form action="/" className="space-y-3">
                   <label className="block text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--sidebar-muted)]">
                     Search the archive
                   </label>
@@ -117,7 +113,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     <div>
                       <p className="text-sm font-semibold text-white">Read-only by design</p>
                       <p className="mt-1 text-xs leading-5 text-white/70">
-                        Built for mirrored EQEmu data with mock-mode fallback while live mappings are wired in.
+                        Built directly on mirrored EQEmu data with live database-backed pages and search.
                       </p>
                     </div>
                   </div>

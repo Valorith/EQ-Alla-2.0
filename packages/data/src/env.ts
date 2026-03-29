@@ -57,7 +57,7 @@ for (const filename of [".env.local", ".env", "env.local", "env"]) {
 }
 
 const envSchema = z.object({
-  EQ_USE_MOCK_DATA: z.string().optional().default("true"),
+  EQ_USE_MOCK_DATA: z.string().optional().default("false"),
   EQ_SITE_NAME: z.string().optional().default("EQ Alla 2.0"),
   EQ_SITE_URL: z.string().optional().default("http://localhost:3000"),
   EQ_DB_HOST: z.string().optional(),
@@ -71,7 +71,7 @@ const envSchema = z.object({
 export const env = envSchema.parse(process.env);
 
 export function useMockData() {
-  return env.EQ_USE_MOCK_DATA !== "false";
+  return env.EQ_USE_MOCK_DATA === "true";
 }
 
 export function hasDatabaseConfig() {
