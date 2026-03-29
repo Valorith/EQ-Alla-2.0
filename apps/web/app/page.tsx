@@ -35,7 +35,13 @@ export default function HomePage() {
             : "eq-home-stage flex min-h-[calc(100vh-7rem)] justify-center px-4 pt-10 sm:px-8 sm:pt-14 xl:pt-18"
         }
       >
-        <form action="/" className="w-full max-w-3xl">
+        <form action="/" className="w-full max-w-3xl space-y-5">
+          <div className="flex justify-center">
+            <div className="flex items-end gap-2">
+              <span className="eq-wordmark text-[3rem] font-semibold leading-none text-[#f3c54f] sm:text-[3.6rem]">EQ Alla</span>
+              <span className="pb-1.5 text-sm font-semibold uppercase tracking-[0.18em] text-[#f0d8a0]/80 sm:pb-2 sm:text-[0.95rem]">2.0</span>
+            </div>
+          </div>
           <div className="eq-home-search relative">
             <Search className="eq-home-search-icon pointer-events-none absolute left-5 top-1/2 z-10 size-5 -translate-y-1/2 text-white/46" />
             <Input
