@@ -181,7 +181,7 @@ This path creates a distributable Windows server folder. The packaged folder inc
 - `.env.example`: a template users can copy to `.env`
 - `EQ-Alla-2.0-Server.exe`: a launcher that opens a console window and runs the server
 
-The launcher reads `.env.local`, `.env`, `env.local`, or `env` from the same folder as the `.exe`, then starts the server on `0.0.0.0` using `PORT` or `EQ_PORT` if provided.
+The launcher reads `.env.local`, `.env`, `env.local`, or `env` from the same folder as the `.exe`, then starts the server on `0.0.0.0` using `PORT` or `EQ_PORT` if provided. If no env file exists, it will create `.env` automatically from the bundled example and ask the user to edit it before running again.
 
 1. Build the package:
 
@@ -197,19 +197,20 @@ dist/windows-server/EQ-Alla-2.0-Server.exe
 
 3. If you run the command on macOS or Linux, it will still assemble the portable runtime package, but you must run the same command once on a Windows machine to generate the native `.exe`.
 
-You can also let GitHub Actions build the Windows package for you automatically. Every push to `main`, plus any manual run from the Actions tab, triggers the `Build Windows Server Package` workflow and uploads `dist/windows-server` as a downloadable artifact.
+You can also let GitHub Actions build the Windows package for you automatically. Every push to `main`, plus any manual run from the Actions tab, triggers the `Build Windows Server Package` workflow and uploads `dist/eq-alla-windows-server.zip` as a downloadable artifact.
 
 4. In the packaged folder:
 
-- copy `.env.example` to `.env`
-- fill in the database and site values
-- run `EQ-Alla-2.0-Server.exe`
+- if needed, run `EQ-Alla-2.0-Server.exe` once to auto-create `.env`
+- fill in the database and site values in `.env`
+- run `EQ-Alla-2.0-Server.exe` again
 
 5. Put a reverse proxy such as Caddy, IIS, or nginx in front of the local port if you want public HTTPS traffic.
 
 Notes:
 
 - the Windows launcher keeps the console window open while the server is running
+- if `.env` is missing, the launcher creates it automatically and exits cleanly
 - by default it serves on `http://0.0.0.0:3000`
 - you can override the port with `PORT=8080` or `EQ_PORT=8080` in the env file
 - the packaged runtime is built from Next.js `standalone` output, so it does not require Docker for deployment

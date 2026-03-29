@@ -1,6 +1,19 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const moduleApi = require("node:module");
+const defaultEnvTemplate = `EQ_USE_MOCK_DATA=false
+EQ_SITE_NAME=EQ Alla 2.0
+EQ_SITE_URL=https://eqalla.example.com
+EQ_SITE_HOST=eqalla.example.com
+
+EQ_DB_HOST=127.0.0.1
+EQ_DB_PORT=3306
+EQ_DB_NAME=peq
+EQ_DB_USER=app_user
+EQ_DB_PASSWORD=change-me
+
+EQ_REDIS_URL=redis://redis:6379
+`;
 
 function parseEnvFile(contents) {
   for (const rawLine of contents.split(/\r?\n/)) {
@@ -31,6 +44,17 @@ function parseEnvFile(contents) {
   }
 }
 
+function findEnvFile(baseDir) {
+  for (const filename of [".env.local", ".env", "env.local", "env"]) {
+    const candidate = path.join(baseDir, filename);
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
 function loadEnvFiles(baseDir) {
   for (const filename of [".env.local", ".env", "env.local", "env"]) {
     const candidate = path.join(baseDir, filename);
@@ -40,6 +64,22 @@ function loadEnvFiles(baseDir) {
 
     parseEnvFile(fs.readFileSync(candidate, "utf8"));
   }
+}
+
+function ensureEnvFile(baseDir) {
+  const existing = findEnvFile(baseDir);
+  if (existing) {
+    return existing;
+  }
+
+  const templatePath = path.join(baseDir, ".env.example");
+  const envPath = path.join(baseDir, ".env");
+  const contents = fs.existsSync(templatePath)
+    ? fs.readFileSync(templatePath, "utf8")
+    : defaultEnvTemplate;
+
+  fs.writeFileSync(envPath, contents, "utf8");
+  return null;
 }
 
 function resolvePackageRoot() {
@@ -57,10 +97,11 @@ function resolvePackageRoot() {
 const packageRoot = resolvePackageRoot();
 const runtimeRoot = path.join(packageRoot, "runtime");
 const serverPath = path.join(runtimeRoot, "apps", "web", "server.js");
+const currentWorkingDirectory = process.cwd();
+const createdEnvFromTemplate = !ensureEnvFile(packageRoot);
 
 loadEnvFiles(packageRoot);
 
-const currentWorkingDirectory = process.cwd();
 if (currentWorkingDirectory !== packageRoot) {
   loadEnvFiles(currentWorkingDirectory);
 }
@@ -68,6 +109,13 @@ if (currentWorkingDirectory !== packageRoot) {
 process.env.NODE_ENV = process.env.NODE_ENV || "production";
 process.env.HOSTNAME = process.env.HOSTNAME || process.env.EQ_HOSTNAME || "0.0.0.0";
 process.env.PORT = process.env.PORT || process.env.EQ_PORT || "3000";
+
+if (createdEnvFromTemplate) {
+  console.log("EQ Alla 2.0");
+  console.log(`Created ${path.join(packageRoot, ".env")} from the bundled example.`);
+  console.log("Update the database and site settings in that file, then run the launcher again.");
+  process.exit(0);
+}
 
 if (!fs.existsSync(serverPath)) {
   console.error("EQ Alla 2.0 runtime was not found.");

@@ -20,6 +20,7 @@ const launcherScriptTarget = path.join(distRoot, "launcher.cjs");
 const notesTarget = path.join(distRoot, "README.txt");
 const seaConfigTarget = path.join(distRoot, "sea-config.json");
 const exeTarget = path.join(distRoot, "EQ-Alla-2.0-Server.exe");
+const zipTarget = path.join(repoRoot, "dist", "eq-alla-windows-server.zip");
 
 function runCommand(command, args) {
   if (process.platform === "win32") {
@@ -36,6 +37,25 @@ function runCommand(command, args) {
 
   execFileSync(command, args, {
     cwd: repoRoot,
+    stdio: "inherit"
+  });
+}
+
+function runCommandInDirectory(command, args, cwd) {
+  if (process.platform === "win32") {
+    const commandLine = [command, ...args]
+      .map((value) => (/\s/.test(value) ? `"${value}"` : value))
+      .join(" ");
+
+    execFileSync("cmd.exe", ["/d", "/s", "/c", commandLine], {
+      cwd,
+      stdio: "inherit"
+    });
+    return;
+  }
+
+  execFileSync(command, args, {
+    cwd,
     stdio: "inherit"
   });
 }
@@ -81,13 +101,32 @@ async function buildWindowsExecutable() {
   await fs.rm(seaConfigTarget, { force: true });
 }
 
+async function buildReleaseZip() {
+  await fs.rm(zipTarget, { force: true });
+
+  if (process.platform === "win32") {
+    runCommand("powershell", [
+      "-NoProfile",
+      "-Command",
+      `Compress-Archive -Path "${distRoot}\\*" -DestinationPath "${zipTarget}" -Force`
+    ]);
+    return;
+  }
+
+  runCommandInDirectory("zip", ["-r", path.basename(zipTarget), path.basename(distRoot)], path.dirname(distRoot));
+}
+
 await buildRuntimePackage();
 
 if (process.platform === "win32") {
   await buildWindowsExecutable();
+  await buildReleaseZip();
   console.log(`\nWindows package ready at ${distRoot}`);
   console.log(`Executable: ${exeTarget}`);
+  console.log(`Zip archive: ${zipTarget}`);
 } else {
+  await buildReleaseZip();
   console.log(`\nWindows runtime package ready at ${distRoot}`);
+  console.log(`Zip archive: ${zipTarget}`);
   console.log("Run this same command on a Windows machine to generate EQ-Alla-2.0-Server.exe.");
 }

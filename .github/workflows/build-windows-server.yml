@@ -33,7 +33,7 @@ jobs:
       - name: Upload Windows server artifact
         uses: actions/upload-artifact@v4
         with:
-          name: eq-alla-windows-server
-          path: dist/windows-server
+          name: eq-alla-windows-server-zip
+          path: dist/eq-alla-windows-server.zip
           if-no-files-found: error
           retention-days: 14
