@@ -22,6 +22,18 @@ const seaConfigTarget = path.join(distRoot, "sea-config.json");
 const exeTarget = path.join(distRoot, "EQ-Alla-2.0-Server.exe");
 
 function runCommand(command, args) {
+  if (process.platform === "win32") {
+    const commandLine = [command, ...args]
+      .map((value) => (/\s/.test(value) ? `"${value}"` : value))
+      .join(" ");
+
+    execFileSync("cmd.exe", ["/d", "/s", "/c", commandLine], {
+      cwd: repoRoot,
+      stdio: "inherit"
+    });
+    return;
+  }
+
   execFileSync(command, args, {
     cwd: repoRoot,
     stdio: "inherit"
@@ -44,7 +56,7 @@ async function writeNotes() {
 }
 
 async function buildRuntimePackage() {
-  runCommand(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "build", "-w", "@eq-alla/web"]);
+  runCommand("npm", ["run", "build", "-w", "@eq-alla/web"]);
 
   await fs.rm(distRoot, { recursive: true, force: true });
   await fs.mkdir(distRoot, { recursive: true });
