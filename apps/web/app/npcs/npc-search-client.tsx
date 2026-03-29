@@ -311,16 +311,7 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
       <SectionCard
         title={mode === "advanced" ? "Advanced filters" : "Filters"}
         right={
-          mode === "basic" ? (
-            <div className="flex items-center gap-4">
-              <Link href="/npcs/advanced" className="text-sm text-white/70 hover:text-white hover:underline">
-                Advanced search
-              </Link>
-              <p className="text-xs font-medium text-[#ccb594]">{statusLabel}</p>
-            </div>
-          ) : (
-            <p className="text-xs font-medium text-[#ccb594]">{statusLabel}</p>
-          )
+          <p className="text-xs font-medium text-[#ccb594]">{statusLabel}</p>
         }
       >
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

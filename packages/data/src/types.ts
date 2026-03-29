@@ -168,6 +168,7 @@ export type ZoneByLevelSummary = {
   shortName: string;
   longName: string;
   era: string;
+  hotzone: boolean;
   suggestedLevel: string;
   bands: ZoneLevelBand[];
 };

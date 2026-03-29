@@ -279,17 +279,20 @@ const spellTypeNames: Record<number, string> = {
   256: "Dot"
 };
 
-const tradeskillNames: Record<number, string> = {
-  56: "Baking",
-  57: "Tailoring",
-  58: "Blacksmithing",
-  59: "Fletching",
-  60: "Brewing",
-  63: "Jewelry",
-  64: "Pottery",
-  65: "Research",
-  68: "Alchemy",
-  69: "Tinkering"
+const recipeTradeskillNames: Record<number, string> = {
+  55: "Fishing",
+  56: "Poison",
+  57: "Tinkering",
+  58: "Research",
+  59: "Alchemy",
+  60: "Baking",
+  61: "Tailoring",
+  63: "Blacksmithing",
+  64: "Fletching",
+  65: "Brewing",
+  68: "Jewelry",
+  69: "Pottery",
+  75: "Poison"
 };
 
 const staticTradeskillContainers: Record<number, { name: string; icon: string }> = {
@@ -614,7 +617,15 @@ function formatTarget(target: number | null | undefined) {
 }
 
 function formatTradeskill(tradeskill: number | null | undefined) {
-  return tradeskillNames[tradeskill ?? -1] ?? `Tradeskill ${tradeskill ?? 0}`;
+  return recipeTradeskillNames[tradeskill ?? -1] ?? `Tradeskill ${tradeskill ?? 0}`;
+}
+
+function resolveRecipeTradeskillIds(tradeskill?: string) {
+  if (!tradeskill) return [];
+
+  return Object.entries(recipeTradeskillNames)
+    .filter(([, name]) => includesFolded(name, tradeskill))
+    .map(([id]) => Number(id));
 }
 
 function classIdFromName(className?: string) {
@@ -2281,6 +2292,7 @@ export async function getZonesByLevel() {
       short_name: string;
       long_name: string;
       expansion: number;
+      hotzone: number;
       bucket: number | null;
       npc_count: number;
     }>`
@@ -2289,6 +2301,7 @@ export async function getZonesByLevel() {
         z.short_name,
         z.long_name,
         z.expansion,
+        z.hotzone,
         floor((nt.level - 1) / ${zoneLevelBandSize}) as bucket,
         count(distinct nt.id) as npc_count
       from zone z
@@ -2301,7 +2314,7 @@ export async function getZonesByLevel() {
         and nt.race not in (127, 240)
       where coalesce(z.version, 0) = 0
         and coalesce(z.min_status, 0) <= 0
-      group by z.zoneidnumber, z.short_name, z.long_name, z.expansion, bucket
+      group by z.zoneidnumber, z.short_name, z.long_name, z.expansion, z.hotzone, bucket
       order by z.long_name asc, bucket asc
     `.execute(db!);
 
@@ -2315,6 +2328,7 @@ export async function getZonesByLevel() {
           shortName: row.short_name,
           longName: row.long_name,
           era: formatExpansion(row.expansion),
+          hotzone: Number(row.hotzone ?? 0) > 0,
           suggestedLevel: "Unknown",
           bands: createZoneLevelBands(new Map())
         };
@@ -2367,6 +2381,7 @@ export async function getZonesByLevel() {
           shortName: zone.shortName,
           longName: zone.longName,
           era: zone.era,
+          hotzone: false,
           suggestedLevel: zone.levelRange,
           bands
         };
@@ -2515,16 +2530,34 @@ export async function getFactionDetail(id: number): Promise<FactionDetail | unde
 export async function listRecipes(filters: RecipeFilters = {}) {
   return withDatabaseFallback(async () => {
     const clauses = [sql`1 = 1`];
+    const isPoisonSearch = includesFolded("Poison", filters.tradeskill);
 
     if (filters.q) {
       clauses.push(sql`name like ${like(filters.q)}`);
     }
 
-    const tradeskillId = filters.tradeskill
-      ? Object.entries(tradeskillNames).find(([, name]) => includesFolded(name, filters.tradeskill))?.[0]
-      : undefined;
-    if (tradeskillId) {
-      clauses.push(sql`tradeskill = ${Number(tradeskillId)}`);
+    const tradeskillIds = resolveRecipeTradeskillIds(filters.tradeskill);
+    if (isPoisonSearch) {
+      clauses.push(sql`
+        (
+          tradeskill = 56
+          or (
+            tradeskill = 75
+            and exists (
+              select 1
+              from tradeskill_recipe_entries poison_entries
+              join items poison_items on poison_items.id = poison_entries.item_id
+              where poison_entries.recipe_id = tradeskill_recipe.id
+                and poison_entries.iscontainer = 1
+                and poison_items.Name like '%Poison%'
+            )
+          )
+        )
+      `);
+    } else if (tradeskillIds.length === 1) {
+      clauses.push(sql`tradeskill = ${tradeskillIds[0]}`);
+    } else if (tradeskillIds.length > 1) {
+      clauses.push(sql`tradeskill in (${sql.join(tradeskillIds.map((id) => sql`${id}`), sql`, `)})`);
     }
 
     if (filters.minTrivial) {

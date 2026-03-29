@@ -12,7 +12,6 @@ const routesWithInlineSearch = new Set([
   "/items",
   "/spells",
   "/npcs",
-  "/npcs/advanced",
   "/zones",
   "/factions",
   "/recipes",
@@ -48,7 +47,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       label: "Browse",
       items: [
         { href: "/search", label: "Global Search" },
-        { href: "/npcs/advanced", label: "Advanced NPCs" },
         { href: "/zones/by-level", label: "Zones by Level" },
         { href: "/zones/by-era", label: "Zones by Era" }
       ]

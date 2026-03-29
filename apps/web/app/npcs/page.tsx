@@ -15,7 +15,7 @@ export default async function NpcsPage({ searchParams }: NpcsPageProps) {
       <PageHero
         eyebrow="Bestiary"
         title="NPC Search"
-        description="Use the quick list for the common browse flow or switch to the advanced screen for legacy-style filters."
+        description="Search named mobs, guards, merchants, and creatures across the live bestiary."
       />
       <NpcSearchClient
         mode="basic"
