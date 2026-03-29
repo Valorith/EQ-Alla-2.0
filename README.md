@@ -6,6 +6,7 @@
 
 <img width="1660" height="838" alt="image" src="https://github.com/user-attachments/assets/c7970b09-4028-4905-8f94-850942a8e0ee" />
 
+<img width="1327" height="821" alt="image" src="https://github.com/user-attachments/assets/56eea33f-228e-4601-aa5b-797056cdf8d0" />
 
 
 # EQ Alla 2.0
