@@ -105,11 +105,14 @@ async function buildReleaseZip() {
   await fs.rm(zipTarget, { force: true });
 
   if (process.platform === "win32") {
-    runCommand("powershell", [
+    execFileSync("powershell", [
       "-NoProfile",
       "-Command",
-      `Compress-Archive -Path "${distRoot}\\*" -DestinationPath "${zipTarget}" -Force`
-    ]);
+      `Compress-Archive -Path '${distRoot}\\*' -DestinationPath '${zipTarget}' -Force`
+    ], {
+      cwd: repoRoot,
+      stdio: "inherit"
+    });
     return;
   }
 
