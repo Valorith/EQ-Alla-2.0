@@ -1,15 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Input } from "@eq-alla/ui";
 import { Search } from "lucide-react";
 import { SearchClient } from "./search/search-client";
 
 export default function HomePage() {
-  const [isFocused, setIsFocused] = useState(false);
+  return (
+    <Suspense fallback={<HomePageBody query="" />}>
+      <HomePageWithSearchParams />
+    </Suspense>
+  );
+}
+
+function HomePageWithSearchParams() {
   const searchParams = useSearchParams();
   const query = searchParams.get("q") ?? "";
+
+  return <HomePageBody query={query} />;
+}
+
+function HomePageBody({ query }: { query: string }) {
+  const [isFocused, setIsFocused] = useState(false);
   const hasResults = query.trim().length > 0;
 
   useEffect(() => {

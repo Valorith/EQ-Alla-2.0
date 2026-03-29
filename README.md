@@ -62,6 +62,7 @@ EQ Alla 2.0 can be hosted in two straightforward ways:
 
 - Docker: recommended if you want the app, Redis, and Caddy bundled together
 - Non-Docker: recommended if you already manage Node.js processes and your own reverse proxy
+- Windows launcher package: recommended if you want a folder with `EQ-Alla-2.0-Server.exe` that starts the server in a visible console window
 
 ### Before you start
 
@@ -171,6 +172,45 @@ eqalla.example.com {
   reverse_proxy 127.0.0.1:3000
 }
 ```
+
+### Build a Windows `.exe` launcher package
+
+This path creates a distributable Windows server folder. The packaged folder includes:
+
+- `runtime/`: the bundled Next.js standalone server
+- `.env.example`: a template users can copy to `.env`
+- `EQ-Alla-2.0-Server.exe`: a launcher that opens a console window and runs the server
+
+The launcher reads `.env.local`, `.env`, `env.local`, or `env` from the same folder as the `.exe`, then starts the server on `0.0.0.0` using `PORT` or `EQ_PORT` if provided.
+
+1. Build the package:
+
+```bash
+npm run package:windows
+```
+
+2. If you are already on Windows, the command will generate:
+
+```text
+dist/windows-server/EQ-Alla-2.0-Server.exe
+```
+
+3. If you run the command on macOS or Linux, it will still assemble the portable runtime package, but you must run the same command once on a Windows machine to generate the native `.exe`.
+
+4. In the packaged folder:
+
+- copy `.env.example` to `.env`
+- fill in the database and site values
+- run `EQ-Alla-2.0-Server.exe`
+
+5. Put a reverse proxy such as Caddy, IIS, or nginx in front of the local port if you want public HTTPS traffic.
+
+Notes:
+
+- the Windows launcher keeps the console window open while the server is running
+- by default it serves on `http://0.0.0.0:3000`
+- you can override the port with `PORT=8080` or `EQ_PORT=8080` in the env file
+- the packaged runtime is built from Next.js `standalone` output, so it does not require Docker for deployment
 
 ### Operational Notes
 

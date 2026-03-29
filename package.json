@@ -10,6 +10,7 @@
     "build": "npm run build -w @eq-alla/web",
     "start": "npm run start -w @eq-alla/web",
     "serve": "npm run build && npm run start",
+    "package:windows": "node scripts/package-windows-server.mjs",
     "compose:up": "docker compose up -d --build",
     "compose:down": "docker compose down",
     "compose:logs": "docker compose logs -f web caddy",
