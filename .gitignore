@@ -10,6 +10,8 @@ test-results
 .turbo
 .env
 .env.local
+env
+env.local
 *.log
 *.tsbuildinfo
 .spire-reference/

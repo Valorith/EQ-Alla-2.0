@@ -8,14 +8,9 @@ Modern EverQuest encyclopedia scaffold built as a monorepo around `Next.js 15`, 
 - Modern responsive catalog UI with clean routes for the major Alla sections
 - Legacy route compatibility for the old `?a=` query model and `task.php` / `spawngroup.php`
 - Internal API routes for search and entity listings
-- Mock-backed read services that mirror the planned domain model
 - MySQL connectivity and schema-capability health checks for an EQEmu-style mirror
 - Redis-backed cache abstraction with in-memory fallback
 - Docker, Caddy, Vitest, and Playwright scaffolding
-
-## Current status
-
-The app runs end-to-end with curated mock data by default so the UI and route model are testable immediately. The data package already includes the DB and capability plumbing needed to connect a mirrored EQEmu schema, but the detailed live SQL mappings for every entity family are still the next major step.
 
 ## Quick start
 
@@ -28,7 +23,147 @@ Open `http://localhost:3000`.
 
 ## Environment
 
-Copy `.env.example` to `.env` and change values as needed.
+Copy `.env.example` to `.env` and change values as needed:
 
-Set `EQ_USE_MOCK_DATA=false` once the live MySQL mappings are ready to be used across the catalog.
+```bash
+cp .env.example .env
+```
 
+Required:
+
+- `EQ_SITE_URL`: full public URL such as `https://eqalla.example.com`
+- `EQ_SITE_HOST`: bare host/domain for Caddy, such as `eqalla.example.com`
+- `EQ_DB_HOST`
+- `EQ_DB_PORT`
+- `EQ_DB_NAME`
+- `EQ_DB_USER`
+- `EQ_DB_PASSWORD`
+
+Optional:
+
+- `EQ_REDIS_URL`: defaults cleanly to the bundled Redis service when you use Docker Compose
+
+The app is configured for live database-backed operation. `EQ_USE_MOCK_DATA` should remain `false`.
+
+## Internet Hosting
+
+EQ Alla 2.0 can be hosted in two straightforward ways:
+
+- Docker: recommended if you want the app, Redis, and Caddy bundled together
+- Non-Docker: recommended if you already manage Node.js processes and your own reverse proxy
+
+### Before you start
+
+Make sure you have:
+
+- a reachable MySQL database with the EQEmu-style schema
+- a public DNS record pointed at your server
+- a completed `.env` file based on `.env.example`
+
+Minimum `.env` values:
+
+```env
+EQ_USE_MOCK_DATA=false
+EQ_SITE_URL=https://eqalla.example.com
+EQ_SITE_HOST=eqalla.example.com
+EQ_DB_HOST=127.0.0.1
+EQ_DB_PORT=3306
+EQ_DB_NAME=peq
+EQ_DB_USER=app_user
+EQ_DB_PASSWORD=change-me
+EQ_REDIS_URL=redis://redis:6379
+```
+
+If you are not using Docker, set `EQ_REDIS_URL` to your own Redis instance or leave it unset to fall back to in-memory caching.
+
+### Host with Docker
+
+This path uses:
+
+- `web`: Next.js app
+- `redis`: cache service
+- `caddy`: public web server and TLS terminator
+
+1. Copy the environment template and update it for your server:
+
+```bash
+cp .env.example .env
+```
+
+2. Start the production stack:
+
+```bash
+npm run compose:up
+```
+
+3. Watch the startup logs:
+
+```bash
+npm run compose:logs
+```
+
+4. Confirm your DNS points to the server and that ports `80` and `443` are open.
+
+5. Stop the stack when needed:
+
+```bash
+npm run compose:down
+```
+
+Notes:
+
+- Caddy reads `EQ_SITE_HOST` from `.env`
+- changing domains is just an `.env` update plus a restart
+- HTTPS is handled by Caddy automatically once the domain resolves publicly
+
+### Host without Docker
+
+This path runs the built Next.js app directly on the server. You provide the reverse proxy yourself.
+
+1. Copy the environment template and update it for your server:
+
+```bash
+cp .env.example .env
+```
+
+2. Install dependencies:
+
+```bash
+npm install
+```
+
+3. Build the app:
+
+```bash
+npm run build
+```
+
+4. Start the production server on the port you want to expose internally:
+
+```bash
+PORT=3000 npm run start
+```
+
+Or build and start in one step:
+
+```bash
+PORT=3000 npm run serve
+```
+
+5. Put a reverse proxy in front of the app and forward traffic to that local port.
+
+Example Caddy config for a non-Docker host:
+
+```caddy
+eqalla.example.com {
+  encode gzip zstd
+  reverse_proxy 127.0.0.1:3000
+}
+```
+
+### Operational Notes
+
+- Keep `.env` on the server only. It is ignored by git.
+- If the public domain changes, update both `EQ_SITE_HOST` and `EQ_SITE_URL`.
+- If you run without Docker, use a process manager such as `systemd`, `pm2`, or `supervisor` so the app restarts automatically.
+- If you run without Docker and do not provide Redis, the app will still run with in-memory cache fallback.
