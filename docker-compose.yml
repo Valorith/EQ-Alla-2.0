@@ -11,7 +11,7 @@ services:
     depends_on:
       - redis
     expose:
-      - "3000"
+      - "${PORT:-3000}"
 
   redis:
     image: redis:7-alpine

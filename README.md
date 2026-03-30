@@ -23,6 +23,18 @@ Before hosting the app, make sure you have:
 - a domain or hostname if you want to expose it to the internet
 - an env file with the correct database and site values
 
+## What Redis and Caddy Are
+
+Two supporting services are mentioned throughout this README:
+
+- `Redis`
+  Redis is an optional cache service. In this app, it is used to store cached data so repeated requests can be served faster. If Redis is not available outside Docker, the app can still run and will fall back to in-memory caching.
+
+- `Caddy`
+  Caddy is a web server and reverse proxy. In this app, it usually sits in front of the EQ Alla server, accepts public web traffic for your domain, forwards that traffic to the app, and can automatically handle HTTPS certificates for you.
+
+If you use the Windows `.exe` path or the non-Docker Node.js path, you do not have to use Redis or Caddy specifically, but you will usually want some kind of reverse proxy in front of the app if you are serving it publicly.
+
 ## Required Environment Values
 
 Copy `.env.example` to `.env` and edit it:
@@ -38,6 +50,7 @@ EQ_USE_MOCK_DATA=false
 EQ_SITE_NAME=EQ Alla 2.0
 EQ_SITE_URL=https://eqalla.example.com
 EQ_SITE_HOST=eqalla.example.com
+PORT=3000
 
 EQ_DB_HOST=127.0.0.1
 EQ_DB_PORT=3306
@@ -57,6 +70,7 @@ Notes:
 - `EQ_USE_MOCK_DATA` should stay `false`
 - `EQ_SITE_URL` should be the full public URL
 - `EQ_SITE_HOST` should be the bare host/domain used by Caddy
+- `PORT` is the app's listening port and defaults to `3000`
 - if you do not provide Redis outside Docker, the app will fall back to in-memory caching
 
 ## Choose a Hosting Path
@@ -94,15 +108,20 @@ Important:
 
 ### How to get the `.exe` package
 
-You can get it in either of these ways:
+Primary way:
 
-1. From GitHub Actions
+1. From a GitHub Release
+- Go to the latest release
+- Download the attached Windows zip asset
+- Extract it anywhere you want to run the app
+
+Secondary/admin way:
+
+2. From GitHub Actions
 - Go to the `Actions` tab
 - Open the latest successful `Build Windows Server Package` run
 - Download the `eq-alla-windows-server-zip` artifact
-
-2. From a GitHub Release
-- Download the attached Windows zip from the release assets
+- This is mainly useful if you want the newest build before making a formal release
 
 ### First run behavior
 
@@ -125,17 +144,13 @@ Default local listener:
 http://0.0.0.0:3000
 ```
 
-You can change the port by setting either of these in `.env`:
+You can change the app port by setting this in `.env`:
 
 ```env
 PORT=8080
 ```
 
-or
-
-```env
-EQ_PORT=8080
-```
+The Windows launcher still accepts `EQ_PORT` as a legacy fallback alias, but `PORT` is the primary setting.
 
 ### To serve it to the internet
 
@@ -155,6 +170,8 @@ eqalla.example.com {
   reverse_proxy 127.0.0.1:3000
 }
 ```
+
+If you change `PORT`, update the proxy target to match.
 
 ## Setup With Docker
 
@@ -203,6 +220,7 @@ npm run compose:logs
 - your DNS points to this server
 - ports `80` and `443` are open
 - the DB host is reachable from inside Docker
+- `PORT` in `.env` is the internal app port Caddy proxies to
 
 6. Stop the stack when needed.
 
@@ -213,6 +231,7 @@ npm run compose:down
 ### Docker notes
 
 - Caddy reads `EQ_SITE_HOST` from `.env`
+- the app listens on `PORT` inside Docker, which defaults to `3000`
 - HTTPS is handled automatically by Caddy once the domain resolves publicly
 - Redis is included in this path, so `EQ_REDIS_URL=redis://redis:6379` is fine
 
@@ -268,6 +287,8 @@ eqalla.example.com {
   reverse_proxy 127.0.0.1:3000
 }
 ```
+
+If you choose a different `PORT`, update the proxy target to match.
 
 ### Non-Docker notes
 

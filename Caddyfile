@@ -1,5 +1,5 @@
 {$EQ_SITE_HOST:localhost} {
   encode gzip zstd
 
-  reverse_proxy web:3000
+  reverse_proxy web:{$PORT:3000}
 }
