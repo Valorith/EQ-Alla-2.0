@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getCatalogStats, getItemDetail, getSpellDetail, getZoneDetail, getZonesByEra, getZonesByLevel, listItems, listNpcs, listSpells, listZoneEras, listZones, resolveLegacyRoute, searchCatalog, spellSearchLevelCap } from "./index";
+import { getCatalogStats, getItemDetail, getSpellDetail, getZoneDetail, getZonesByEra, getZonesByLevel, listFactions, listItems, listNpcs, listSpells, listZoneEras, listZones, resolveLegacyRoute, searchCatalog, spellSearchLevelCap } from "./index";
 
 describe("catalog services", () => {
   it("filters items by tradeable flag", async () => {
@@ -93,6 +93,37 @@ describe("catalog services", () => {
     const target = resolveLegacyRoute("/", new URLSearchParams("a=item&id=1001"));
     expect(target).toBe("/items/1001");
   });
+
+  it("lists all factions when no filters are applied", async () => {
+    const factions = await listFactions();
+    expect(factions.length).toBeGreaterThan(1);
+  });
+
+  it("filters factions by aligned zone", async () => {
+    const allFactions = await listFactions();
+    const sample = allFactions.find((entry) => entry.alignedZone !== "—");
+
+    if (!sample) {
+      const empty = await listFactions({ zone: "__no_such_zone__" });
+      expect(empty).toEqual([]);
+      return;
+    }
+
+    const results = await listFactions({ zone: sample.alignedZone });
+    expect(results.length).toBeGreaterThan(0);
+    expect(results.some((entry) => entry.id === sample.id)).toBe(true);
+    expect(results.every((entry) => entry.alignedZone.toLowerCase().includes(sample.alignedZone.toLowerCase()))).toBe(true);
+  }, 15_000);
+
+  it("filters factions by NPC relationship type", async () => {
+    const raised = await listFactions({ relationship: "raises" });
+    const lowered = await listFactions({ relationship: "lowers" });
+    const none = await listFactions({ relationship: "none" });
+
+    expect(raised.every((entry) => entry.raisedByCount > 0)).toBe(true);
+    expect(lowered.every((entry) => entry.loweredByCount > 0)).toBe(true);
+    expect(none.every((entry) => entry.raisedByCount === 0 && entry.loweredByCount === 0)).toBe(true);
+  }, 15_000);
 
   it("maps index.php legacy item routes", () => {
     const target = resolveLegacyRoute("/index.php", new URLSearchParams("a=item&id=1001"));

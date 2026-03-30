@@ -8,11 +8,14 @@ type FactionsPageProps = {
 export default async function FactionsPage({ searchParams }: FactionsPageProps) {
   const params = await searchParams;
   const q = typeof params.q === "string" ? params.q : "";
+  const zone = typeof params.zone === "string" ? params.zone : "";
+  const relationship = typeof params.relationship === "string" ? params.relationship : "";
+  const view = typeof params.view === "string" ? params.view : "";
 
   return (
     <>
-      <PageHero eyebrow="Factions" title="Faction Search" description="Track faction groups, allied zones, and sample raise/lower relationships." />
-      <FactionSearchClient initialQuery={q} />
+      <PageHero eyebrow="Factions" title="Faction Search" description="Track faction groups, aligned zones, and NPCs that can raise or lower standing. Search narrowly or browse the full index." />
+      <FactionSearchClient initialQuery={q} initialZone={zone} initialRelationship={relationship} initialViewAll={view === "all"} />
     </>
   );
 }

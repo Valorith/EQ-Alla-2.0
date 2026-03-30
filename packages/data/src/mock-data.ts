@@ -432,6 +432,8 @@ export const factions: FactionDetail[] = [
     name: "Mayong's Retainers",
     category: "Castle Faction",
     alignedZone: "Castle Mistmoore",
+    raisedByCount: 0,
+    loweredByCount: 2,
     overview: "The retainers who keep the Mistmoore estate functional and hostile to intruders.",
     raisedBy: [],
     loweredBy: [
@@ -444,6 +446,8 @@ export const factions: FactionDetail[] = [
     name: "Keepers of the Knowledge",
     category: "City Faction",
     alignedZone: "The Plane of Knowledge",
+    raisedByCount: 1,
+    loweredByCount: 0,
     overview: "Scholars, guides, and quartermasters supporting travel across Norrath.",
     raisedBy: [{ id: 3003, name: "Scholar Alquen", href: "/npcs/3003" }],
     loweredBy: []

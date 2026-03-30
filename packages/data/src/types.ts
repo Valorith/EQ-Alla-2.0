@@ -239,6 +239,8 @@ export type FactionSummary = {
   name: string;
   category: string;
   alignedZone: string;
+  raisedByCount: number;
+  loweredByCount: number;
 };
 
 export type FactionDetail = FactionSummary & {

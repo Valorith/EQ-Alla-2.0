@@ -1322,11 +1322,13 @@ function summarizeZones(): ZoneSummary[] {
 }
 
 function summarizeFactions(): FactionSummary[] {
-  return factions.map(({ id, name, category, alignedZone }) => ({
+  return factions.map(({ id, name, category, alignedZone, raisedBy, loweredBy }) => ({
     id,
     name,
     category,
-    alignedZone
+    alignedZone,
+    raisedByCount: raisedBy.length,
+    loweredByCount: loweredBy.length
   }));
 }
 
@@ -2828,23 +2830,110 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
   }, () => zones.find((zone) => zone.shortName === shortName));
 }
 
-export async function listFactions(q?: string) {
+type FactionRelationshipFilter = "raises" | "lowers" | "both" | "none";
+
+export type FactionFilters = {
+  q?: string;
+  zone?: string;
+  relationship?: FactionRelationshipFilter;
+};
+
+export async function listFactions(filters: FactionFilters = {}) {
   return withDatabaseFallback(async () => {
-    const rows = await sql<{ id: number; name: string }>`
-      select id, name
-      from faction_list
-      where name like ${like(q)}
-      order by name asc
-      limit 500
+    const clauses = [sql`1 = 1`];
+    const trimmedQuery = filters.q?.trim();
+    const numericQuery = trimmedQuery && /^\d+$/.test(trimmedQuery) ? Number(trimmedQuery) : null;
+
+    if (trimmedQuery) {
+      clauses.push(
+        numericQuery !== null
+          ? sql`(fl.name like ${like(trimmedQuery)} or fl.id = ${numericQuery})`
+          : sql`fl.name like ${like(trimmedQuery)}`
+      );
+    }
+
+    if (filters.zone?.trim()) {
+      clauses.push(sql`coalesce(zone_info.zone_name, '—') like ${like(filters.zone)}`);
+    }
+
+    if (filters.relationship === "raises") {
+      clauses.push(sql`coalesce(relationship_info.raised_by_count, 0) > 0`);
+    } else if (filters.relationship === "lowers") {
+      clauses.push(sql`coalesce(relationship_info.lowered_by_count, 0) > 0`);
+    } else if (filters.relationship === "both") {
+      clauses.push(sql`coalesce(relationship_info.raised_by_count, 0) > 0 and coalesce(relationship_info.lowered_by_count, 0) > 0`);
+    } else if (filters.relationship === "none") {
+      clauses.push(sql`coalesce(relationship_info.raised_by_count, 0) = 0 and coalesce(relationship_info.lowered_by_count, 0) = 0`);
+    }
+
+    const rows = await sql<{
+      id: number;
+      name: string;
+      aligned_zone: string | null;
+      raised_by_count: number | string | null;
+      lowered_by_count: number | string | null;
+    }>`
+      select fl.id,
+             fl.name,
+             zone_info.zone_name as aligned_zone,
+             relationship_info.raised_by_count,
+             relationship_info.lowered_by_count
+      from faction_list fl
+      left join (
+        select nf.primaryfaction as faction_id,
+               min(z.long_name) as zone_name
+        from npc_faction nf
+        join npc_types nt on nt.npc_faction_id = nf.id
+        join spawnentry se on se.npcID = nt.id
+        join spawngroup sg on sg.id = se.spawngroupID
+        join spawn2 s2 on s2.spawngroupID = sg.id
+        left join (
+          select short_name, min(long_name) as long_name
+          from zone
+          where coalesce(version, 0) = 0
+            and coalesce(min_status, 0) <= ${publicZoneStatusCeiling}
+          group by short_name
+        ) z on z.short_name = s2.zone
+        group by nf.primaryfaction
+      ) zone_info on zone_info.faction_id = fl.id
+      left join (
+        select nfe.faction_id,
+               count(distinct case when nfe.value > 0 then nt.id end) as raised_by_count,
+               count(distinct case when nfe.value < 0 then nt.id end) as lowered_by_count
+        from npc_faction_entries nfe
+        join npc_faction nf on nf.id = nfe.npc_faction_id
+        join npc_types nt on nt.npc_faction_id = nf.id
+        group by nfe.faction_id
+      ) relationship_info on relationship_info.faction_id = fl.id
+      where ${sql.join(clauses, sql` and `)}
+      order by fl.name asc
     `.execute(db!);
 
     return rows.rows.map((row) => ({
       id: row.id,
       name: row.name,
       category: "Faction",
-      alignedZone: "—"
+      alignedZone: row.aligned_zone ?? "—",
+      raisedByCount: Number(row.raised_by_count ?? 0),
+      loweredByCount: Number(row.lowered_by_count ?? 0)
     }));
-  }, () => summarizeFactions().filter((faction) => includesFolded(faction.name, q)));
+  }, () =>
+    summarizeFactions().filter((faction) => {
+      const query = filters.q?.trim();
+      const matchesQuery =
+        !query || includesFolded(faction.name, query) || String(faction.id) === query;
+      const matchesZone = !filters.zone?.trim() || includesFolded(faction.alignedZone, filters.zone);
+
+      const matchesRelationship =
+        !filters.relationship ||
+        (filters.relationship === "raises" && faction.raisedByCount > 0) ||
+        (filters.relationship === "lowers" && faction.loweredByCount > 0) ||
+        (filters.relationship === "both" && faction.raisedByCount > 0 && faction.loweredByCount > 0) ||
+        (filters.relationship === "none" && faction.raisedByCount === 0 && faction.loweredByCount === 0);
+
+      return matchesQuery && matchesZone && matchesRelationship;
+    })
+  );
 }
 
 export async function getFactionDetail(id: number): Promise<FactionDetail | undefined> {
@@ -2903,6 +2992,8 @@ export async function getFactionDetail(id: number): Promise<FactionDetail | unde
       name: row.name,
       category: "Faction",
       alignedZone,
+      raisedByCount: raisedRows.rows.length,
+      loweredByCount: loweredRows.rows.length,
       overview:
         alignedZone !== "—"
           ? `${row.name} is a tracked faction with NPC presence aligned to ${alignedZone}.`

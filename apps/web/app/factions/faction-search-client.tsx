@@ -6,10 +6,20 @@ import { usePathname, useRouter } from "next/navigation";
 import type { FactionSummary } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
-import { PaginationControls, SearchPrompt, SectionCard, SimpleTable } from "../../components/catalog-shell";
+import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../components/catalog-shell";
 
 type FactionSearchClientProps = {
   initialQuery: string;
+  initialZone: string;
+  initialRelationship: string;
+  initialViewAll: boolean;
+};
+
+type FactionFilters = {
+  q: string;
+  zone: string;
+  relationship: string;
+  viewAll: boolean;
 };
 
 type SearchResolutionMeta = {
@@ -30,20 +40,63 @@ const factionResultsPerPage = 25;
 const factionSearchCacheTtlMs = 180_000;
 const factionSearchCacheMaxEntries = 12;
 const factionSearchSessionStorageKey = "eq-faction-search-cache";
+const factionRelationshipOptions = ["Raises", "Lowers", "Both", "No NPC Modifiers"];
 
 const factionResultCache = new Map<string, FactionCacheEntry>();
 let factionCacheHydrated = false;
 
-function buildSearchKey(query: string) {
-  return query.trim();
+function buildSearchParams(filters: FactionFilters) {
+  const params = new URLSearchParams();
+  const query = filters.q.trim();
+  const zone = filters.zone.trim();
+  if (query) params.set("q", query);
+  if (zone) params.set("zone", zone);
+  if (filters.relationship) params.set("relationship", mapRelationshipLabelToValue(filters.relationship));
+  if (filters.viewAll) params.set("view", "all");
+  return params;
 }
 
-function hasQuery(query: string) {
-  return buildSearchKey(query).length > 0;
+function buildSearchKey(filters: FactionFilters) {
+  return buildSearchParams(filters).toString();
 }
 
-function hasAutoSearchableQuery(query: string) {
-  return buildSearchKey(query).length >= factionSearchAutoQueryMinLength;
+function hasQuery(filters: FactionFilters) {
+  return filters.viewAll || filters.q.trim().length > 0 || filters.zone.trim().length > 0 || filters.relationship.length > 0;
+}
+
+function hasAutoSearchableQuery(filters: FactionFilters) {
+  return filters.viewAll || filters.zone.trim().length > 0 || filters.relationship.length > 0 || filters.q.trim().length >= factionSearchAutoQueryMinLength;
+}
+
+function mapRelationshipLabelToValue(label: string) {
+  switch (label) {
+    case "Raises":
+      return "raises";
+    case "Lowers":
+      return "lowers";
+    case "Both":
+      return "both";
+    case "No NPC Modifiers":
+      return "none";
+    default:
+      return "";
+  }
+}
+
+function describeRelationships(faction: FactionSummary) {
+  if (faction.raisedByCount > 0 && faction.loweredByCount > 0) {
+    return `${faction.raisedByCount} raise, ${faction.loweredByCount} lower`;
+  }
+
+  if (faction.raisedByCount > 0) {
+    return `${faction.raisedByCount} raise`;
+  }
+
+  if (faction.loweredByCount > 0) {
+    return `${faction.loweredByCount} lower`;
+  }
+
+  return "No NPC modifiers";
 }
 
 function formatDuration(durationMs: number) {
@@ -117,24 +170,101 @@ function setCachedFactions(key: string, results: FactionSummary[]) {
   persistFactionCache();
 }
 
-export function FactionSearchClient({ initialQuery }: FactionSearchClientProps) {
+export function FactionSearchClient({ initialQuery, initialZone, initialRelationship, initialViewAll }: FactionSearchClientProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const [query, setQuery] = useState(initialQuery);
+  const [filters, setFilters] = useState<FactionFilters>({
+    q: initialQuery,
+    zone: initialZone,
+    relationship: initialRelationship === "raises"
+      ? "Raises"
+      : initialRelationship === "lowers"
+        ? "Lowers"
+        : initialRelationship === "both"
+          ? "Both"
+          : initialRelationship === "none"
+            ? "No NPC Modifiers"
+            : "",
+    viewAll: initialViewAll
+  });
   const [results, setResults] = useState<FactionSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [isFetching, setIsFetching] = useState(hasQuery(initialQuery));
+  const [isFetching, setIsFetching] = useState(
+    hasQuery({
+      q: initialQuery,
+      zone: initialZone,
+      relationship:
+        initialRelationship === "raises"
+          ? "Raises"
+          : initialRelationship === "lowers"
+            ? "Lowers"
+            : initialRelationship === "both"
+              ? "Both"
+              : initialRelationship === "none"
+                ? "No NPC Modifiers"
+                : "",
+      viewAll: initialViewAll
+    })
+  );
   const [displayKey, setDisplayKey] = useState("");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
-  const [submitCount, setSubmitCount] = useState(0);
+  const [submitCount, setSubmitCount] = useState(
+    hasQuery({
+      q: initialQuery,
+      zone: initialZone,
+      relationship:
+        initialRelationship === "raises"
+          ? "Raises"
+          : initialRelationship === "lowers"
+            ? "Lowers"
+            : initialRelationship === "both"
+              ? "Both"
+              : initialRelationship === "none"
+                ? "No NPC Modifiers"
+                : "",
+      viewAll: initialViewAll
+    })
+      ? 1
+      : 0
+  );
   const [awaitingManualSubmit, setAwaitingManualSubmit] = useState(false);
   const [page, setPage] = useState(1);
   const abortRef = useRef<AbortController | null>(null);
-  const currentUrlKeyRef = useRef(buildSearchKey(initialQuery));
+  const currentUrlKeyRef = useRef(
+    buildSearchKey({
+      q: initialQuery,
+      zone: initialZone,
+      relationship:
+        initialRelationship === "raises"
+          ? "Raises"
+          : initialRelationship === "lowers"
+            ? "Lowers"
+            : initialRelationship === "both"
+              ? "Both"
+              : initialRelationship === "none"
+                ? "No NPC Modifiers"
+                : "",
+      viewAll: initialViewAll
+    })
+  );
   const lastHandledSubmitRef = useRef(0);
 
   useEffect(() => {
-    const key = buildSearchKey(initialQuery);
+    const key = buildSearchKey({
+      q: initialQuery,
+      zone: initialZone,
+      relationship:
+        initialRelationship === "raises"
+          ? "Raises"
+          : initialRelationship === "lowers"
+            ? "Lowers"
+            : initialRelationship === "both"
+              ? "Both"
+              : initialRelationship === "none"
+                ? "No NPC Modifiers"
+                : "",
+      viewAll: initialViewAll
+    });
     if (!key) return;
     const cached = getCachedFactions(key);
     if (!cached) return;
@@ -142,12 +272,36 @@ export function FactionSearchClient({ initialQuery }: FactionSearchClientProps) 
     setDisplayKey(key);
     setIsFetching(false);
     setResolutionMeta({ key, durationMs: 0, source: "cache" });
-  }, [initialQuery]);
+  }, [initialQuery, initialRelationship, initialViewAll, initialZone]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  const setFilter = (key: keyof FactionFilters, value: string | boolean) => {
+    setFilters((current) => ({
+      ...current,
+      [key]: value
+    }));
+  };
+
   const submitSearch = () => {
-    if (!hasQuery(query)) return;
+    if (!hasQuery(filters)) return;
+    setSubmitCount((current) => current + 1);
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      q: "",
+      zone: "",
+      relationship: "",
+      viewAll: false
+    });
+  };
+
+  const viewAllFactions = () => {
+    setFilters((current) => ({
+      ...current,
+      viewAll: true
+    }));
     setSubmitCount((current) => current + 1);
   };
 
@@ -155,8 +309,8 @@ export function FactionSearchClient({ initialQuery }: FactionSearchClientProps) 
     const isForcedSearch = submitCount !== lastHandledSubmitRef.current;
     const timer = window.setTimeout(() => {
       if (isForcedSearch) lastHandledSubmitRef.current = submitCount;
-      const nextKey = buildSearchKey(query);
-      const nextHref = nextKey ? `${pathname}?q=${encodeURIComponent(nextKey)}` : pathname;
+      const nextKey = buildSearchKey(filters);
+      const nextHref = nextKey ? `${pathname}?${nextKey}` : pathname;
 
       if (nextKey !== currentUrlKeyRef.current) {
         currentUrlKeyRef.current = nextKey;
@@ -167,7 +321,7 @@ export function FactionSearchClient({ initialQuery }: FactionSearchClientProps) 
 
       abortRef.current?.abort();
 
-      if (!nextKey) {
+      if (!hasQuery(filters)) {
         setResults([]);
         setError(null);
         setDisplayKey(nextKey);
@@ -177,7 +331,7 @@ export function FactionSearchClient({ initialQuery }: FactionSearchClientProps) 
         return;
       }
 
-      if (!isForcedSearch && !hasAutoSearchableQuery(query)) {
+      if (!isForcedSearch && !hasAutoSearchableQuery(filters)) {
         setResults([]);
         setError(null);
         setDisplayKey(nextKey);
@@ -206,7 +360,7 @@ export function FactionSearchClient({ initialQuery }: FactionSearchClientProps) 
 
       void (async () => {
         try {
-          const response = await fetch(`/api/factions?q=${encodeURIComponent(nextKey)}`, { signal: controller.signal });
+          const response = await fetch(`/api/factions?${nextKey}`, { signal: controller.signal });
           if (!response.ok) throw new Error(`Search failed with ${response.status}`);
           const payload = (await response.json()) as { data?: FactionSummary[] };
           if (controller.signal.aborted) return;
@@ -228,13 +382,13 @@ export function FactionSearchClient({ initialQuery }: FactionSearchClientProps) 
     }, isForcedSearch ? 0 : factionSearchDebounceMs);
 
     return () => window.clearTimeout(timer);
-  }, [displayKey, pathname, query, router, submitCount]);
+  }, [displayKey, filters, pathname, router, submitCount]);
 
-  const activeQuery = buildSearchKey(query);
+  const activeQuery = buildSearchKey(filters);
   const totalPages = Math.max(1, Math.ceil(results.length / factionResultsPerPage));
   const visiblePage = Math.min(page, totalPages);
   const pagedResults = results.slice((visiblePage - 1) * factionResultsPerPage, visiblePage * factionResultsPerPage);
-  const hasShortQuery = activeQuery.length > 0 && activeQuery.length < factionSearchAutoQueryMinLength;
+  const hasShortQuery = filters.q.trim().length > 0 && filters.q.trim().length < factionSearchAutoQueryMinLength;
   const showResults = activeQuery.length > 0 || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading factions" : `${results.length} factions`) : "Results";
   const statusLabel = error ? error : isFetching ? "Refreshing results..." : "Search updates automatically";
@@ -256,34 +410,64 @@ export function FactionSearchClient({ initialQuery }: FactionSearchClientProps) 
   return (
     <>
       <SectionCard title="Filter" right={<p className="text-xs font-medium text-[#ccb594]">{statusLabel}</p>}>
-        <div className="flex gap-3">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(200px,0.9fr)_minmax(220px,0.9fr)_auto]">
           <Input
             name="q"
             type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            value={filters.q}
+            onChange={(event) => setFilter("q", event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") {
                 event.preventDefault();
                 submitSearch();
               }
             }}
-            placeholder="Mayong..."
+            placeholder="Faction name or ID..."
           />
-          <Button type="button" onClick={submitSearch}>
-            Search
-          </Button>
+          <Input
+            name="zone"
+            type="search"
+            value={filters.zone}
+            onChange={(event) => setFilter("zone", event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                submitSearch();
+              }
+            }}
+            placeholder="Aligned zone..."
+          />
+          <SelectField
+            label="NPC Relationship"
+            name="relationship"
+            value={filters.relationship}
+            onChange={(value) => setFilter("relationship", value)}
+            options={factionRelationshipOptions}
+          />
+          <div className="flex flex-wrap items-end gap-3">
+            <Button type="button" onClick={submitSearch} disabled={!hasQuery(filters)}>
+              Search
+            </Button>
+            <Button type="button" variant="outline" onClick={viewAllFactions}>
+              View all
+            </Button>
+            <Button type="button" variant="outline" onClick={clearFilters} disabled={!hasQuery(filters)}>
+              Clear
+            </Button>
+          </div>
         </div>
       </SectionCard>
       <SectionCard title={resultTitle}>
         {showResults && results.length > 0 ? (
           <>
             <SimpleTable
-              columns={["Name", "Faction ID"]}
+              columns={["Name", "Aligned Zone", "NPC Relationship", "Faction ID"]}
               rows={pagedResults.map((faction) => [
                 <Link key={faction.id} href={`/factions/${faction.id}`} className="font-medium hover:underline">
                   {faction.name}
                 </Link>,
+                faction.alignedZone,
+                describeRelationships(faction),
                 faction.id
               ])}
             />
@@ -299,12 +483,12 @@ export function FactionSearchClient({ initialQuery }: FactionSearchClientProps) 
           isFetching ? (
             <ClassLoadingIndicator message="Loading factions" detail="Resolving alliances and rivalries." />
           ) : awaitingManualSubmit && hasShortQuery ? (
-            <SearchPrompt message={`Type ${factionSearchAutoQueryMinLength}+ characters to auto-search, or press Enter to search now.`} />
+            <SearchPrompt message={`Type ${factionSearchAutoQueryMinLength}+ characters to auto-search, or press Enter to search now. Zone and relationship filters can also be used on their own.`} />
           ) : (
             <SearchPrompt message="No factions matched this search." />
           )
         ) : (
-          <SearchPrompt message="Enter a faction name to load results." />
+          <SearchPrompt message="Enter a faction name or zone, choose an NPC relationship filter, or use View all factions." />
         )}
         {resolvedTiming ? <p className="pt-1 text-right text-[11px] uppercase tracking-[0.16em] text-[#9f8e79]">{resolvedTiming}</p> : null}
       </SectionCard>
