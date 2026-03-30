@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getCatalogStats, getZoneDetail, getZonesByEra, listItems, listZoneEras, resolveLegacyRoute, searchCatalog } from "./index";
+import { getCatalogStats, getZoneDetail, getZonesByEra, listItems, listNpcs, listZoneEras, resolveLegacyRoute, searchCatalog } from "./index";
 
 describe("catalog services", () => {
   it("filters items by tradeable flag", async () => {
@@ -11,6 +11,21 @@ describe("catalog services", () => {
     const trimmed = await listItems({ q: "fiend" });
     const spaced = await listItems({ q: "  fiend  " });
     expect(spaced.map((item) => item.id)).toEqual(trimmed.map((item) => item.id));
+  });
+
+  it("treats items with no required level as level 1 for level filters", async () => {
+    const unfiltered = await listItems();
+    const minLevelOne = await listItems({ minLevel: 1 });
+    const maxLevelOne = await listItems({ maxLevel: 1 });
+
+    expect(minLevelOne.map((item) => item.id)).toEqual(unfiltered.map((item) => item.id));
+    expect(maxLevelOne.length).toBeGreaterThan(1);
+    expect(maxLevelOne.every((item) => item.levelRequired <= 1)).toBe(true);
+  });
+
+  it("translates non-player NPC race ids to race names", async () => {
+    const skeletonPets = await listNpcs({ q: "skel_pet_1_" });
+    expect(skeletonPets.some((npc) => npc.race === "Skeleton")).toBe(true);
   });
 
   it("returns populated search hits", async () => {

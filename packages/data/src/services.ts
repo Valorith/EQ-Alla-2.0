@@ -1,6 +1,7 @@
 import { cacheGet, cacheGetOrResolve } from "./cache";
 import { getDb } from "./db";
 import { factions, items, npcs, pets, recipes, spells, spawnGroups, tasks, zones } from "./mock-data";
+import { raceNames } from "./race-names";
 import { getSpellEffectName, summarizeSpellEffects } from "./spell-effects";
 import { formatExpansion, getZoneEraLabels, matchesZoneEraFilter } from "./zone-eras";
 import { sql } from "kysely";
@@ -133,25 +134,6 @@ const slotFlags: Array<[number, string]> = [
   [1048576, "Waist"],
   [2097152, "Ammo"]
 ];
-
-const raceNames: Record<number, string> = {
-  1: "Human",
-  2: "Barbarian",
-  3: "Erudite",
-  4: "Wood Elf",
-  5: "High Elf",
-  6: "Dark Elf",
-  7: "Half Elf",
-  8: "Dwarf",
-  9: "Troll",
-  10: "Ogre",
-  11: "Halfling",
-  12: "Gnome",
-  128: "Iksar",
-  130: "Vah Shir",
-  330: "Froglok",
-  522: "Drakkin"
-};
 
 const sizeNames: Record<number, string> = {
   0: "TINY",
@@ -314,6 +296,10 @@ function normalizeNumber(value?: number) {
   return Number.isFinite(value) ? Number(value) : undefined;
 }
 
+function effectiveItemLevel(levelRequired: number | null | undefined) {
+  return Math.max(1, Number(levelRequired ?? 0));
+}
+
 function normalizeItemFilters(filters: ItemFilters = {}): ItemFilters {
   return {
     q: normalizeText(filters.q),
@@ -403,8 +389,9 @@ function itemMatchesFilters(item: ItemSummary, filters: ItemFilters) {
   if (filters.slot && !includesFolded(item.slot, filters.slot)) return false;
   if (filters.type && !includesFolded(item.type, filters.type)) return false;
   if (typeof filters.tradeable === "boolean" && item.tradeable !== filters.tradeable) return false;
-  if (filters.minLevel && item.levelRequired < filters.minLevel) return false;
-  if (filters.maxLevel && item.levelRequired > filters.maxLevel) return false;
+  const itemLevel = effectiveItemLevel(item.levelRequired);
+  if (filters.minLevel && itemLevel < filters.minLevel) return false;
+  if (filters.maxLevel && itemLevel > filters.maxLevel) return false;
   return true;
 }
 
@@ -1101,17 +1088,18 @@ function mapItemRowToSummary(row: ItemSearchRow): ItemSummary {
 
 function buildItemFilterClauses(filters: ItemFilters) {
   const clauses = [sql`1 = 1`];
+  const effectiveRequiredLevelClause = sql`greatest(coalesce(reqlevel, 0), 1)`;
 
   if (typeof filters.tradeable === "boolean") {
     clauses.push(filters.tradeable ? sql`nodrop = 0` : sql`nodrop <> 0`);
   }
 
   if (filters.minLevel) {
-    clauses.push(sql`reqlevel >= ${filters.minLevel}`);
+    clauses.push(sql`${effectiveRequiredLevelClause} >= ${filters.minLevel}`);
   }
 
   if (filters.maxLevel) {
-    clauses.push(sql`reqlevel <= ${filters.maxLevel}`);
+    clauses.push(sql`${effectiveRequiredLevelClause} <= ${filters.maxLevel}`);
   }
 
   const classMask = classMaskForFilter(filters.className);
