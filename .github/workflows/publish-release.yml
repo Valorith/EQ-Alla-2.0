@@ -1,0 +1,126 @@
+name: Publish Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Release bump type
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      prerelease:
+        description: Mark the release as a prerelease
+        required: true
+        default: false
+        type: boolean
+
+jobs:
+  publish-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute next release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          latest_tag="$(git tag --sort=-version:refname | head -n 1)"
+          if [[ -z "$latest_tag" ]]; then
+            latest_tag="v0.1.0"
+          fi
+
+          version="${latest_tag#v}"
+          IFS='.' read -r major minor patch <<< "$version"
+
+          case "${{ github.event.inputs.bump }}" in
+            major)
+              major=$((major + 1))
+              minor=0
+              patch=0
+              ;;
+            minor)
+              minor=$((minor + 1))
+              patch=0
+              ;;
+            patch)
+              patch=$((patch + 1))
+              ;;
+            *)
+              echo "Unsupported bump type: ${{ github.event.inputs.bump }}" >&2
+              exit 1
+              ;;
+          esac
+
+          next_tag="v${major}.${minor}.${patch}"
+          echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
+          echo "next_tag=$next_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Find latest successful Windows package run
+        id: build_run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          run_id="$(
+            gh run list \
+              --workflow "Build Windows Server Package" \
+              --branch main \
+              --limit 20 \
+              --json databaseId,conclusion \
+            | jq -r 'map(select(.conclusion == "success")) | first | .databaseId // empty'
+          )"
+
+          if [[ -z "$run_id" ]]; then
+            echo "No successful Windows package build was found on main." >&2
+            exit 1
+          fi
+
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Download latest Windows package artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p release-assets
+          gh run download "${{ steps.build_run.outputs.run_id }}" \
+            --name eq-alla-windows-server-zip \
+            --dir release-assets
+
+          test -f release-assets/eq-alla-windows-server.zip
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          prerelease_flag=""
+          if [[ "${{ github.event.inputs.prerelease }}" == "true" ]]; then
+            prerelease_flag="--prerelease"
+          fi
+
+          gh release create "${{ steps.version.outputs.next_tag }}" \
+            release-assets/eq-alla-windows-server.zip \
+            --target "${GITHUB_SHA}" \
+            --title "${{ steps.version.outputs.next_tag }}" \
+            --generate-notes \
+            ${prerelease_flag}
