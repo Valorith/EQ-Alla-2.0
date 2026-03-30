@@ -170,6 +170,41 @@ function setCachedFactions(key: string, results: FactionSummary[]) {
   persistFactionCache();
 }
 
+function TextFilterField({
+  label,
+  name,
+  value,
+  placeholder,
+  onChange,
+  onEnter
+}: {
+  label: string;
+  name: string;
+  value: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+  onEnter: () => void;
+}) {
+  return (
+    <label className="grid gap-2 text-sm">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">{label}</span>
+      <Input
+        name={name}
+        type="search"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            onEnter();
+          }
+        }}
+        placeholder={placeholder}
+      />
+    </label>
+  );
+}
+
 export function FactionSearchClient({ initialQuery, initialZone, initialRelationship, initialViewAll }: FactionSearchClientProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -279,6 +314,7 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
   const setFilter = (key: keyof FactionFilters, value: string | boolean) => {
     setFilters((current) => ({
       ...current,
+      viewAll: key === "viewAll" ? Boolean(value) : false,
       [key]: value
     }));
   };
@@ -410,32 +446,22 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
   return (
     <>
       <SectionCard title="Filter" right={<p className="text-xs font-medium text-[#ccb594]">{statusLabel}</p>}>
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(200px,0.9fr)_minmax(220px,0.9fr)_auto]">
-          <Input
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+          <TextFilterField
+            label="Faction Name or ID"
             name="q"
-            type="search"
             value={filters.q}
-            onChange={(event) => setFilter("q", event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                submitSearch();
-              }
-            }}
-            placeholder="Faction name or ID..."
+            onChange={(value) => setFilter("q", value)}
+            onEnter={submitSearch}
+            placeholder="Mayong's Retainers or 4001"
           />
-          <Input
+          <TextFilterField
+            label="Aligned Zone"
             name="zone"
-            type="search"
             value={filters.zone}
-            onChange={(event) => setFilter("zone", event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                submitSearch();
-              }
-            }}
-            placeholder="Aligned zone..."
+            onChange={(value) => setFilter("zone", value)}
+            onEnter={submitSearch}
+            placeholder="Castle Mistmoore"
           />
           <SelectField
             label="NPC Relationship"
@@ -444,16 +470,32 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
             onChange={(value) => setFilter("relationship", value)}
             options={factionRelationshipOptions}
           />
-          <div className="flex flex-wrap items-end gap-3">
-            <Button type="button" onClick={submitSearch} disabled={!hasQuery(filters)}>
-              Search
-            </Button>
-            <Button type="button" variant="outline" onClick={viewAllFactions}>
-              View all
-            </Button>
-            <Button type="button" variant="outline" onClick={clearFilters} disabled={!hasQuery(filters)}>
-              Clear
-            </Button>
+          <div className="grid gap-2 text-sm">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">Actions</span>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="button" onClick={submitSearch} disabled={!hasQuery(filters)}>
+                Search
+              </Button>
+              <Button type="button" variant="outline" onClick={viewAllFactions}>
+                View all
+              </Button>
+              <Button type="button" variant="outline" onClick={clearFilters} disabled={!hasQuery(filters)}>
+                Clear
+              </Button>
+            </div>
+            <p className="text-xs leading-5 text-[#9f8e79]">
+              Use a specific filter to narrow the index, or jump straight into the full faction catalog.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 lg:col-span-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#ccb594]">Current mode</p>
+            <p className="mt-2 text-sm leading-6 text-[#e8dfcf]">
+              {filters.viewAll
+                ? "Browsing the full faction index."
+                : hasQuery(filters)
+                  ? "Showing filtered results based on the controls above."
+                  : "Waiting for a search, zone filter, relationship filter, or a View all request."}
+            </p>
           </div>
         </div>
       </SectionCard>
