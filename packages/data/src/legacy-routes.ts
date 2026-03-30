@@ -2,12 +2,14 @@ export function resolveLegacyRoute(
   pathname: string,
   searchParams: URLSearchParams
 ): string | null {
-  if (pathname === "/task.php") {
+  const normalizedPath = pathname.toLowerCase();
+
+  if (normalizedPath === "/task.php") {
     const id = searchParams.get("id");
     return id ? `/tasks/${id}` : "/tasks";
   }
 
-  if (pathname === "/spawngroup.php") {
+  if (normalizedPath === "/spawngroup.php") {
     const id = searchParams.get("id");
     return id ? `/spawngroups/${id}` : "/zones";
   }
@@ -15,6 +17,10 @@ export function resolveLegacyRoute(
   const route = searchParams.get("a");
 
   if (!route) {
+    if (normalizedPath === "/index.php" || isLegacyPhpPath(normalizedPath)) {
+      return "/";
+    }
+
     return null;
   }
 
@@ -83,7 +89,7 @@ export function resolveLegacyRoute(
     case "global_search":
       return withQuery("/search", searchParams, ["q"]);
     default:
-      return null;
+      return isLegacyEntrypoint(normalizedPath) ? "/" : null;
   }
 }
 
@@ -99,4 +105,12 @@ function withQuery(path: string, searchParams: URLSearchParams, keys: string[]) 
 
   const serialized = next.toString();
   return serialized ? `${path}?${serialized}` : path;
+}
+
+function isLegacyPhpPath(pathname: string) {
+  return pathname.endsWith(".php");
+}
+
+function isLegacyEntrypoint(pathname: string) {
+  return pathname === "/" || pathname === "/index.php" || isLegacyPhpPath(pathname);
 }

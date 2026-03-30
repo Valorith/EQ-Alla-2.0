@@ -94,6 +94,21 @@ describe("catalog services", () => {
     expect(target).toBe("/items/1001");
   });
 
+  it("maps index.php legacy item routes", () => {
+    const target = resolveLegacyRoute("/index.php", new URLSearchParams("a=item&id=1001"));
+    expect(target).toBe("/items/1001");
+  });
+
+  it("falls back unknown legacy route params to the home page", () => {
+    const target = resolveLegacyRoute("/", new URLSearchParams("a=totally_unknown_route"));
+    expect(target).toBe("/");
+  });
+
+  it("falls back unknown php entrypoints to the home page", () => {
+    const target = resolveLegacyRoute("/mystery.php", new URLSearchParams());
+    expect(target).toBe("/");
+  });
+
   it("exposes the legacy zone era list from the clone", async () => {
     const eras = await listZoneEras();
     expect(eras).toContain("Faydwer");
