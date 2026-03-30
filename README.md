@@ -49,7 +49,6 @@ Minimum values:
 EQ_USE_MOCK_DATA=false
 EQ_SITE_NAME=EQ Alla 2.0
 EQ_SITE_URL=https://eqalla.example.com
-EQ_SITE_HOST=eqalla.example.com
 PORT=3000
 
 EQ_DB_HOST=127.0.0.1
@@ -69,24 +68,29 @@ Notes:
 
 - `EQ_USE_MOCK_DATA` should stay `false`
 - `EQ_SITE_URL` should be the full public URL
-- `EQ_SITE_HOST` should be the bare host/domain used by Caddy
+- `EQ_SITE_HOST` is only needed when a self-hosted reverse proxy like Caddy uses it
 - `PORT` is the app's listening port and defaults to `3000`
+- on Railway, `PORT` is injected automatically and normally should not be set manually
 - if you do not provide Redis outside Docker, the app will fall back to in-memory caching
+- on Railway, `MYSQLHOST` / `MYSQLPORT` / `MYSQLDATABASE` / `MYSQLUSER` / `MYSQLPASSWORD`, `DATABASE_URL`, `MYSQL_URL`, `REDIS_URL`, and `RAILWAY_PUBLIC_DOMAIN` are supported as fallbacks so you do not have to rename everything into `EQ_*`
 
 ## Choose a Hosting Path
 
-There are four practical ways to run this app:
+There are five practical ways to run this app:
 
 1. `.exe app`
 This is the primary and easiest distribution path for Windows users.
 
-2. `Docker`
+2. `Railway`
+Best if you want a managed deployment with built-in HTTPS, optional managed MySQL/Redis, and a minimal amount of server setup.
+
+3. `Docker`
 Best if you want the app, Redis, and Caddy bundled together.
 
-3. `Without Docker`
+4. `Without Docker`
 Best if you want a normal Node.js deployment with your own reverse proxy.
 
-4. `CLI`
+5. `CLI`
 Best for local testing, admin use, or running the server manually from a terminal.
 
 ## Setup With `.exe` App
@@ -235,6 +239,61 @@ npm run compose:down
 - HTTPS is handled automatically by Caddy once the domain resolves publicly
 - Redis is included in this path, so `EQ_REDIS_URL=redis://redis:6379` is fine
 
+## Setup With Railway
+
+Use this if you want Railway to host the web app and optionally provide managed MySQL and Redis services.
+
+This path does not use Caddy. Railway already handles public domains and TLS for you.
+
+### What is already set up for Railway
+
+- a `railway.toml` file defines the start command and health check
+- `/api/health` returns `200` only when the app is actually ready to serve traffic
+- the Dockerfile is optimized for Railway's container deployment flow
+- Railway-style environment variables are supported as fallbacks so existing `EQ_*` variables still work unchanged
+
+### Recommended Railway service layout
+
+- one service for this repo's web app
+- one MySQL service, unless you are using an external MySQL database
+- one Redis service if you want shared cache state across instances
+
+Redis is optional. If you skip it, the app falls back to in-memory caching.
+
+### How to deploy on Railway
+
+1. Create a new Railway project.
+2. Add a service from this repository.
+3. Keep the repo root as the source directory so Railway sees `Dockerfile` and `railway.toml`.
+4. Add the required variables if they are not already being provided by referenced Railway services.
+
+Minimum app variables:
+
+- `EQ_USE_MOCK_DATA=false`
+- `EQ_SITE_NAME=EQ Alla 2.0`
+
+You can provide database settings in either form:
+
+- `EQ_DB_HOST`, `EQ_DB_PORT`, `EQ_DB_NAME`, `EQ_DB_USER`, `EQ_DB_PASSWORD`
+- or Railway-style values such as `MYSQLHOST`, `MYSQLPORT`, `MYSQLDATABASE`, `MYSQLUSER`, `MYSQLPASSWORD`
+- or a MySQL connection string in `DATABASE_URL` or `MYSQL_URL`
+
+Optional cache variables:
+
+- `EQ_REDIS_URL`
+- or `REDIS_URL`
+
+Site URL notes:
+
+- if `EQ_SITE_URL` is not set, the app will automatically use Railway's `RAILWAY_PUBLIC_DOMAIN`
+- `EQ_SITE_HOST` is not needed on Railway
+
+### Railway notes
+
+- do not put Caddy in front of the Railway deployment
+- do not hard-code `PORT`; Railway injects it
+- if you later move off Railway, the existing `EQ_*` variables and Docker/self-hosted flows still work the same way
+
 ## Setup Without Docker
 
 Use this if you want a standard Node.js deployment on a server you already manage.
@@ -294,7 +353,7 @@ If you choose a different `PORT`, update the proxy target to match.
 
 - if you do not provide Redis, the app will still run with in-memory caching
 - use a process manager such as `systemd`, `pm2`, or `supervisor`
-- if the public domain changes, update both `EQ_SITE_HOST` and `EQ_SITE_URL`
+- if the public domain changes, update both `EQ_SITE_HOST` and `EQ_SITE_URL` when you are using your own reverse proxy
 
 ## Setup With CLI
 
@@ -352,9 +411,9 @@ No matter which hosting path you choose, check these before going live:
 
 - `.env` has the correct DB host, DB name, DB user, and DB password
 - `EQ_SITE_URL` matches the real public URL
-- `EQ_SITE_HOST` matches the domain used by your proxy
+- `EQ_SITE_HOST` matches the domain used by your proxy if you are using Caddy or another self-hosted reverse proxy
 - your domain points at the correct server
-- your reverse proxy forwards traffic to the app’s local port
+- your reverse proxy forwards traffic to the app’s local port if you are not on Railway
 - ports `80` and `443` are open if you are serving public HTTP/HTTPS
 
 ## Repo Commands
@@ -376,4 +435,4 @@ npm run package:windows
 
 - `.env`, `env`, `.env.local`, and `env.local` are ignored by git
 - this app expects live database-backed operation
-- the Windows `.exe` path is the best user-facing distribution method, but Docker and direct Node hosting are both supported
+- the Windows `.exe` path is the best user-facing distribution method, but Railway, Docker, and direct Node hosting are all supported

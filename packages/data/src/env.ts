@@ -2,6 +2,65 @@ import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 
+function setEnvIfMissing(key: string, value: string | undefined) {
+  if (!value || process.env[key] !== undefined) {
+    return;
+  }
+
+  process.env[key] = value;
+}
+
+function applySiteUrlFallbacks() {
+  const railwayPublicDomain = process.env.RAILWAY_PUBLIC_DOMAIN?.trim();
+
+  if (!railwayPublicDomain || process.env.EQ_SITE_URL !== undefined) {
+    return;
+  }
+
+  const normalizedDomain = railwayPublicDomain.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  if (!normalizedDomain) {
+    return;
+  }
+
+  process.env.EQ_SITE_URL = `https://${normalizedDomain}`;
+}
+
+function applyRedisFallbacks() {
+  setEnvIfMissing("EQ_REDIS_URL", process.env.REDIS_URL);
+}
+
+function applyDatabaseComponentFallbacks() {
+  setEnvIfMissing("EQ_DB_HOST", process.env.MYSQLHOST);
+  setEnvIfMissing("EQ_DB_PORT", process.env.MYSQLPORT);
+  setEnvIfMissing("EQ_DB_NAME", process.env.MYSQLDATABASE);
+  setEnvIfMissing("EQ_DB_USER", process.env.MYSQLUSER);
+  setEnvIfMissing("EQ_DB_PASSWORD", process.env.MYSQLPASSWORD);
+}
+
+function applyDatabaseUrlFallbacks() {
+  const connectionUrl = process.env.DATABASE_URL ?? process.env.MYSQL_URL;
+  if (!connectionUrl) {
+    return;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(connectionUrl);
+  } catch {
+    return;
+  }
+
+  if (parsed.protocol !== "mysql:" && parsed.protocol !== "mysql2:") {
+    return;
+  }
+
+  setEnvIfMissing("EQ_DB_HOST", parsed.hostname || undefined);
+  setEnvIfMissing("EQ_DB_PORT", parsed.port || undefined);
+  setEnvIfMissing("EQ_DB_NAME", parsed.pathname.replace(/^\//, "") || undefined);
+  setEnvIfMissing("EQ_DB_USER", parsed.username ? decodeURIComponent(parsed.username) : undefined);
+  setEnvIfMissing("EQ_DB_PASSWORD", parsed.password ? decodeURIComponent(parsed.password) : undefined);
+}
+
 function parseEnvFile(contents: string) {
   for (const rawLine of contents.split(/\r?\n/)) {
     const line = rawLine.trim();
@@ -55,6 +114,11 @@ function loadEnvFile(filename: string) {
 for (const filename of [".env.local", ".env", "env.local", "env"]) {
   loadEnvFile(filename);
 }
+
+applySiteUrlFallbacks();
+applyRedisFallbacks();
+applyDatabaseComponentFallbacks();
+applyDatabaseUrlFallbacks();
 
 const envSchema = z.object({
   EQ_USE_MOCK_DATA: z.string().optional().default("false"),
