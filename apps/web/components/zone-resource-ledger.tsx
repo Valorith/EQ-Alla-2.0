@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@eq-alla/ui";
+import { Button, Input } from "@eq-alla/ui";
 import { ItemIcon } from "./item-icon";
 
 type ZoneMode = "npcs" | "named" | "items" | "forage";
@@ -121,7 +121,7 @@ function ItemLedger({ entries }: { entries: ItemEntry[] }) {
           href={entry.href}
           className="group grid gap-3 px-5 py-4 transition hover:bg-white/[0.025] sm:grid-cols-[auto_minmax(0,1fr)_160px] sm:items-center sm:px-6"
         >
-          <ItemIcon icon={entry.icon} name={entry.name} size="sm" />
+          <ItemIcon icon={entry.icon} name={entry.name} size="sm" tooltipItemId={entry.id} />
           <div className="min-w-0">
             <p className="truncate text-[16px] font-semibold text-[#f3ecdf] transition group-hover:text-white">{entry.name}</p>
             <p className="mt-1 text-[11px] uppercase tracking-[0.2em] text-[#8f7f68]">Zone equipment</p>
@@ -145,7 +145,7 @@ function ForageLedger({ entries }: { entries: ForageEntry[] }) {
           href={entry.href}
           className="group grid gap-3 px-5 py-4 transition hover:bg-white/[0.025] sm:grid-cols-[auto_minmax(0,1fr)_120px_120px] sm:items-center sm:px-6"
         >
-          <ItemIcon icon={entry.icon} name={entry.name} size="sm" />
+          <ItemIcon icon={entry.icon} name={entry.name} size="sm" tooltipItemId={entry.id} />
           <div className="min-w-0">
             <p className="truncate text-[16px] font-semibold text-[#f3ecdf] transition group-hover:text-white">{entry.name}</p>
             <p className="mt-1 text-[11px] uppercase tracking-[0.2em] text-[#8f7f68]">Forageable item</p>
@@ -178,6 +178,53 @@ function pageSizeForMode(mode: ZoneMode) {
   }
 }
 
+function searchPlaceholderForMode(mode: ZoneMode) {
+  switch (mode) {
+    case "items":
+      return "Filter equipment by item name...";
+    case "forage":
+      return "Filter forage by item name...";
+    case "named":
+      return "Filter named encounters by name...";
+    case "npcs":
+    default:
+      return "Filter the bestiary by name...";
+  }
+}
+
+function emptyStateForMode(mode: ZoneMode, query: string) {
+  const trimmedQuery = query.trim();
+  if (!trimmedQuery) {
+    switch (mode) {
+      case "items":
+        return "No equipment entries are available for this zone yet.";
+      case "forage":
+        return "No forage entries are available for this zone yet.";
+      case "named":
+        return "No named encounters are indexed for this zone yet.";
+      case "npcs":
+      default:
+        return "No bestiary entries are indexed for this zone yet.";
+    }
+  }
+
+  switch (mode) {
+    case "items":
+      return `No equipment matches "${trimmedQuery}".`;
+    case "forage":
+      return `No forage entries match "${trimmedQuery}".`;
+    case "named":
+      return `No named encounters match "${trimmedQuery}".`;
+    case "npcs":
+    default:
+      return `No bestiary entries match "${trimmedQuery}".`;
+  }
+}
+
+function includesQuery(value: string | number | boolean, normalizedQuery: string) {
+  return String(value).toLowerCase().includes(normalizedQuery);
+}
+
 export function ZoneResourceLedger({
   mode,
   bestiary,
@@ -191,12 +238,34 @@ export function ZoneResourceLedger({
 }) {
   const entries = mode === "items" ? itemDrops : mode === "forage" ? forage : bestiary;
   const pageSize = pageSizeForMode(mode);
+  const [query, setQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const totalPages = Math.max(1, Math.ceil(entries.length / pageSize));
+  const filteredEntries = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return entries;
+    }
+
+    if (mode === "items") {
+      return itemDrops.filter((entry) => includesQuery(entry.name, normalizedQuery));
+    }
+
+    if (mode === "forage") {
+      return forage.filter((entry) => includesQuery(entry.name, normalizedQuery));
+    }
+
+    return bestiary.filter((entry) => includesQuery(entry.name, normalizedQuery));
+  }, [bestiary, entries, forage, itemDrops, mode, query]);
+  const totalPages = Math.max(1, Math.ceil(filteredEntries.length / pageSize));
 
   useEffect(() => {
     setCurrentPage(1);
+    setQuery("");
   }, [mode]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query]);
 
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, totalPages));
@@ -204,22 +273,48 @@ export function ZoneResourceLedger({
 
   const pagedEntries = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return entries.slice(start, start + pageSize);
-  }, [currentPage, entries, pageSize]);
+    return filteredEntries.slice(start, start + pageSize);
+  }, [currentPage, filteredEntries, pageSize]);
 
-  const start = entries.length > 0 ? (currentPage - 1) * pageSize + 1 : 0;
-  const end = Math.min(currentPage * pageSize, entries.length);
+  const start = filteredEntries.length > 0 ? (currentPage - 1) * pageSize + 1 : 0;
+  const end = Math.min(currentPage * pageSize, filteredEntries.length);
 
   return (
-    <div>
-      {mode === "items" ? <ItemLedger entries={pagedEntries as ItemEntry[]} /> : null}
-      {mode === "forage" ? <ForageLedger entries={pagedEntries as ForageEntry[]} /> : null}
-      {mode === "npcs" || mode === "named" ? <BestiaryLedger entries={pagedEntries as BestiaryEntry[]} /> : null}
+    <div className="space-y-4">
+      <div className="border-b border-white/8 px-5 py-4 sm:px-6">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <Input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={searchPlaceholderForMode(mode)}
+            aria-label={`Filter ${mode === "items" ? "equipment" : mode === "forage" ? "forage" : mode === "named" ? "named encounters" : "bestiary"}`}
+            className="h-10 max-w-xl rounded-xl border-white/12 bg-white/8 px-4 text-[#efe7d8] placeholder:text-[#9f8e79] focus:border-[#d7a45f] focus:bg-white/10"
+          />
+          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#8f836f]">
+            {query.trim().length > 0 ? `${formatCount(filteredEntries.length)} matches` : `${formatCount(filteredEntries.length)} entries`}
+          </p>
+        </div>
+      </div>
+
+      {pagedEntries.length > 0 ? (
+        <>
+          {mode === "items" ? <ItemLedger entries={pagedEntries as ItemEntry[]} /> : null}
+          {mode === "forage" ? <ForageLedger entries={pagedEntries as ForageEntry[]} /> : null}
+          {mode === "npcs" || mode === "named" ? <BestiaryLedger entries={pagedEntries as BestiaryEntry[]} /> : null}
+        </>
+      ) : (
+        <div className="px-5 pb-5 sm:px-6 sm:pb-6">
+          <p className="rounded-[18px] border border-dashed border-white/10 bg-white/[0.03] px-4 py-5 text-sm leading-7 text-[#b6aa97]">
+            {emptyStateForMode(mode, query)}
+          </p>
+        </div>
+      )}
 
       {totalPages > 1 ? (
         <div className="flex flex-col gap-3 border-t border-white/8 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#8f836f]">
-            Showing {start}-{end} of {formatCount(entries.length)}
+            Showing {start}-{end} of {formatCount(filteredEntries.length)}
           </p>
           <div className="flex flex-wrap items-center gap-1.5">
             <Button

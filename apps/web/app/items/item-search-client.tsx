@@ -544,7 +544,7 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
             <SimpleTable
               columns={["Icon", "Item", "Type", "AC", "HP", "Mana", "Damage", "Delay", "Item ID"]}
               rows={pagedItems.map((item) => [
-                <ItemIcon key={`${item.id}-icon`} icon={item.icon} name={item.name} size="sm" />,
+                <ItemIcon key={`${item.id}-icon`} icon={item.icon} name={item.name} size="sm" tooltipItemId={item.id} />,
                 <Link
                   key={item.id}
                   href={`/items/${item.id}`}

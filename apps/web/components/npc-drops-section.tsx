@@ -30,7 +30,7 @@ function DropListView({ drops }: { drops: DropGroup[] }) {
                 href={entry.href}
                 className="group flex items-center gap-3 rounded-[12px] border border-white/10 bg-[linear-gradient(180deg,rgba(19,23,31,0.94),rgba(10,14,21,0.92))] px-3 py-3 transition hover:border-[#c5a869]/45 hover:bg-[linear-gradient(180deg,rgba(35,42,53,0.96),rgba(16,20,28,0.92))]"
               >
-                <ItemIcon icon={entry.icon} name={entry.name} size="sm" />
+                <ItemIcon icon={entry.icon} name={entry.name} size="sm" tooltipItemId={entry.id} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[15px] font-semibold text-[#e6e0d2] transition group-hover:text-white">{entry.name}</p>
                   <p className="text-[12px] uppercase tracking-[0.18em] text-[#9f8e79]">
@@ -60,7 +60,7 @@ function DropCardView({ drops }: { drops: DropGroup[] }) {
                 className="group flex min-h-[158px] flex-col justify-between rounded-[14px] border border-white/10 bg-[linear-gradient(180deg,rgba(19,23,31,0.96),rgba(11,14,20,0.94))] p-4 transition hover:border-[#c5a869]/45 hover:bg-[linear-gradient(180deg,rgba(35,42,53,0.98),rgba(16,20,28,0.94))]"
               >
                 <div className="flex items-start gap-3">
-                  <ItemIcon icon={entry.icon} name={entry.name} size="md" />
+                  <ItemIcon icon={entry.icon} name={entry.name} size="md" tooltipItemId={entry.id} />
                   <div className="min-w-0">
                     <p className="line-clamp-2 text-[15px] font-semibold leading-6 text-[#e6e0d2] transition group-hover:text-white">{entry.name}</p>
                     <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9f8e79]">{entry.type}</p>

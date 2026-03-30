@@ -68,6 +68,7 @@ const itemSearchCacheTtlSeconds = 60;
 const zoneLevelBandSize = 5;
 const zoneLevelBandMaximum = 110;
 const zoneLevelBandSignificanceFloor = 5;
+const publicZoneStatusCeiling = 80;
 const merchantNpcClasses = [40, 41, 59, 61, 67, 68, 70] as const;
 
 const classNames = [
@@ -2282,7 +2283,7 @@ export async function listZones(filters: ZoneFilters = {}) {
       from zone z
       left join spawn2 s2 on s2.zone = z.short_name and s2.version = z.version
       where coalesce(z.version, 0) = 0
-        and coalesce(z.min_status, 0) <= 1
+        and coalesce(z.min_status, 0) <= ${publicZoneStatusCeiling}
         and (z.short_name like ${like(filters.q)} or z.long_name like ${like(filters.q)})
       group by z.short_name, z.long_name, z.zoneidnumber, z.expansion, z.min_level, z.max_level, z.note
       order by z.long_name asc
@@ -2343,7 +2344,7 @@ export async function getZonesByLevel() {
         and nt.level <= ${zoneLevelBandMaximum}
         and nt.race not in (127, 240)
       where coalesce(z.version, 0) = 0
-        and coalesce(z.min_status, 0) <= 0
+        and coalesce(z.min_status, 0) <= ${publicZoneStatusCeiling}
       group by z.zoneidnumber, z.short_name, z.long_name, z.expansion, z.hotzone, bucket
       order by z.long_name asc, bucket asc
     `.execute(db!);
@@ -2430,6 +2431,7 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
       short_name: string;
       long_name: string;
       zoneidnumber: number;
+      version: number;
       expansion: number;
       min_level: number;
       max_level: number;
@@ -2442,7 +2444,7 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
       canlevitate: number;
       castoutdoor: number;
     }>`
-      select short_name, long_name, zoneidnumber, expansion, min_level, max_level, note, safe_x, safe_y, safe_z,
+      select short_name, long_name, zoneidnumber, version, expansion, min_level, max_level, note, safe_x, safe_y, safe_z,
              hotzone, canbind, canlevitate, castoutdoor
       from zone
       where short_name = ${shortName}
@@ -2453,6 +2455,8 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
     const zone = result.rows[0];
 
     if (!zone) return undefined;
+
+    const spawnVersions = [...new Set([Number(zone.version ?? 0), -1])];
 
     const [bestiaryRows, itemRows, forageRows, spawnLocationRows, spawnEntryRows] = await Promise.all([
       sql<{
@@ -2476,7 +2480,7 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
         join spawngroup sg on sg.id = se.spawngroupID
         join spawn2 s2 on s2.spawngroupID = sg.id
         where s2.zone = ${shortName}
-          and s2.version = 0
+          and s2.version in (${sql.join(spawnVersions.map((value) => sql`${value}`), sql`, `)})
           and nt.trackable > 0
           and nt.race not in (127, 240)
         group by nt.name
@@ -2499,7 +2503,7 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
         join spawngroup sg on sg.id = se.spawngroupID
         join spawn2 s2 on s2.spawngroupID = sg.id
         where s2.zone = ${shortName}
-          and s2.version = 0
+          and s2.version in (${sql.join(spawnVersions.map((value) => sql`${value}`), sql`, `)})
           and ${discoveredItemClause("i.id")}
           and nt.class not in (${sql.join(merchantNpcClasses.map((value) => sql`${value}`), sql`, `)})
         order by i.Name asc
@@ -2536,7 +2540,7 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
         from spawn2 s2
         join spawngroup sg on sg.id = s2.spawngroupID
         where s2.zone = ${shortName}
-          and s2.version = 0
+          and s2.version in (${sql.join(spawnVersions.map((value) => sql`${value}`), sql`, `)})
         order by sg.name asc, s2.id asc
       `.execute(db!),
       sql<{
@@ -2550,7 +2554,7 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
         join npc_types nt on nt.id = se.npcID
         join spawn2 s2 on s2.spawngroupID = se.spawngroupID
         where s2.zone = ${shortName}
-          and s2.version = 0
+          and s2.version in (${sql.join(spawnVersions.map((value) => sql`${value}`), sql`, `)})
         order by se.spawngroupID asc, nt.name asc
       `.execute(db!)
     ]);

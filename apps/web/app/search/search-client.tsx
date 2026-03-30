@@ -410,7 +410,7 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
                 {pagedVisibleHits.map((hit) => (
                   <li key={hit.href} className="text-left text-sm text-[#e8dfcf]">
                     <Link href={hit.href} className="inline-flex items-center gap-2 font-medium hover:underline">
-                      {hit.type === "item" && hit.icon ? <ItemIcon icon={hit.icon} name={hit.title} size="xs" /> : null}
+                      {hit.type === "item" && hit.icon ? <ItemIcon icon={hit.icon} name={hit.title} size="xs" tooltipItemId={Number(hit.id)} /> : null}
                       {hit.type === "spell" && hit.icon ? <SpellIcon icon={hit.icon} name={hit.title} /> : null}
                       <span>{hit.title}</span>
                     </Link>

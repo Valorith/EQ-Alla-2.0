@@ -45,4 +45,10 @@ describe("catalog services", () => {
     expect(stats.items).toBeGreaterThan(0);
     expect(zone?.namedNpcs.length).toBeGreaterThan(0);
   });
+
+  it("includes shared spawn versions in zone detail bestiary data", async () => {
+    const zone = await getZoneDetail("fearplane");
+    expect(zone?.bestiary.length).toBeGreaterThan(1);
+    expect(zone?.bestiary.some((npc) => npc.name === "a dracoliche")).toBe(true);
+  });
 });

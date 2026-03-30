@@ -37,7 +37,7 @@ function RecipeEntryRow({
       href={entry.href}
       className="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-t border-white/8 py-3 first:border-t-0"
     >
-      <ItemIcon icon={entry.icon} name={entry.name} size="sm" />
+      <ItemIcon icon={entry.icon} name={entry.name} size="sm" tooltipItemId={entry.id} />
       <div className="min-w-0">
         <p className="truncate text-[15px] font-semibold text-[#ede4d3] transition group-hover:text-white">{entry.name}</p>
         <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8d7f6b]">{quantityLabel}</p>
@@ -54,7 +54,7 @@ function ContainerLink({
 }) {
   const content = (
     <>
-      {entry.icon ? <ItemIcon icon={entry.icon} name={entry.name} size="xs" /> : null}
+      {entry.icon ? <ItemIcon icon={entry.icon} name={entry.name} size="xs" tooltipItemId={entry.id} /> : null}
       <span className="truncate text-[var(--muted-strong)]">{entry.name}</span>
     </>
   );
@@ -134,7 +134,7 @@ export default async function RecipeDetailPage({ params }: RecipeDetailPageProps
 
               {firstCreate ? (
                 <div className="mt-6 flex items-center gap-4 border-t border-white/10 pt-5">
-                  <ItemIcon icon={firstCreate.icon} name={firstCreate.name} size="lg" />
+                  <ItemIcon icon={firstCreate.icon} name={firstCreate.name} size="lg" tooltipItemId={firstCreate.id} />
                   <div className="min-w-0">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">Primary Output</p>
                     <Link

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { Input } from "@eq-alla/ui";
 import { ArrowRight, Database, Search, ShieldCheck } from "lucide-react";
+import { ItemHoverTooltip } from "./item-hover-tooltip";
 
 const routesWithInlineSearch = new Set([
   "/",
@@ -147,6 +148,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className={isHome ? "flex min-w-0 flex-col" : "flex min-w-0 flex-col gap-4"}>{children}</div>
         </main>
       </div>
+      <ItemHoverTooltip />
     </div>
   );
 }
