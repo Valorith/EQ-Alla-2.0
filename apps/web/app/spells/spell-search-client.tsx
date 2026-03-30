@@ -16,6 +16,7 @@ type SpellSearchClientProps = {
   initialClassName: string;
   initialLevel: string;
   initialLevelMode: LevelMode;
+  levelCap: number;
 };
 
 type SearchResolutionMeta = {
@@ -45,7 +46,6 @@ const spellSearchSessionStorageKey = "eq-spell-search-cache";
 const spellResultCache = new Map<string, SpellCacheEntry>();
 let spellCacheHydrated = false;
 const spellClassOptions = ["Bard", "Beastlord", "Berserker", "Cleric", "Druid", "Enchanter", "Magician", "Necromancer", "Paladin", "Ranger", "Rogue", "Shadow Knight", "Shaman", "Warrior", "Wizard"];
-const spellLevelOptions = Array.from({ length: 85 }, (_, index) => String(index + 1));
 
 function buildSearchParams(filters: SpellSearchFilters) {
   const params = new URLSearchParams();
@@ -186,7 +186,7 @@ function SpellTableHeaderRow({ repeated = false }: { repeated?: boolean }) {
   );
 }
 
-export function SpellSearchClient({ initialQuery, initialClassName, initialLevel, initialLevelMode }: SpellSearchClientProps) {
+export function SpellSearchClient({ initialQuery, initialClassName, initialLevel, initialLevelMode, levelCap }: SpellSearchClientProps) {
   const router = useRouter();
   const pathname = usePathname();
   const initialFilters: SpellSearchFilters = {
@@ -195,6 +195,7 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
     level: initialLevel,
     levelMode: initialLevelMode
   };
+  const spellLevelOptions = Array.from({ length: levelCap }, (_, index) => String(index + 1));
 
   const [filters, setFilters] = useState<SpellSearchFilters>(initialFilters);
   const [results, setResults] = useState<SpellSummary[]>([]);

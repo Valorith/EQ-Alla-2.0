@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getCatalogStats, getItemDetail, getZoneDetail, getZonesByEra, getZonesByLevel, listItems, listNpcs, listZoneEras, listZones, resolveLegacyRoute, searchCatalog } from "./index";
+import { getCatalogStats, getItemDetail, getSpellDetail, getZoneDetail, getZonesByEra, getZonesByLevel, listItems, listNpcs, listSpells, listZoneEras, listZones, resolveLegacyRoute, searchCatalog, spellSearchLevelCap } from "./index";
 
 describe("catalog services", () => {
   it("filters items by tradeable flag", async () => {
@@ -40,6 +40,24 @@ describe("catalog services", () => {
   it("translates non-player NPC race ids to race names", async () => {
     const skeletonPets = await listNpcs({ q: "skel_pet_1_" });
     expect(skeletonPets.some((npc) => npc.race === "Skeleton")).toBe(true);
+  });
+
+  it("renders readable spell effect translations for trigger focus effects", async () => {
+    const spell = await getSpellDetail(38188);
+    const effectTexts = spell?.effects.map((entry) => entry.text) ?? [];
+
+    expect(effectTexts).toContain("Focus: Trigger on Cast (25% chance to cast Soul Flay Effect)");
+    expect(effectTexts).toContain("Limit: Target (Life Tap)");
+    expect(effectTexts).toContain("Limit: Min Level 51");
+  });
+
+  it("caps spell search results at level 60", async () => {
+    const highLevelOnly = await listSpells({ q: "Agility of the Wrulan" });
+    const upperBand = await listSpells({ className: "Shaman", level: 60, levelMode: "min" });
+
+    expect(highLevelOnly.some((spell) => spell.id === 3378)).toBe(false);
+    expect(upperBand.length).toBeGreaterThan(0);
+    expect(upperBand.every((spell) => spell.level <= spellSearchLevelCap)).toBe(true);
   });
 
   it("excludes high-status zones from zones by level", async () => {
