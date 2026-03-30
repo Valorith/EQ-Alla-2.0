@@ -1,10 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { getCatalogStats, getZoneDetail, getZonesByEra, listItems, listNpcs, listZoneEras, resolveLegacyRoute, searchCatalog } from "./index";
+import { getCatalogStats, getItemDetail, getZoneDetail, getZonesByEra, getZonesByLevel, listItems, listNpcs, listZoneEras, listZones, resolveLegacyRoute, searchCatalog } from "./index";
 
 describe("catalog services", () => {
   it("filters items by tradeable flag", async () => {
     const tradeableItems = await listItems({ tradeable: true });
     expect(tradeableItems.every((item) => item.tradeable)).toBe(true);
+  });
+
+  it("interprets nodrop correctly for item lists and detail flags", async () => {
+    const clothCap = await getItemDetail(1001);
+    const prayerShawl = await getItemDetail(1175);
+    const tradeableClothCaps = await listItems({ q: "Cloth Cap", tradeable: true });
+    const noDropShawls = await listItems({ q: "Prayer Shawl", tradeable: false });
+
+    expect(clothCap?.tradeable).toBe(true);
+    expect(clothCap?.flags.includes("No Drop")).toBe(false);
+    expect(prayerShawl?.tradeable).toBe(false);
+    expect(prayerShawl?.flags.includes("No Drop")).toBe(true);
+    expect(tradeableClothCaps.some((item) => item.id === 1001)).toBe(true);
+    expect(noDropShawls.some((item) => item.id === 1175)).toBe(true);
   });
 
   it("normalizes whitespace in item search queries", async () => {
@@ -28,6 +42,24 @@ describe("catalog services", () => {
     expect(skeletonPets.some((npc) => npc.race === "Skeleton")).toBe(true);
   });
 
+  it("excludes high-status zones from zones by level", async () => {
+    const zones = await getZonesByLevel();
+    expect(zones.some((zone) => zone.shortName === "poknowledge")).toBe(false);
+  });
+
+  it("hides high-status zones from zone listings and detail routes", async () => {
+    const zones = await listZones();
+    const hiddenZone = await getZoneDetail("poknowledge");
+
+    expect(zones.some((zone) => zone.shortName === "poknowledge")).toBe(false);
+    expect(hiddenZone).toBeUndefined();
+  });
+
+  it("excludes high-status zones from catalog search results", async () => {
+    const hits = await searchCatalog("knowledge");
+    expect(hits.some((hit) => hit.type === "zone" && hit.href === "/zones/poknowledge")).toBe(false);
+  });
+
   it("returns populated search hits", async () => {
     const hits = await searchCatalog("mistmoore");
     expect(hits.some((hit) => hit.type === "zone")).toBe(true);
@@ -48,10 +80,9 @@ describe("catalog services", () => {
 
   it("resolves clone-style zone era filters and slugs", async () => {
     const faydwerZones = await getZonesByEra("Faydwer");
-    const powerZones = await getZonesByEra("power");
 
     expect(faydwerZones.some((zone) => zone.shortName === "mistmoore")).toBe(true);
-    expect(powerZones.some((zone) => zone.shortName === "poknowledge")).toBe(true);
+    expect(faydwerZones.some((zone) => zone.shortName === "poknowledge")).toBe(false);
   });
 
   it("exposes stats and zone detail", async () => {

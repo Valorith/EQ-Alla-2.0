@@ -69,7 +69,7 @@ const itemSearchCacheTtlSeconds = 60;
 const zoneLevelBandSize = 5;
 const zoneLevelBandMaximum = 110;
 const zoneLevelBandSignificanceFloor = 5;
-const publicZoneStatusCeiling = 80;
+const publicZoneStatusCeiling = 1;
 const merchantNpcClasses = [40, 41, 59, 61, 67, 68, 70] as const;
 
 const classNames = [
@@ -294,6 +294,12 @@ function normalizeText(value?: string) {
 
 function normalizeNumber(value?: number) {
   return Number.isFinite(value) ? Number(value) : undefined;
+}
+
+// In the EQEmu item schema used here, `nodrop = 0` means the item is no-drop
+// and `nodrop = 1` means it can be traded.
+function isTradeableItem(nodrop: number | null | undefined) {
+  return Number(nodrop ?? 0) !== 0;
 }
 
 function effectiveItemLevel(levelRequired: number | null | undefined) {
@@ -1075,7 +1081,7 @@ function mapItemRowToSummary(row: ItemSearchRow): ItemSummary {
     type: formatItemType(row.itemclass, row.itemtype, row.damage),
     slot: formatSlotMask(row.slots, row.itemclass),
     classes: decodeClassMask(row.classes),
-    tradeable: Number(row.nodrop ?? 0) === 0,
+    tradeable: isTradeableItem(row.nodrop),
     levelRequired: Number(row.reqlevel ?? 0),
     zone: row.source?.trim() || "Various",
     ac: Number(row.ac ?? 0),
@@ -1091,7 +1097,7 @@ function buildItemFilterClauses(filters: ItemFilters) {
   const effectiveRequiredLevelClause = sql`greatest(coalesce(reqlevel, 0), 1)`;
 
   if (typeof filters.tradeable === "boolean") {
-    clauses.push(filters.tradeable ? sql`nodrop = 0` : sql`nodrop <> 0`);
+    clauses.push(filters.tradeable ? sql`coalesce(nodrop, 0) <> 0` : sql`coalesce(nodrop, 0) = 0`);
   }
 
   if (filters.minLevel) {
@@ -1282,7 +1288,7 @@ export async function getCatalogStats(): Promise<CatalogStats> {
         (select count(*) from items i where ${discoveredItemClause("i.id")}) as items,
         (select count(*) from spells_new) as spells,
         (select count(*) from npc_types) as npcs,
-        (select count(*) from zone) as zones,
+        (select count(*) from zone z where coalesce(z.version, 0) = 0 and coalesce(z.min_status, 0) <= ${publicZoneStatusCeiling}) as zones,
         (select count(*) from faction_list) as factions,
         (select count(*) from tradeskill_recipe) as recipes,
         (select count(*) from pets) as pets,
@@ -1347,6 +1353,7 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
           left join spawngroup sg on sg.id = se.spawngroupID
           left join spawn2 s2 on s2.spawngroupID = sg.id
           left join zone z on z.short_name = s2.zone and z.version = s2.version
+            and coalesce(z.min_status, 0) <= ${publicZoneStatusCeiling}
           where nt.name like ${like(query)}
           group by nt.id, nt.name, nt.race, nt.level
           order by nt.name asc
@@ -1355,7 +1362,9 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
         sql<{ short_name: string; long_name: string; expansion: number; min_level: number; max_level: number }>`
           select short_name, long_name, expansion, min_level, max_level
           from zone
-          where short_name like ${like(query)} or long_name like ${like(query)}
+          where coalesce(version, 0) = 0
+            and coalesce(min_status, 0) <= ${publicZoneStatusCeiling}
+            and (short_name like ${like(query)} or long_name like ${like(query)})
           order by long_name asc
           limit 8
         `.execute(db!),
@@ -1612,6 +1621,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       join spawngroup sg on sg.id = se.spawngroupID
       join spawn2 s2 on s2.spawngroupID = sg.id
       join zone z on z.short_name = s2.zone and z.version = s2.version
+        and coalesce(z.min_status, 0) <= ${publicZoneStatusCeiling}
       where lde.item_id = ${id}
       order by z.long_name asc
       limit 20
@@ -1680,7 +1690,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
 
     const flags = [
       Number(row.magic ?? 0) > 0 ? "Magic" : null,
-      Number(row.nodrop ?? 0) > 0 ? "No Drop" : null,
+      !isTradeableItem(row.nodrop) ? "No Drop" : null,
       Number(row.attuneable ?? 0) > 0 ? "Attuneable" : null
     ].filter((value): value is string => Boolean(value));
 
@@ -1730,7 +1740,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       weight: formatWeight(row.weight),
       skill: formatSkill(row.itemtype, row.damage, row.itemclass),
       itemTypeLabel: formatItemTypeLabel(row.itemtype, row.damage, row.itemclass, row.light),
-      tradeable: Number(row.nodrop ?? 0) === 0,
+      tradeable: isTradeableItem(row.nodrop),
       levelRequired: Number(row.reqlevel ?? 0),
       recommendedLevel: Number(row.reclevel ?? 0),
       range: Number(row.item_range ?? 0),
@@ -2006,6 +2016,8 @@ export async function listNpcs(filters: NpcFilters = {}) {
       left join (
         select short_name, min(long_name) as long_name
         from zone
+        where coalesce(version, 0) = 0
+          and coalesce(min_status, 0) <= ${publicZoneStatusCeiling}
         group by short_name
       ) z on z.short_name = s2.zone
       where nt.name like ${like(filters.q)}
@@ -2085,6 +2097,8 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
       left join (
         select short_name, min(long_name) as long_name
         from zone
+        where coalesce(version, 0) = 0
+          and coalesce(min_status, 0) <= ${publicZoneStatusCeiling}
         group by short_name
       ) z on z.short_name = s2.zone
       where nt.id = ${id}
@@ -2159,6 +2173,8 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
         left join (
           select short_name, min(long_name) as long_name
           from zone
+          where coalesce(version, 0) = 0
+            and coalesce(min_status, 0) <= ${publicZoneStatusCeiling}
           group by short_name
         ) z on z.short_name = s2.zone
         where se.npcID = ${id}
@@ -2437,6 +2453,7 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
       from zone
       where short_name = ${shortName}
         and version = 0
+        and coalesce(min_status, 0) <= ${publicZoneStatusCeiling}
       limit 1
     `.execute(db!);
 
@@ -2512,6 +2529,7 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
         join zone z on z.zoneidnumber = f.zoneid and z.version = 0
         join items i on i.id = f.Itemid
         where z.short_name = ${shortName}
+          and coalesce(z.min_status, 0) <= ${publicZoneStatusCeiling}
           and ${discoveredItemClause("i.id")}
         group by i.id, i.Name, i.icon
         order by i.Name asc
@@ -2755,6 +2773,8 @@ export async function getFactionDetail(id: number): Promise<FactionDetail | unde
         left join (
           select short_name, min(long_name) as long_name
           from zone
+          where coalesce(version, 0) = 0
+            and coalesce(min_status, 0) <= ${publicZoneStatusCeiling}
           group by short_name
         ) z on z.short_name = s2.zone
         where nf.primaryfaction = ${id}

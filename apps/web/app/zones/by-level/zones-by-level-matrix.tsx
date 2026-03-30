@@ -10,6 +10,7 @@ type ZonesByLevelMatrixProps = {
 };
 
 const defaultSelectedLevel = 25;
+const zonesByLevelPickerMaximum = 65;
 
 function bandTone(npcCount: number) {
   if (npcCount >= 20) {
@@ -86,7 +87,7 @@ function buildCellBoxShadow({
 
 export function ZonesByLevelMatrix({ zones }: ZonesByLevelMatrixProps) {
   const bands = zones[0]?.bands ?? [];
-  const maximumLevel = bands[bands.length - 1]?.maxLevel ?? 110;
+  const maximumLevel = Math.min(bands[bands.length - 1]?.maxLevel ?? 110, zonesByLevelPickerMaximum);
   const [selectedLevel, setSelectedLevel] = useState(() => clampLevel(defaultSelectedLevel, maximumLevel));
 
   const selectedBandIndex = Math.max(0, Math.floor((selectedLevel - 1) / 5));
