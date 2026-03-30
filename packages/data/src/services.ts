@@ -1401,6 +1401,10 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
 
   return cacheGetOrResolve(key, 60, async () =>
     withDatabaseFallback(async () => {
+      const spellSearchClassClauses = classNames.map((_, index) => {
+        const classColumn = sql.raw(`classes${index + 1}`);
+        return sql`(${classColumn} > 0 and ${classColumn} < 255 and ${classColumn} <= ${spellSearchLevelCap})`;
+      });
       const [itemRows, spellRows, npcRows, zoneRows, factionRows, recipeRows] = await Promise.all([
         sql<{ id: number; name: string; icon: number; itemclass: number; itemtype: number; slots: number; damage: number }>`
           select id, Name as name, icon, itemclass, itemtype, slots, damage
@@ -1415,6 +1419,7 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
                  classes9, classes10, classes11, classes12, classes13, classes14, classes15, classes16
           from spells_new
           where name like ${like(query)}
+            and (${sql.join(spellSearchClassClauses, sql` or `)})
           order by name asc
           limit 8
         `.execute(db!),
@@ -1471,7 +1476,8 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
       }
 
       for (const row of spellRows.rows) {
-        const classes = spellClassesFromRow(row);
+        const classes = spellClassesFromRow(row).filter((entry) => entry.level <= spellSearchLevelCap);
+        if (classes.length === 0) continue;
         const primaryClass = classes[0];
         dbHits.push({
           id: String(row.id),
@@ -1535,7 +1541,7 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
         if (includesFolded(item.name, query)) fallbackHits.push({ id: String(item.id), type: "item", title: item.name, href: `/items/${item.id}`, subtitle: `${item.type} • ${item.slot}`, tags: [item.zone], icon: item.icon });
       }
       for (const spell of summarizeSpells()) {
-        if (includesFolded(spell.name, query) || includesFolded(spell.effect, query)) {
+        if ((includesFolded(spell.name, query) || includesFolded(spell.effect, query)) && spell.level <= spellSearchLevelCap) {
           fallbackHits.push({
             id: String(spell.id),
             type: "spell",

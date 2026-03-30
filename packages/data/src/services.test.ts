@@ -78,6 +78,11 @@ describe("catalog services", () => {
     expect(hits.some((hit) => hit.type === "zone" && hit.href === "/zones/poknowledge")).toBe(false);
   });
 
+  it("excludes spells above level 60 from global search results", async () => {
+    const hits = await searchCatalog("Agility of the Wrulan");
+    expect(hits.some((hit) => hit.type === "spell" && hit.href === "/spells/3378")).toBe(false);
+  });
+
   it("returns populated search hits", async () => {
     const hits = await searchCatalog("mistmoore");
     expect(hits.some((hit) => hit.type === "zone")).toBe(true);
