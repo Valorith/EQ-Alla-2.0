@@ -2371,15 +2371,25 @@ export async function listZoneEras() {
 export async function listZoneEraBrowseDefinitions() {
   const zones = await listZones();
 
-  return listZoneEraDefinitions().map((definition) => {
-    const zoneCount = zones.filter((zone) => matchesZoneEraFilter(zone, definition.label)).length;
+  return listZoneEraDefinitions()
+    .map((definition, index) => {
+      const zoneCount = zones.filter((zone) => matchesZoneEraFilter(zone, definition.label)).length;
 
-    return {
-      ...definition,
-      enabled: zoneCount > 0,
-      zoneCount
-    };
-  });
+      return {
+        ...definition,
+        enabled: zoneCount > 0,
+        zoneCount,
+        sortIndex: index
+      };
+    })
+    .sort((left, right) => {
+      if (left.enabled !== right.enabled) {
+        return left.enabled ? -1 : 1;
+      }
+
+      return left.sortIndex - right.sortIndex;
+    })
+    .map(({ sortIndex: _sortIndex, ...definition }) => definition);
 }
 
 export async function getZonesByEra(era: string) {

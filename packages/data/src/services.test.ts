@@ -357,6 +357,15 @@ describe("catalog services", () => {
     expect(power?.zoneCount).toBe(0);
   });
 
+  it("lists enabled zone expansions before disabled ones on the zones by era landing page", async () => {
+    const eras = await listZoneEraBrowseDefinitions();
+    const firstDisabledIndex = eras.findIndex((era) => !era.enabled);
+
+    expect(firstDisabledIndex).toBeGreaterThan(-1);
+    expect(eras.slice(0, firstDisabledIndex).every((era) => era.enabled)).toBe(true);
+    expect(eras.slice(firstDisabledIndex).every((era) => !era.enabled)).toBe(true);
+  });
+
   it("maps zone eras directly from the database expansion value", () => {
     expect(formatZoneEra("nektulos", 1)).toBe("Ruins of Kunark");
     expect(formatZoneEra("mistmoore", 1)).toBe("Ruins of Kunark");
