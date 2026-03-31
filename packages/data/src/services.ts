@@ -72,7 +72,6 @@ export const zoneByLevelCap = 60;
 const zoneLevelBandMaximum = zoneByLevelCap;
 const zoneLevelBandSignificanceFloor = 5;
 const publicZoneStatusCeiling = 1;
-const itemRelationshipZoneStatus = 1;
 const merchantNpcClasses = [40, 41, 59, 61, 67, 68, 70] as const;
 export const spellSearchLevelCap = 60;
 export const petSearchLevelCap = 60;
@@ -1610,7 +1609,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       join spawngroup sg on sg.id = se.spawngroupID
       join spawn2 s2 on s2.spawngroupID = sg.id
       join zone z on z.short_name = s2.zone and z.version = s2.version
-        and coalesce(z.min_status, 0) = ${itemRelationshipZoneStatus}
+        and coalesce(z.min_status, 0) <= ${publicZoneStatusCeiling}
       where lde.item_id = ${id}
       order by z.long_name asc, nt.name asc
       limit 160
@@ -1625,7 +1624,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       join spawngroup sg on sg.id = se.spawngroupID
       join spawn2 s2 on s2.spawngroupID = sg.id
       join zone z on z.short_name = s2.zone and z.version = s2.version
-        and coalesce(z.min_status, 0) = ${itemRelationshipZoneStatus}
+        and coalesce(z.min_status, 0) <= ${publicZoneStatusCeiling}
       where lde.item_id = ${id}
       order by z.long_name asc
       limit 20
@@ -1639,7 +1638,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       join spawngroup sg on sg.id = se.spawngroupID
       join spawn2 s2 on s2.spawngroupID = sg.id
       join zone z on z.short_name = s2.zone and z.version = s2.version
-        and coalesce(z.min_status, 0) = ${itemRelationshipZoneStatus}
+        and coalesce(z.min_status, 0) <= ${publicZoneStatusCeiling}
       where ml.item = ${id}
       order by z.long_name asc, nt.name asc
       limit 160
