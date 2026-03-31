@@ -40,7 +40,7 @@ function getHoveredItemTrigger(target: EventTarget | null) {
 
 function loadingCard() {
   return (
-    <div className="w-fit max-w-full rounded-[12px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,29,38,0.96),rgba(14,19,27,0.94))] px-4 py-4 text-[#e6e0d2] shadow-[0_18px_40px_rgba(0,0,0,0.3)] backdrop-blur-sm">
+    <div className="inline-block max-w-full rounded-[12px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,29,38,0.96),rgba(14,19,27,0.94))] px-4 py-4 text-[#e6e0d2] shadow-[0_18px_40px_rgba(0,0,0,0.3)] backdrop-blur-sm">
       <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b99a67]">Item Preview</p>
       <p className="mt-3 text-sm leading-7 text-[#d7cfbf]">Loading item details...</p>
     </div>
@@ -238,12 +238,11 @@ export function ItemHoverTooltip() {
   return (
     <div
       ref={tooltipRef}
-      className="pointer-events-none fixed z-[120] hidden min-[1100px]:block"
+      className="pointer-events-none fixed z-[120] hidden min-[1100px]:inline-block"
       style={{
         left: position?.left ?? 0,
         top: position?.top ?? 0,
         visibility: position ? "visible" : "hidden",
-        width: "max-content",
         maxWidth: "min(650px, calc(100vw - 24px))"
       }}
       aria-hidden="true"
@@ -251,7 +250,7 @@ export function ItemHoverTooltip() {
       {status === "ready" && item ? <ItemDetailPreview item={item} /> : null}
       {status === "loading" ? loadingCard() : null}
       {status === "error" ? (
-        <div className="w-fit max-w-full rounded-[12px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,29,38,0.96),rgba(14,19,27,0.94))] px-4 py-4 text-[#e6e0d2] shadow-[0_18px_40px_rgba(0,0,0,0.3)] backdrop-blur-sm">
+        <div className="inline-block max-w-full rounded-[12px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,29,38,0.96),rgba(14,19,27,0.94))] px-4 py-4 text-[#e6e0d2] shadow-[0_18px_40px_rgba(0,0,0,0.3)] backdrop-blur-sm">
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b99a67]">Item Preview</p>
           <p className="mt-3 text-sm leading-7 text-[#d7cfbf]">Could not load the item tooltip.</p>
         </div>

@@ -125,7 +125,7 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
 
   return (
     <div className="max-w-[1240px] space-y-8 text-[#e6e0d2]">
-      <div className="space-y-3">
+      <div className="inline-block max-w-full space-y-3 align-top">
         <ItemDetailPreview item={item} className="max-w-[650px]" />
       </div>
 
