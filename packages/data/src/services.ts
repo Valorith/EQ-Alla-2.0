@@ -67,7 +67,6 @@ const sourceMode = db ? "live" : "database-unavailable";
 const databaseEnabled = Boolean(db);
 const itemSearchLimit = 100;
 const itemSearchCacheTtlSeconds = 60;
-const contentFlagsCacheTtlSeconds = 60;
 const zoneLevelBandSize = 5;
 export const zoneByLevelCap = 60;
 const zoneLevelBandMaximum = zoneByLevelCap;
@@ -221,45 +220,46 @@ const spellSkillNames: Record<number, string> = {
   98: "Combat Ability"
 };
 
-function parseContentFlagList(value: string | null | undefined): string[] {
-  return value
-    ?.split(/[,\s|]+/)
-    .map((entry) => entry.trim())
-    .filter((entry): entry is string => Boolean(entry)) ?? [];
-}
-
-function contentFlagsMatchEnabledState(
-  requiredFlags: string | null | undefined,
-  disabledFlags: string | null | undefined,
-  enabledFlags: ReadonlySet<string>
+function enabledContentFlagsCondition(
+  alias: string,
+  requiredColumn = "content_flags",
+  disabledColumn = "content_flags_disabled"
 ) {
-  const required = parseContentFlagList(requiredFlags);
-  const disabled = parseContentFlagList(disabledFlags);
-
-  return required.every((flag) => enabledFlags.has(flag))
-    && disabled.every((flag) => !enabledFlags.has(flag));
+  return `(
+    (
+      coalesce(${alias}.${requiredColumn}, '') = ''
+      or exists (
+        select 1
+        from content_flags required_cf
+        where required_cf.flag_name = ${alias}.${requiredColumn}
+          and coalesce(required_cf.enabled, 0) <> 0
+      )
+    )
+    and (
+      coalesce(${alias}.${disabledColumn}, '') = ''
+      or not exists (
+        select 1
+        from content_flags disabled_cf
+        where disabled_cf.flag_name = ${alias}.${disabledColumn}
+          and coalesce(disabled_cf.enabled, 0) <> 0
+      )
+    )
+  )`;
 }
 
-async function getEnabledContentFlags() {
-  if (!db) {
-    return new Set<string>();
-  }
+function trackableNpcCondition(alias: string) {
+  return `coalesce(${alias}.trackable, 0) = ${requiredTrackableNpcValue}`;
+}
 
-  const flags = await cacheGetOrResolve("content-flags-enabled", contentFlagsCacheTtlSeconds, async () => {
-    const rows = await sql<{ flag_name: string | null }>`
-      select flag_name
-      from content_flags
-      where coalesce(enabled, 0) <> 0
-        and coalesce(flag_name, '') <> ''
-      order by flag_name asc
-    `.execute(db);
+function enabledRecipeCondition(alias: string) {
+  return `coalesce(${alias}.enabled, 1) = 1`;
+}
 
-    return rows.rows
-      .map((row) => normalizeText(row.flag_name ?? ""))
-      .filter((flag): flag is string => Boolean(flag));
-  });
-
-  return new Set<string>(flags);
+function merchantAvailabilityCondition(alias: string) {
+  return `(
+    coalesce(${alias}.min_status, 0) <= ${publicZoneStatusCeiling}
+    and ${enabledContentFlagsCondition(alias)}
+  )`;
 }
 
 function publicEnabledSpawnSubquery(alias: string) {
@@ -288,6 +288,7 @@ function publicEnabledSpawnSubquery(alias: string) {
       group by short_name
     ) z on z.short_name = s2.zone
     where s2d.spawn2_id is null
+      and ${enabledContentFlagsCondition("s2")}
   ) ${alias}`);
 }
 
@@ -1351,10 +1352,17 @@ export async function getCatalogStats(): Promise<CatalogStats> {
       select
         (select count(*) from items i where ${discoveredItemClause("i.id")}) as items,
         (select count(*) from spells_new) as spells,
-        (select count(*) from npc_types) as npcs,
+        (
+          select count(distinct nt.id)
+          from npc_types nt
+          join spawnentry se on se.npcID = nt.id
+          join spawngroup sg on sg.id = se.spawngroupID
+          join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
+          where ${sql.raw(trackableNpcCondition("nt"))}
+        ) as npcs,
         (select count(*) from zone z where coalesce(z.version, 0) = 0 and coalesce(z.min_status, 0) <= ${publicZoneStatusCeiling}) as zones,
         (select count(*) from faction_list) as factions,
-        (select count(*) from tradeskill_recipe) as recipes,
+        (select count(*) from tradeskill_recipe where ${sql.raw(enabledRecipeCondition("tradeskill_recipe"))}) as recipes,
         (select count(*) from pets) as pets,
         (select count(*) from tasks) as tasks
     `.execute(db!);
@@ -1422,7 +1430,7 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
           left join spawngroup sg on sg.id = se.spawngroupID
           left join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
           where nt.name like ${like(query)}
-            and coalesce(nt.trackable, 0) = ${requiredTrackableNpcValue}
+            and ${sql.raw(trackableNpcCondition("nt"))}
           group by nt.id, nt.name, nt.race, nt.level
           order by nt.name asc
           limit 8
@@ -1447,6 +1455,7 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
           select id, name, tradeskill, trivial
           from tradeskill_recipe
           where name like ${like(query)}
+            and ${sql.raw(enabledRecipeCondition("tradeskill_recipe"))}
           order by name asc
           limit 8
         `.execute(db!)
@@ -1680,7 +1689,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       join spawngroup sg on sg.id = se.spawngroupID
       join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
       where lde.item_id = ${id}
-        and coalesce(nt.trackable, 0) = ${requiredTrackableNpcValue}
+        and ${sql.raw(trackableNpcCondition("nt"))}
       order by ps.long_name asc, nt.name asc
       limit 160
     `.execute(db!);
@@ -1694,7 +1703,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       join spawngroup sg on sg.id = se.spawngroupID
       join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
       where lde.item_id = ${id}
-        and coalesce(nt.trackable, 0) = ${requiredTrackableNpcValue}
+        and ${sql.raw(trackableNpcCondition("nt"))}
       order by ps.long_name asc
       limit 20
     `.execute(db!);
@@ -1704,28 +1713,20 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       name: string;
       short_name: string;
       long_name: string;
-      merchant_content_flags: string | null;
-      merchant_content_flags_disabled: string | null;
-      spawn_content_flags: string | null;
-      spawn_content_flags_disabled: string | null;
     }>`
       select distinct
         nt.id,
         nt.name,
         ps.zone as short_name,
-        ps.long_name,
-        ml.content_flags as merchant_content_flags,
-        ml.content_flags_disabled as merchant_content_flags_disabled,
-        ps.content_flags as spawn_content_flags,
-        ps.content_flags_disabled as spawn_content_flags_disabled
+        ps.long_name
       from merchantlist ml
       join npc_types nt on nt.merchant_id = ml.merchantid
       join spawnentry se on se.npcID = nt.id
       join spawngroup sg on sg.id = se.spawngroupID
       join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
       where ml.item = ${id}
-        and coalesce(nt.trackable, 0) = ${requiredTrackableNpcValue}
-        and coalesce(ml.min_status, 0) <= ${publicZoneStatusCeiling}
+        and ${sql.raw(trackableNpcCondition("nt"))}
+        and ${sql.raw(merchantAvailabilityCondition("ml"))}
       order by ps.long_name asc, nt.name asc
       limit 160
     `.execute(db!);
@@ -1735,7 +1736,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       from tradeskill_recipe_entries tre
       join tradeskill_recipe tr on tr.id = tre.recipe_id
       where tre.item_id = ${id}
-        and coalesce(tr.enabled, 1) = 1
+        and ${sql.raw(enabledRecipeCondition("tr"))}
         and coalesce(tre.iscontainer, 0) = 0
         and coalesce(tre.successcount, 0) = 0
         and coalesce(tre.componentcount, 0) > 0
@@ -1744,33 +1745,17 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
     `.execute(db!);
 
     const effectNameMapPromise = spellNamesById([row.proceffect, row.worneffect, row.focuseffect, row.clickeffect].map(Number));
-    const enabledContentFlagsPromise = getEnabledContentFlags();
 
-    const [droppedByRows, droppedZoneRows, soldByRows, recipeRows, effectNameMap, enabledContentFlags] = await Promise.all([
+    const [droppedByRows, droppedZoneRows, soldByRows, recipeRows, effectNameMap] = await Promise.all([
       droppedByRowsPromise,
       droppedZoneRowsPromise,
       soldByRowsPromise,
       recipeRowsPromise,
-      effectNameMapPromise,
-      enabledContentFlagsPromise
+      effectNameMapPromise
     ]);
 
     const soldByEntries = Array.from(
-      new Map(
-        soldByRows.rows
-          .filter((entry) =>
-            contentFlagsMatchEnabledState(
-              entry.merchant_content_flags,
-              entry.merchant_content_flags_disabled,
-              enabledContentFlags
-            ) && contentFlagsMatchEnabledState(
-              entry.spawn_content_flags,
-              entry.spawn_content_flags_disabled,
-              enabledContentFlags
-            )
-          )
-          .map((entry) => [`${entry.id}:${entry.short_name}`, entry] as const)
-      ).values()
+      new Map(soldByRows.rows.map((entry) => [`${entry.id}:${entry.short_name}`, entry] as const)).values()
     );
 
     const statPairs: Array<[string, string | number | null | undefined]> = [
@@ -2173,7 +2158,7 @@ export async function listNpcs(filters: NpcFilters = {}) {
       left join spawngroup sg on sg.id = se.spawngroupID
       left join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
       where nt.name like ${like(filters.q)}
-        and coalesce(nt.trackable, 0) = ${requiredTrackableNpcValue}
+        and ${sql.raw(trackableNpcCondition("nt"))}
       group by nt.id, nt.name, nt.race, nt.level, nt.class
       order by nt.level desc, nt.name asc
       limit 100
@@ -2248,7 +2233,7 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
       left join spawngroup sg on sg.id = se.spawngroupID
       left join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
       where nt.id = ${id}
-        and coalesce(nt.trackable, 0) = ${requiredTrackableNpcValue}
+        and ${sql.raw(trackableNpcCondition("nt"))}
       group by nt.id, nt.name, nt.lastname, nt.race, nt.gender, nt.texture, nt.helmtexture, nt.level, nt.class, nt.hp, nt.mana, nt.mindmg, nt.maxdmg,
                nt.npc_faction_id, nt.npc_spells_id, nt.loottable_id, nt.merchant_id, nt.npcspecialattks, nt.attack_delay,
                fl.id, fl.name
@@ -2258,7 +2243,7 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
 
     if (!row) return undefined;
 
-    const [spellRows, dropRows, sellRows, merchantSpawnRows, spawnZoneRows, factionRows, enabledContentFlags] = await Promise.all([
+    const [spellRows, dropRows, sellRows, spawnZoneRows, factionRows] = await Promise.all([
       row.npc_spells_id
         ? sql<{ spellid: number; type: number; name: string; new_icon: number }>`
             select nse.spellid, nse.type, s.name, s.new_icon
@@ -2309,38 +2294,24 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
             icon: number;
             price: number;
             ldonprice: number;
-            content_flags: string | null;
-            content_flags_disabled: string | null;
           }>`
-            select i.id, i.Name as name, i.icon, i.price, i.ldonprice,
-                   ml.content_flags, ml.content_flags_disabled
+            select i.id, i.Name as name, i.icon, i.price, i.ldonprice
             from merchantlist ml
             join items i on i.id = ml.item
             where ml.merchantid = ${row.merchant_id}
-              and coalesce(ml.min_status, 0) <= ${publicZoneStatusCeiling}
+              and ${sql.raw(merchantAvailabilityCondition("ml"))}
               and ${discoveredItemClause("i.id")}
             order by ml.slot asc
           `.execute(db!)
         : Promise.resolve({
-            rows: [] as Array<{
-              id: number;
-              name: string;
-              icon: number;
-              price: number;
-              ldonprice: number;
-              content_flags: string | null;
-              content_flags_disabled: string | null;
-            }>
-          }),
-      row.merchant_id
-        ? sql<{ content_flags: string | null; content_flags_disabled: string | null }>`
-            select distinct ps.content_flags, ps.content_flags_disabled
-            from spawnentry se
-            join spawngroup sg on sg.id = se.spawngroupID
-            join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
-            where se.npcID = ${row.id}
-          `.execute(db!)
-        : Promise.resolve({ rows: [] as Array<{ content_flags: string | null; content_flags_disabled: string | null }> }),
+          rows: [] as Array<{
+            id: number;
+            name: string;
+            icon: number;
+            price: number;
+            ldonprice: number;
+          }>
+        }),
       sql<{ short_name: string; long_name: string | null }>`
         select distinct ps.zone as short_name, ps.long_name
         from spawnentry se
@@ -2358,18 +2329,7 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
             order by nfe.value desc, fl.name asc
           `.execute(db!)
         : Promise.resolve({ rows: [] as Array<{ id: number; name: string; value: number }> }),
-      getEnabledContentFlags()
     ]);
-
-    const merchantHasEnabledPublicSpawn = merchantSpawnRows.rows.some((entry) =>
-      contentFlagsMatchEnabledState(entry.content_flags, entry.content_flags_disabled, enabledContentFlags)
-    );
-
-    const enabledSellRows = merchantHasEnabledPublicSpawn
-      ? sellRows.rows.filter((entry) =>
-          contentFlagsMatchEnabledState(entry.content_flags, entry.content_flags_disabled, enabledContentFlags)
-        )
-      : [];
 
     const dropGroups = new Map<
       number,
@@ -2434,7 +2394,7 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
         icon: String(entry.new_icon ?? 0)
       })),
       drops: [...dropGroups.values()],
-      sells: enabledSellRows.map((entry) => ({
+      sells: sellRows.rows.map((entry) => ({
         id: entry.id,
         name: entry.name,
         href: `/items/${entry.id}`,
@@ -2551,6 +2511,7 @@ export async function getZonesByLevel() {
         and nt.level > 1
         and nt.level <= ${zoneLevelBandMaximum}
         and nt.race not in (127, 240)
+        and ${sql.raw(trackableNpcCondition("nt"))}
       where coalesce(z.version, 0) = 0
         and coalesce(z.min_status, 0) <= ${publicZoneStatusCeiling}
       group by z.zoneidnumber, z.short_name, z.long_name, z.expansion, z.hotzone, bucket
@@ -2690,7 +2651,7 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
         join ${publicEnabledSpawnSubquery("s2")} on s2.spawngroupID = sg.id
         where s2.zone = ${shortName}
           and s2.version in (${sql.join(spawnVersions.map((value) => sql`${value}`), sql`, `)})
-          and coalesce(nt.trackable, 0) = ${requiredTrackableNpcValue}
+          and ${sql.raw(trackableNpcCondition("nt"))}
           and nt.race not in (127, 240)
         group by nt.name
         order by nt.name asc
@@ -2713,6 +2674,7 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
         join ${publicEnabledSpawnSubquery("s2")} on s2.spawngroupID = sg.id
         where s2.zone = ${shortName}
           and s2.version in (${sql.join(spawnVersions.map((value) => sql`${value}`), sql`, `)})
+          and ${sql.raw(trackableNpcCondition("nt"))}
           and ${discoveredItemClause("i.id")}
           and nt.class not in (${sql.join(merchantNpcClasses.map((value) => sql`${value}`), sql`, `)})
         order by i.Name asc
@@ -2765,7 +2727,7 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
         join ${publicEnabledSpawnSubquery("s2")} on s2.spawngroupID = se.spawngroupID
         where s2.zone = ${shortName}
           and s2.version in (${sql.join(spawnVersions.map((value) => sql`${value}`), sql`, `)})
-          and coalesce(nt.trackable, 0) = ${requiredTrackableNpcValue}
+          and ${sql.raw(trackableNpcCondition("nt"))}
         order by se.spawngroupID asc, nt.name asc
       `.execute(db!)
     ]);
@@ -2991,7 +2953,7 @@ export async function listFactions(filters: FactionFilters = {}) {
         join spawnentry se on se.npcID = nt.id
         join spawngroup sg on sg.id = se.spawngroupID
         join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
-        where coalesce(nt.trackable, 0) = ${requiredTrackableNpcValue}
+        where ${sql.raw(trackableNpcCondition("nt"))}
         group by nf.primaryfaction
       ) zone_info on zone_info.faction_id = fl.id
       left join (
@@ -3001,7 +2963,10 @@ export async function listFactions(filters: FactionFilters = {}) {
         from npc_faction_entries nfe
         join npc_faction nf on nf.id = nfe.npc_faction_id
         join npc_types nt on nt.npc_faction_id = nf.id
-        where coalesce(nt.trackable, 0) = ${requiredTrackableNpcValue}
+        join spawnentry se on se.npcID = nt.id
+        join spawngroup sg on sg.id = se.spawngroupID
+        join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
+        where ${sql.raw(trackableNpcCondition("nt"))}
         group by nfe.faction_id
       ) relationship_info on relationship_info.faction_id = fl.id
       where ${sql.join(clauses, sql` and `)}
@@ -3058,16 +3023,19 @@ export async function getFactionDetail(id: number): Promise<FactionDetail | unde
         join spawngroup sg on sg.id = se.spawngroupID
         join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
         where nf.primaryfaction = ${id}
-          and coalesce(nt.trackable, 0) = ${requiredTrackableNpcValue}
+          and ${sql.raw(trackableNpcCondition("nt"))}
       `.execute(db!),
       sql<{ id: number; name: string }>`
         select distinct nt.id, nt.name
         from npc_faction_entries nfe
         join npc_faction nf on nf.id = nfe.npc_faction_id
         join npc_types nt on nt.npc_faction_id = nf.id
+        join spawnentry se on se.npcID = nt.id
+        join spawngroup sg on sg.id = se.spawngroupID
+        join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
         where nfe.faction_id = ${id}
           and nfe.value > 0
-          and coalesce(nt.trackable, 0) = ${requiredTrackableNpcValue}
+          and ${sql.raw(trackableNpcCondition("nt"))}
         order by nt.name asc
       `.execute(db!),
       sql<{ id: number; name: string }>`
@@ -3075,9 +3043,12 @@ export async function getFactionDetail(id: number): Promise<FactionDetail | unde
         from npc_faction_entries nfe
         join npc_faction nf on nf.id = nfe.npc_faction_id
         join npc_types nt on nt.npc_faction_id = nf.id
+        join spawnentry se on se.npcID = nt.id
+        join spawngroup sg on sg.id = se.spawngroupID
+        join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
         where nfe.faction_id = ${id}
           and nfe.value < 0
-          and coalesce(nt.trackable, 0) = ${requiredTrackableNpcValue}
+          and ${sql.raw(trackableNpcCondition("nt"))}
         order by nt.name asc
       `.execute(db!)
     ]);
@@ -3146,7 +3117,8 @@ export async function listRecipes(filters: RecipeFilters = {}) {
     const rows = await sql<{ id: number; name: string; tradeskill: number; trivial: number }>`
       select id, name, tradeskill, trivial
       from tradeskill_recipe
-      where ${sql.join(clauses, sql` and `)}
+      where ${sql.raw(enabledRecipeCondition("tradeskill_recipe"))}
+        and ${sql.join(clauses, sql` and `)}
       order by name asc
       limit 100
     `.execute(db!);
@@ -3181,6 +3153,7 @@ export async function getRecipeDetail(id: number): Promise<RecipeDetail | undefi
       select id, name, tradeskill, trivial, notes
       from tradeskill_recipe
       where id = ${id}
+        and ${sql.raw(enabledRecipeCondition("tradeskill_recipe"))}
       limit 1
     `.execute(db!);
 

@@ -4,9 +4,11 @@ import {
   formatPlayableItemRaceMask,
   formatZoneEra,
   getCatalogStats,
+  getFactionDetail,
   getItemDetail,
   getNpcDetail,
   getPetDetail,
+  getRecipeDetail,
   getSpellDetail,
   getZoneDetail,
   getZonesByEra,
@@ -16,6 +18,7 @@ import {
   listItems,
   listNpcs,
   listPets,
+  listRecipes,
   listSpells,
   listZoneEraBrowseDefinitions,
   listZoneEras,
@@ -278,34 +281,49 @@ describe("catalog services", () => {
     expect(item?.droppedBy.some((entry) => entry.id === rows.rows[0].npc_id)).toBe(false);
   }, 20_000);
 
-  it("hides merchant inventory when the merchant has no enabled public spawn", async () => {
+  it("hides merchant inventory rows when the merchantlist entry is not enabled", async () => {
     const db = getDb();
     expect(db).toBeTruthy();
 
-    const rows = await sql<{ npc_id: number }>`
-      select distinct nt.id as npc_id
+    const rows = await sql<{ npc_id: number; item_id: number }>`
+      select distinct nt.id as npc_id, ml.item as item_id
       from npc_types nt
+      join merchantlist ml on ml.merchantid = nt.merchant_id
       join spawnentry se on se.npcID = nt.id
       join spawngroup sg on sg.id = se.spawngroupID
       join spawn2 s2 on s2.spawngroupID = sg.id
+      left join spawn2_disabled s2d on s2d.spawn2_id = s2.id and coalesce(s2d.disabled, 0) <> 0
       join zone z on z.short_name = s2.zone and z.version = s2.version
-      left join content_flags cf on cf.flag_name = s2.content_flags
+      left join content_flags required_cf on required_cf.flag_name = ml.content_flags
+      left join content_flags disabled_cf on disabled_cf.flag_name = ml.content_flags_disabled
       where nt.merchant_id > 0
         and coalesce(z.min_status, 0) <= ${1}
-        and coalesce(s2.content_flags, '') <> ''
-        and coalesce(cf.enabled, 0) = 0
+        and s2d.spawn2_id is null
+        and (
+          (
+            coalesce(ml.content_flags, '') <> ''
+            and coalesce(required_cf.enabled, 0) = 0
+          )
+          or (
+            coalesce(ml.content_flags_disabled, '') <> ''
+            and coalesce(disabled_cf.enabled, 0) <> 0
+          )
+        )
+        and exists (
+          select 1
+          from discovered_items di
+          where di.item_id = ml.item
+        )
         and not exists (
           select 1
-          from spawnentry se2
-          join spawngroup sg2 on sg2.id = se2.spawngroupID
-          join spawn2 s22 on s22.spawngroupID = sg2.id
-          join zone z2 on z2.short_name = s22.zone and z2.version = s22.version
-          left join content_flags cf2 on cf2.flag_name = s22.content_flags
-          where se2.npcID = nt.id
-            and coalesce(z2.min_status, 0) <= ${1}
+          from merchantlist ml2
+          left join content_flags required_cf2 on required_cf2.flag_name = ml2.content_flags
+          left join content_flags disabled_cf2 on disabled_cf2.flag_name = ml2.content_flags_disabled
+          where ml2.merchantid = nt.merchant_id
+            and ml2.item = ml.item
             and (
-              coalesce(s22.content_flags, '') = ''
-              or coalesce(cf2.enabled, 0) <> 0
+              (coalesce(ml2.content_flags, '') = '' or coalesce(required_cf2.enabled, 0) <> 0)
+              and (coalesce(ml2.content_flags_disabled, '') = '' or coalesce(disabled_cf2.enabled, 0) = 0)
             )
         )
       order by nt.id asc
@@ -319,7 +337,7 @@ describe("catalog services", () => {
 
     const npc = await getNpcDetail(rows.rows[0].npc_id);
 
-    expect(npc?.sells).toEqual([]);
+    expect(npc?.sells.some((entry) => entry.id === rows.rows[0].item_id)).toBe(false);
   }, 20_000);
 
   it("matches canonical ingredient-only recipe usage rows", async () => {
@@ -364,6 +382,33 @@ describe("catalog services", () => {
     const item = await getItemDetail(itemId);
 
     expect(item?.usedInRecipes.map((entry) => entry.id)).toEqual(expectedRows.rows.map((row) => row.id));
+  }, 20_000);
+
+  it("hides disabled recipes across recipe list, search, and detail surfaces", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{ id: number; name: string }>`
+      select id, name
+      from tradeskill_recipe
+      where coalesce(enabled, 1) <> 1
+      order by id asc
+      limit 1
+    `.execute(db!);
+
+    if (!rows.rows[0]) {
+      expect(rows.rows).toEqual([]);
+      return;
+    }
+
+    const recipe = rows.rows[0];
+    const recipes = await listRecipes({ q: recipe.name });
+    const hits = await searchCatalog(recipe.name);
+    const detail = await getRecipeDetail(recipe.id);
+
+    expect(recipes.some((entry) => entry.id === recipe.id)).toBe(false);
+    expect(hits.some((entry) => entry.type === "recipe" && entry.href === `/recipes/${recipe.id}`)).toBe(false);
+    expect(detail).toBeUndefined();
   }, 20_000);
 
   it("normalizes whitespace in item search queries", async () => {
@@ -558,6 +603,66 @@ describe("catalog services", () => {
     expect(none.every((entry) => entry.raisedByCount === 0 && entry.loweredByCount === 0)).toBe(true);
   }, 15_000);
 
+  it("zeros faction relationships when their NPCs have no eligible public spawn", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{ faction_id: number }>`
+      select nfe.faction_id
+      from npc_faction_entries nfe
+      join npc_faction nf on nf.id = nfe.npc_faction_id
+      join npc_types nt on nt.npc_faction_id = nf.id
+      where coalesce(nt.trackable, 0) = 1
+        and not exists (
+          select 1
+          from spawnentry se
+          join spawngroup sg on sg.id = se.spawngroupID
+          join spawn2 s2 on s2.spawngroupID = sg.id
+          left join spawn2_disabled s2d on s2d.spawn2_id = s2.id and coalesce(s2d.disabled, 0) <> 0
+          join (
+            select short_name
+            from zone
+            where coalesce(version, 0) = 0
+              and coalesce(min_status, 0) <= ${1}
+            group by short_name
+          ) z on z.short_name = s2.zone
+          where se.npcID = nt.id
+            and s2d.spawn2_id is null
+            and (
+              (coalesce(s2.content_flags, '') = '' or exists (
+                select 1
+                from content_flags cf
+                where cf.flag_name = s2.content_flags
+                  and coalesce(cf.enabled, 0) <> 0
+              ))
+              and (coalesce(s2.content_flags_disabled, '') = '' or not exists (
+                select 1
+                from content_flags cf
+                where cf.flag_name = s2.content_flags_disabled
+                  and coalesce(cf.enabled, 0) <> 0
+              ))
+            )
+        )
+      group by nfe.faction_id
+      order by count(distinct nt.id) desc
+      limit 1
+    `.execute(db!);
+
+    if (!rows.rows[0]) {
+      expect(rows.rows).toEqual([]);
+      return;
+    }
+
+    const factionId = rows.rows[0].faction_id;
+    const summary = (await listFactions({ q: String(factionId) })).find((entry) => entry.id === factionId);
+    const detail = await getFactionDetail(factionId);
+
+    expect(summary?.raisedByCount ?? 0).toBe(0);
+    expect(summary?.loweredByCount ?? 0).toBe(0);
+    expect(detail?.raisedByCount ?? 0).toBe(0);
+    expect(detail?.loweredByCount ?? 0).toBe(0);
+  }, 20_000);
+
   it("maps index.php legacy item routes", () => {
     const target = resolveLegacyRoute("/index.php", new URLSearchParams("a=item&id=1001"));
     expect(target).toBe("/items/1001");
@@ -629,6 +734,55 @@ describe("catalog services", () => {
     expect(stats.items).toBeGreaterThan(0);
     expect(zone?.namedNpcs.length).toBeGreaterThan(0);
   });
+
+  it("reports catalog stats from the same visible NPC and recipe populations used by the app", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const [expectedNpcCount, expectedRecipeCount] = await Promise.all([
+      sql<{ count: number }>`
+        select count(distinct nt.id) as count
+        from npc_types nt
+        join spawnentry se on se.npcID = nt.id
+        join spawngroup sg on sg.id = se.spawngroupID
+        join spawn2 s2 on s2.spawngroupID = sg.id
+        left join spawn2_disabled s2d on s2d.spawn2_id = s2.id and coalesce(s2d.disabled, 0) <> 0
+        join (
+          select short_name
+          from zone
+          where coalesce(version, 0) = 0
+            and coalesce(min_status, 0) <= ${1}
+          group by short_name
+        ) z on z.short_name = s2.zone
+        where s2d.spawn2_id is null
+          and coalesce(nt.trackable, 0) = 1
+          and (
+            (coalesce(s2.content_flags, '') = '' or exists (
+              select 1
+              from content_flags cf
+              where cf.flag_name = s2.content_flags
+                and coalesce(cf.enabled, 0) <> 0
+            ))
+            and (coalesce(s2.content_flags_disabled, '') = '' or not exists (
+              select 1
+              from content_flags cf
+              where cf.flag_name = s2.content_flags_disabled
+                and coalesce(cf.enabled, 0) <> 0
+            ))
+          )
+      `.execute(db!),
+      sql<{ count: number }>`
+        select count(*) as count
+        from tradeskill_recipe
+        where coalesce(enabled, 1) = 1
+      `.execute(db!)
+    ]);
+
+    const stats = await getCatalogStats();
+
+    expect(stats.npcs).toBe(Number(expectedNpcCount.rows[0]?.count ?? 0));
+    expect(stats.recipes).toBe(Number(expectedRecipeCount.rows[0]?.count ?? 0));
+  }, 20_000);
 
   it("includes shared spawn versions in zone detail bestiary data", async () => {
     const zone = await getZoneDetail("fearplane");
