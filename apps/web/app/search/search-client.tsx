@@ -179,6 +179,26 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
     return () => abortRef.current?.abort();
   }, []);
 
+  useEffect(() => {
+    const nextKey = buildSearchKey(initialQuery);
+
+    setQuery(initialQuery);
+    currentUrlKeyRef.current = nextKey;
+
+    if (!nextKey) {
+      setHits([]);
+      setError(null);
+      setDisplayKey("");
+      setResolutionMeta(null);
+      setIsFetching(false);
+      setActiveType(null);
+      setPage(1);
+      return;
+    }
+
+    setSubmitCount((current) => current + 1);
+  }, [initialQuery]);
+
   const submitSearch = () => {
     if (!hasQuery(query)) {
       return;
