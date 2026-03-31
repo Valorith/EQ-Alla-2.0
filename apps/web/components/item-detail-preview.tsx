@@ -253,12 +253,12 @@ export function ItemDetailPreview({ item, className = "" }: { item: ItemDetail; 
         </div>
 
         <div className="space-y-4">
-          <div className="grid justify-start gap-x-4 gap-y-2.5 sm:grid-cols-[235px_185px]">
+          <div className="grid justify-start gap-x-4 gap-y-2.5 sm:grid-cols-[max-content_max-content]">
             <StatPairList rows={overviewRows} alignValuesRight />
             <StatPairList rows={primaryValueRows} alignValuesRight />
           </div>
 
-          <div className="grid justify-start gap-x-4 gap-y-2.5 sm:grid-cols-[175px_195px_170px]">
+          <div className="grid justify-start gap-x-4 gap-y-2.5 sm:grid-cols-[max-content_max-content_max-content]">
             <StatPairList rows={attributeRows} alignValuesRight />
             <StatPairList rows={resistRows} alignValuesRight />
             <StatPairList rows={utilityRows} alignValuesRight />
