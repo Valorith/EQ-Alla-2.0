@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatPlayableItemRaceMask, getCatalogStats, getItemDetail, getSpellDetail, getZoneDetail, getZonesByEra, getZonesByLevel, itemTypeFilterOptions, listFactions, listItems, listNpcs, listSpells, listZoneEras, listZones, resolveLegacyRoute, searchCatalog, spellSearchLevelCap } from "./index";
+import { formatPlayableItemRaceMask, formatZoneEra, getCatalogStats, getItemDetail, getSpellDetail, getZoneDetail, getZonesByEra, getZonesByLevel, itemTypeFilterOptions, listFactions, listItems, listNpcs, listSpells, listZoneEras, listZones, matchesZoneEraFilter, resolveLegacyRoute, searchCatalog, spellSearchLevelCap } from "./index";
 
 describe("catalog services", () => {
   it("filters items by tradeable flag", async () => {
@@ -159,6 +159,17 @@ describe("catalog services", () => {
     expect(eras).toContain("Faydwer");
     expect(eras).toContain("The Planes of Power");
     expect(eras).toContain("Veil of Alaris");
+  });
+
+  it("prefers canonical classic zone era labels over raw expansion values", () => {
+    expect(formatZoneEra("nektulos", 1)).toBe("Antonica");
+    expect(formatZoneEra("mistmoore", 1)).toBe("Faydwer");
+    expect(formatZoneEra("sebilis", 1)).toBe("Ruins of Kunark");
+  });
+
+  it("matches classic era filters using zone short names even when expansion data is misleading", () => {
+    expect(matchesZoneEraFilter({ shortName: "nektulos", era: "Ruins of Kunark" }, "Antonica")).toBe(true);
+    expect(matchesZoneEraFilter({ shortName: "nektulos", era: "Ruins of Kunark" }, "Kunark")).toBe(false);
   });
 
   it("resolves clone-style zone era filters and slugs", async () => {

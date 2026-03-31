@@ -45,6 +45,7 @@ const classicAntonicaShortNames = [
   "freporte",
   "freportn",
   "freportw",
+  "grobb",
   "gukbottom",
   "gukta",
   "guktop",
@@ -52,6 +53,7 @@ const classicAntonicaShortNames = [
   "halls",
   "highkeep",
   "highpass",
+  "highpasshold",
   "innothule",
   "jaggedpine",
   "kithicor",
@@ -64,11 +66,13 @@ const classicAntonicaShortNames = [
   "neriaka",
   "neriakb",
   "neriakc",
+  "neriakd",
   "northkarana",
   "nro",
   "oasis",
   "oggok",
   "oot",
+  "qey2hh1",
   "paw",
   "permafrost",
   "qcat",
@@ -89,6 +93,7 @@ const classicAntonicaShortNames = [
 
 const classicOdusShortNames = [
   "erudnext",
+  "erudnint",
   "erudsxing",
   "hole",
   "kerraridge",
@@ -115,7 +120,7 @@ const classicFaydwerShortNames = [
   "unrest"
 ] as const;
 
-const classicPlanesShortNames = ["airplane", "fearplane", "hateplane"] as const;
+const classicPlanesShortNames = ["airplane", "fearplane", "hateplane", "hateplaneb"] as const;
 
 export const zoneEraDefinitions: ZoneEraDefinition[] = [
   { slug: "antonica", label: "Antonica", shortNames: [...classicAntonicaShortNames] },
@@ -186,6 +191,16 @@ export function resolveZoneEraLabel(input: string | null | undefined) {
   return resolveZoneEra(input)?.label ?? (input?.trim() || "");
 }
 
+export function resolveZoneEraByShortName(shortName: string | null | undefined) {
+  const normalizedShortName = shortName?.trim().toLowerCase();
+  if (!normalizedShortName) return undefined;
+  return zoneEraDefinitions.find((definition) => definition.shortNames?.includes(normalizedShortName));
+}
+
+export function formatZoneEra(shortName: string | null | undefined, expansion: number | null | undefined) {
+  return resolveZoneEraByShortName(shortName)?.label ?? formatExpansion(expansion);
+}
+
 export function matchesZoneEraFilter(zone: Pick<ZoneSummary, "shortName" | "era">, filter: string | null | undefined) {
   if (!filter?.trim()) return true;
 
@@ -194,11 +209,12 @@ export function matchesZoneEraFilter(zone: Pick<ZoneSummary, "shortName" | "era"
     return normalizeZoneEraValue(zone.era).includes(normalizeZoneEraValue(filter));
   }
 
+  const zoneDefinition = resolveZoneEraByShortName(zone.shortName);
   const normalizedShortName = zone.shortName.toLowerCase();
   if (definition.shortNames?.includes(normalizedShortName)) {
     return true;
   }
 
-  const zoneEra = normalizeZoneEraValue(zone.era);
+  const zoneEra = normalizeZoneEraValue(zoneDefinition?.label ?? zone.era);
   return [...buildZoneEraCandidates(definition)].includes(zoneEra);
 }

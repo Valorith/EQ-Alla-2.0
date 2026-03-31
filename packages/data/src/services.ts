@@ -4,7 +4,7 @@ import { canonicalizeItemTypeName, itemTypeIdFromName, itemTypeNameFromId } from
 import { factions, items, npcs, pets, recipes, spells, spawnGroups, tasks, zones } from "./mock-data";
 import { formatPlayableItemRaceMask, raceNames } from "./race-names";
 import { getSpellEffectName, summarizeSpellEffects } from "./spell-effects";
-import { formatExpansion, getZoneEraLabels, matchesZoneEraFilter } from "./zone-eras";
+import { formatExpansion, formatZoneEra, getZoneEraLabels, matchesZoneEraFilter } from "./zone-eras";
 import { sql } from "kysely";
 import type {
   CatalogStats,
@@ -1432,7 +1432,7 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
           type: "zone",
           title: row.long_name,
           href: `/zones/${row.short_name}`,
-          subtitle: `${formatExpansion(row.expansion)} • ${formatLevelRange(row.min_level, row.max_level)}`,
+          subtitle: `${formatZoneEra(row.short_name, row.expansion)} • ${formatLevelRange(row.min_level, row.max_level)}`,
           tags: []
         });
       }
@@ -2323,7 +2323,7 @@ export async function listZones(filters: ZoneFilters = {}) {
         shortName: row.short_name,
         longName: row.long_name,
         spawns: Number(row.spawns ?? 0),
-        era: formatExpansion(row.expansion),
+        era: formatZoneEra(row.short_name, row.expansion),
         levelRange: formatLevelRange(row.min_level, row.max_level),
         population: row.note?.trim() || "Live zone data"
       }))
@@ -2386,7 +2386,7 @@ export async function getZonesByLevel() {
           id: row.zoneidnumber,
           shortName: row.short_name,
           longName: row.long_name,
-          era: formatExpansion(row.expansion),
+          era: formatZoneEra(row.short_name, row.expansion),
           hotzone: Number(row.hotzone ?? 0) > 0,
           suggestedLevel: "Unknown",
           bands: createZoneLevelBands(new Map())
@@ -2734,7 +2734,7 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
       longName: zone.long_name,
       spawns: bestiary.length,
       hotzone: Number(zone.hotzone ?? 0) > 0,
-      era: formatExpansion(zone.expansion),
+      era: formatZoneEra(zone.short_name, zone.expansion),
       levelRange: displayRange,
       population: zone.note?.trim() || `${bestiary.length} creatures indexed across ${spawnLocationRows.rows.length} spawn points.`,
       safePoint: `${Math.floor(zone.safe_x ?? 0)} / ${Math.floor(zone.safe_y ?? 0)} / ${Math.floor(zone.safe_z ?? 0)}`,
