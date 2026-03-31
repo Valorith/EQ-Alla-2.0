@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getCatalogStats, getItemDetail, getSpellDetail, getZoneDetail, getZonesByEra, getZonesByLevel, listFactions, listItems, listNpcs, listSpells, listZoneEras, listZones, resolveLegacyRoute, searchCatalog, spellSearchLevelCap } from "./index";
+import { formatPlayableItemRaceMask, getCatalogStats, getItemDetail, getSpellDetail, getZoneDetail, getZonesByEra, getZonesByLevel, listFactions, listItems, listNpcs, listSpells, listZoneEras, listZones, resolveLegacyRoute, searchCatalog, spellSearchLevelCap } from "./index";
 
 describe("catalog services", () => {
   it("filters items by tradeable flag", async () => {
@@ -25,6 +25,12 @@ describe("catalog services", () => {
     const trimmed = await listItems({ q: "fiend" });
     const spaced = await listItems({ q: "  fiend  " });
     expect(spaced.map((item) => item.id)).toEqual(trimmed.map((item) => item.id));
+  });
+
+  it("formats item race masks using only playable races", () => {
+    expect(formatPlayableItemRaceMask(1 | 4 | 8)).toBe("Human, Erudite, Wood Elf");
+    expect(formatPlayableItemRaceMask(512 | 4096 | 16384)).toBe("Ogre, Iksar, Froglok");
+    expect(formatPlayableItemRaceMask(65535)).toBe("ALL");
   });
 
   it("treats items with no required level as level 1 for level filters", async () => {

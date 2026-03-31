@@ -1,7 +1,7 @@
 import { cacheGet, cacheGetOrResolve } from "./cache";
 import { getDb } from "./db";
 import { factions, items, npcs, pets, recipes, spells, spawnGroups, tasks, zones } from "./mock-data";
-import { raceNames } from "./race-names";
+import { formatPlayableItemRaceMask, raceNames } from "./race-names";
 import { getSpellEffectName, summarizeSpellEffects } from "./spell-effects";
 import { formatExpansion, getZoneEraLabels, matchesZoneEraFilter } from "./zone-eras";
 import { sql } from "kysely";
@@ -433,15 +433,7 @@ function formatClassMask(mask: number | null | undefined) {
 }
 
 function formatRaceMask(mask: number | null | undefined) {
-  if (!mask || mask <= 0 || mask >= 65535) {
-    return "ALL";
-  }
-
-  const races = Object.entries(raceNames)
-    .filter(([flag]) => (mask & Number(flag)) !== 0)
-    .map(([, label]) => label);
-
-  return races.length > 0 ? races.join(", ") : "ALL";
+  return formatPlayableItemRaceMask(mask);
 }
 
 function formatSlotList(mask: number | null | undefined, itemClass: number | null | undefined) {
