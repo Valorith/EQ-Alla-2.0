@@ -1,5 +1,5 @@
 [deploy]
-startCommand = "node apps/web/server.js"
+startCommand = "node apps/web/.next/standalone/apps/web/server.js"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
