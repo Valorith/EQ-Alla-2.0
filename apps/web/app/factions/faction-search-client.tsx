@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useEffect, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import type { FactionSummary } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
@@ -34,8 +34,6 @@ type FactionCacheEntry = {
   touchedAt: number;
 };
 
-const factionSearchDebounceMs = 500;
-const factionSearchAutoQueryMinLength = 3;
 const factionResultsPerPage = 25;
 const factionSearchCacheTtlMs = 180_000;
 const factionSearchCacheMaxEntries = 12;
@@ -62,10 +60,6 @@ function buildSearchKey(filters: FactionFilters) {
 
 function hasQuery(filters: FactionFilters) {
   return filters.viewAll || filters.q.trim().length > 0 || filters.zone.trim().length > 0 || filters.relationship.length > 0;
-}
-
-function hasAutoSearchableQuery(filters: FactionFilters) {
-  return filters.viewAll || filters.zone.trim().length > 0 || filters.relationship.length > 0 || filters.q.trim().length >= factionSearchAutoQueryMinLength;
 }
 
 function mapRelationshipLabelToValue(label: string) {
@@ -206,7 +200,6 @@ function TextFilterField({
 }
 
 export function FactionSearchClient({ initialQuery, initialZone, initialRelationship, initialViewAll }: FactionSearchClientProps) {
-  const router = useRouter();
   const pathname = usePathname();
   const [filters, setFilters] = useState<FactionFilters>({
     q: initialQuery,
@@ -224,45 +217,10 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
   });
   const [results, setResults] = useState<FactionSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [isFetching, setIsFetching] = useState(
-    hasQuery({
-      q: initialQuery,
-      zone: initialZone,
-      relationship:
-        initialRelationship === "raises"
-          ? "Raises"
-          : initialRelationship === "lowers"
-            ? "Lowers"
-            : initialRelationship === "both"
-              ? "Both"
-              : initialRelationship === "none"
-                ? "No NPC Modifiers"
-                : "",
-      viewAll: initialViewAll
-    })
-  );
+  const [isFetching, setIsFetching] = useState(false);
   const [displayKey, setDisplayKey] = useState("");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
-  const [submitCount, setSubmitCount] = useState(
-    hasQuery({
-      q: initialQuery,
-      zone: initialZone,
-      relationship:
-        initialRelationship === "raises"
-          ? "Raises"
-          : initialRelationship === "lowers"
-            ? "Lowers"
-            : initialRelationship === "both"
-              ? "Both"
-              : initialRelationship === "none"
-                ? "No NPC Modifiers"
-                : "",
-      viewAll: initialViewAll
-    })
-      ? 1
-      : 0
-  );
-  const [awaitingManualSubmit, setAwaitingManualSubmit] = useState(false);
+  const [submitCount, setSubmitCount] = useState(0);
   const [page, setPage] = useState(1);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(
@@ -284,31 +242,6 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
   );
   const lastHandledSubmitRef = useRef(0);
 
-  useEffect(() => {
-    const key = buildSearchKey({
-      q: initialQuery,
-      zone: initialZone,
-      relationship:
-        initialRelationship === "raises"
-          ? "Raises"
-          : initialRelationship === "lowers"
-            ? "Lowers"
-            : initialRelationship === "both"
-              ? "Both"
-              : initialRelationship === "none"
-                ? "No NPC Modifiers"
-                : "",
-      viewAll: initialViewAll
-    });
-    if (!key) return;
-    const cached = getCachedFactions(key);
-    if (!cached) return;
-    setResults(cached);
-    setDisplayKey(key);
-    setIsFetching(false);
-    setResolutionMeta({ key, durationMs: 0, source: "cache" });
-  }, [initialQuery, initialRelationship, initialViewAll, initialZone]);
-
   useEffect(() => () => abortRef.current?.abort(), []);
 
   const setFilter = (key: keyof FactionFilters, value: string | boolean) => {
@@ -325,12 +258,23 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
   };
 
   const clearFilters = () => {
+    abortRef.current?.abort();
     setFilters({
       q: "",
       zone: "",
       relationship: "",
       viewAll: false
     });
+    setResults([]);
+    setError(null);
+    setDisplayKey("");
+    setIsFetching(false);
+    setResolutionMeta(null);
+    setPage(1);
+    currentUrlKeyRef.current = "";
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", pathname);
+    }
   };
 
   const viewAllFactions = () => {
@@ -342,92 +286,79 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
   };
 
   useEffect(() => {
-    const isForcedSearch = submitCount !== lastHandledSubmitRef.current;
-    const timer = window.setTimeout(() => {
-      if (isForcedSearch) lastHandledSubmitRef.current = submitCount;
-      const nextKey = buildSearchKey(filters);
-      const nextHref = nextKey ? `${pathname}?${nextKey}` : pathname;
+    if (submitCount === 0 || submitCount === lastHandledSubmitRef.current) {
+      return;
+    }
 
-      if (nextKey !== currentUrlKeyRef.current) {
-        currentUrlKeyRef.current = nextKey;
-        startTransition(() => router.replace(nextHref, { scroll: false }));
+    lastHandledSubmitRef.current = submitCount;
+    const nextKey = buildSearchKey(filters);
+    const nextHref = nextKey ? `${pathname}?${nextKey}` : pathname;
+
+    if (nextKey !== currentUrlKeyRef.current) {
+      currentUrlKeyRef.current = nextKey;
+      if (typeof window !== "undefined") {
+        window.history.replaceState(null, "", nextHref);
       }
+    }
 
-      if (nextKey === displayKey && !isForcedSearch) return;
+    abortRef.current?.abort();
 
-      abortRef.current?.abort();
-
-      if (!hasQuery(filters)) {
-        setResults([]);
-        setError(null);
-        setDisplayKey(nextKey);
-        setIsFetching(false);
-        setResolutionMeta(null);
-        setAwaitingManualSubmit(false);
-        return;
-      }
-
-      if (!isForcedSearch && !hasAutoSearchableQuery(filters)) {
-        setResults([]);
-        setError(null);
-        setDisplayKey(nextKey);
-        setIsFetching(false);
-        setResolutionMeta(null);
-        setAwaitingManualSubmit(true);
-        return;
-      }
-
-      setAwaitingManualSubmit(false);
-      const startedAt = performance.now();
-      const cached = getCachedFactions(nextKey);
-      if (cached) {
-        setResults(cached);
-        setDisplayKey(nextKey);
-        setError(null);
-        setIsFetching(false);
-        setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "cache" });
-        return;
-      }
-
-      const controller = new AbortController();
-      abortRef.current = controller;
-      setIsFetching(true);
+    if (!hasQuery(filters)) {
+      setResults([]);
       setError(null);
+      setDisplayKey("");
+      setIsFetching(false);
+      setResolutionMeta(null);
+      setPage(1);
+      return;
+    }
 
-      void (async () => {
-        try {
-          const response = await fetch(`/api/factions?${nextKey}`, { signal: controller.signal });
-          if (!response.ok) throw new Error(`Search failed with ${response.status}`);
-          const payload = (await response.json()) as { data?: FactionSummary[] };
-          if (controller.signal.aborted) return;
-          setResults(payload.data ?? []);
-          setDisplayKey(nextKey);
-          setCachedFactions(nextKey, payload.data ?? []);
-          setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "network" });
-        } catch (searchError) {
-          if (controller.signal.aborted) return;
-          console.error(searchError);
-          setError("Could not refresh faction results. Showing the last successful search.");
-        } finally {
-          if (abortRef.current === controller) {
-            abortRef.current = null;
-            setIsFetching(false);
-          }
+    const startedAt = performance.now();
+    const cached = getCachedFactions(nextKey);
+    if (cached) {
+      setResults(cached);
+      setDisplayKey(nextKey);
+      setError(null);
+      setIsFetching(false);
+      setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "cache" });
+      return;
+    }
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setIsFetching(true);
+    setError(null);
+
+    void (async () => {
+      try {
+        const response = await fetch(`/api/factions?${nextKey}`, { signal: controller.signal });
+        if (!response.ok) throw new Error(`Search failed with ${response.status}`);
+        const payload = (await response.json()) as { data?: FactionSummary[] };
+        if (controller.signal.aborted) return;
+        setResults(payload.data ?? []);
+        setDisplayKey(nextKey);
+        setCachedFactions(nextKey, payload.data ?? []);
+        setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "network" });
+      } catch (searchError) {
+        if (controller.signal.aborted) return;
+        console.error(searchError);
+        setError("Could not refresh faction results. Showing the last successful search.");
+      } finally {
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+          setIsFetching(false);
         }
-      })();
-    }, isForcedSearch ? 0 : factionSearchDebounceMs);
-
-    return () => window.clearTimeout(timer);
-  }, [displayKey, filters, pathname, router, submitCount]);
+      }
+    })();
+  }, [filters, pathname, submitCount]);
 
   const activeQuery = buildSearchKey(filters);
   const totalPages = Math.max(1, Math.ceil(results.length / factionResultsPerPage));
   const visiblePage = Math.min(page, totalPages);
   const pagedResults = results.slice((visiblePage - 1) * factionResultsPerPage, visiblePage * factionResultsPerPage);
-  const hasShortQuery = filters.q.trim().length > 0 && filters.q.trim().length < factionSearchAutoQueryMinLength;
   const showResults = activeQuery.length > 0 || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading factions" : `${results.length} factions`) : "Results";
-  const statusLabel = error ? error : isFetching ? "Refreshing results..." : "Search updates automatically";
+  const statusLabel = error ? error : isFetching ? "Refreshing results..." : activeQuery === displayKey && displayKey ? "Filters applied" : "Press Search or View all to apply filters";
   const resolvedTiming =
     resolutionMeta && resolutionMeta.key === displayKey && !isFetching
       ? `Loaded in ${formatDuration(resolutionMeta.durationMs)}${resolutionMeta.source === "cache" ? " from cache" : ""}`
@@ -524,8 +455,8 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
         ) : showResults ? (
           isFetching ? (
             <ClassLoadingIndicator message="Loading factions" detail="Resolving alliances and rivalries." />
-          ) : awaitingManualSubmit && hasShortQuery ? (
-            <SearchPrompt message={`Type ${factionSearchAutoQueryMinLength}+ characters to auto-search, or press Enter to search now. Zone and relationship filters can also be used on their own.`} />
+          ) : activeQuery !== displayKey ? (
+            <SearchPrompt message="Press Search or View all to apply these filters." />
           ) : (
             <SearchPrompt message="No factions matched this search." />
           )

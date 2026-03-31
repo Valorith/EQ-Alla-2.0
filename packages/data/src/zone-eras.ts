@@ -8,6 +8,11 @@ export type ZoneEraDefinition = {
   shortNames?: string[];
 };
 
+export type ZoneEraBrowseDefinition = ZoneEraDefinition & {
+  enabled: boolean;
+  zoneCount: number;
+};
+
 export const expansionNames: Record<number, string> = {
   0: "Classic",
   1: "Ruins of Kunark",

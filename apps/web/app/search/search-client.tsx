@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useEffect, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import type { SearchHit } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
@@ -167,7 +167,6 @@ function setClientCachedHits(key: string, hits: SearchHit[]) {
 }
 
 export function SearchClient({ initialQuery }: SearchClientProps) {
-  const router = useRouter();
   const pathname = usePathname();
   const [query, setQuery] = useState(initialQuery);
   const [hits, setHits] = useState<SearchHit[]>([]);
@@ -229,9 +228,9 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
 
       if (nextKey !== currentUrlKeyRef.current) {
         currentUrlKeyRef.current = nextKey;
-        startTransition(() => {
-          router.replace(nextHref, { scroll: false });
-        });
+        if (typeof window !== "undefined") {
+          window.history.replaceState(null, "", nextHref);
+        }
       }
 
       if (nextKey === displayKey && !isForcedSearch) {
@@ -322,7 +321,7 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
     }, isForcedSearch ? 0 : globalSearchDebounceMs);
 
     return () => window.clearTimeout(timer);
-  }, [displayKey, pathname, query, router, submitCount]);
+  }, [displayKey, pathname, query, submitCount]);
 
   const activeQuery = buildSearchKey(query);
   const groupedHits = globalSearchOrder

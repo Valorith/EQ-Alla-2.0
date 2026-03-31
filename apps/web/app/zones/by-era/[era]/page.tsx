@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { getZonesByEra, resolveZoneEraLabel } from "@eq-alla/data";
 import { PageHero, SectionCard, SimpleTable } from "../../../../components/catalog-shell";
 
@@ -17,6 +18,8 @@ export default async function ZonesByEraDetailPage({ params }: ZonesByEraDetailP
   const { era } = await params;
   const normalizedEra = resolveZoneEraLabel(era) || titleCase(era);
   const zones = await getZonesByEra(normalizedEra);
+
+  if (zones.length === 0) notFound();
 
   return (
     <>

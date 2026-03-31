@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useEffect, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import type { NpcSummary } from "@eq-alla/data";
 import { Input, Button } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
@@ -43,8 +43,6 @@ type NpcCacheEntry = {
   touchedAt: number;
 };
 
-const npcSearchDebounceMs = 500;
-const npcSearchAutoQueryMinLength = 3;
 const npcResultsPerPage = 25;
 const npcSearchCacheTtlMs = 180_000;
 const npcSearchCacheMaxEntries = 12;
@@ -78,10 +76,6 @@ function hasActiveFilters(filters: NpcFilters) {
     filters.named.length > 0 ||
     filters.showLevel.length > 0
   );
-}
-
-function hasAutoSearchableQuery(filters: NpcFilters) {
-  return filters.q.trim().length >= npcSearchAutoQueryMinLength;
 }
 
 function formatDuration(durationMs: number) {
@@ -156,31 +150,18 @@ function setCachedNpcs(key: string, results: NpcSummary[]) {
 }
 
 export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) {
-  const router = useRouter();
   const pathname = usePathname();
   const [filters, setFilters] = useState<NpcFilters>(initialFilters);
   const [results, setResults] = useState<NpcSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [isFetching, setIsFetching] = useState(hasActiveFilters(initialFilters));
+  const [isFetching, setIsFetching] = useState(false);
   const [displayKey, setDisplayKey] = useState("");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
-  const [submitCount, setSubmitCount] = useState(hasActiveFilters(initialFilters) ? 1 : 0);
-  const [awaitingManualSubmit, setAwaitingManualSubmit] = useState(false);
+  const [submitCount, setSubmitCount] = useState(0);
   const [page, setPage] = useState(1);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(buildSearchParams(initialFilters, mode).toString());
   const lastHandledSubmitRef = useRef(0);
-
-  useEffect(() => {
-    const key = buildSearchParams(initialFilters, mode).toString();
-    if (!key) return;
-    const cached = getCachedNpcs(key);
-    if (!cached) return;
-    setResults(cached);
-    setDisplayKey(key);
-    setIsFetching(false);
-    setResolutionMeta({ key, durationMs: 0, source: "cache" });
-  }, [initialFilters, mode]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -194,6 +175,7 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
   };
 
   const clearFilters = () => {
+    abortRef.current?.abort();
     setFilters({
       q: "",
       zone: "",
@@ -203,90 +185,87 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
       named: "",
       showLevel: ""
     });
+    setResults([]);
+    setError(null);
+    setDisplayKey("");
+    setIsFetching(false);
+    setResolutionMeta(null);
+    setPage(1);
+    currentUrlKeyRef.current = "";
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", pathname);
+    }
   };
 
   useEffect(() => {
-    const isForcedSearch = submitCount !== lastHandledSubmitRef.current;
-    const timer = window.setTimeout(() => {
-      if (isForcedSearch) lastHandledSubmitRef.current = submitCount;
-      const nextKey = buildSearchParams(filters, mode).toString();
-      const nextHref = nextKey ? `${pathname}?${nextKey}` : pathname;
-      if (nextKey !== currentUrlKeyRef.current) {
-        currentUrlKeyRef.current = nextKey;
-        startTransition(() => router.replace(nextHref, { scroll: false }));
+    if (submitCount === 0 || submitCount === lastHandledSubmitRef.current) {
+      return;
+    }
+
+    lastHandledSubmitRef.current = submitCount;
+    const nextKey = buildSearchParams(filters, mode).toString();
+    const nextHref = nextKey ? `${pathname}?${nextKey}` : pathname;
+    if (nextKey !== currentUrlKeyRef.current) {
+      currentUrlKeyRef.current = nextKey;
+      if (typeof window !== "undefined") {
+        window.history.replaceState(null, "", nextHref);
       }
-      if (nextKey === displayKey && !isForcedSearch) return;
+    }
 
-      abortRef.current?.abort();
+    abortRef.current?.abort();
 
-      if (!hasActiveFilters(filters)) {
-        setResults([]);
-        setError(null);
-        setDisplayKey(nextKey);
-        setIsFetching(false);
-        setResolutionMeta(null);
-        setAwaitingManualSubmit(false);
-        return;
-      }
-
-      if (!isForcedSearch && !hasAutoSearchableQuery(filters)) {
-        setResults([]);
-        setError(null);
-        setDisplayKey(nextKey);
-        setIsFetching(false);
-        setResolutionMeta(null);
-        setAwaitingManualSubmit(true);
-        return;
-      }
-
-      setAwaitingManualSubmit(false);
-      const startedAt = performance.now();
-      const cached = getCachedNpcs(nextKey);
-      if (cached) {
-        setResults(cached);
-        setDisplayKey(nextKey);
-        setError(null);
-        setIsFetching(false);
-        setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "cache" });
-        return;
-      }
-
-      const controller = new AbortController();
-      abortRef.current = controller;
-      setIsFetching(true);
+    if (!hasActiveFilters(filters)) {
+      setResults([]);
       setError(null);
+      setDisplayKey("");
+      setIsFetching(false);
+      setResolutionMeta(null);
+      setPage(1);
+      return;
+    }
 
-      void (async () => {
-        try {
-          const response = await fetch(`/api/npcs?${nextKey}`, { signal: controller.signal });
-          if (!response.ok) throw new Error(`Search failed with ${response.status}`);
-          const payload = (await response.json()) as { data?: NpcSummary[] };
-          if (controller.signal.aborted) return;
-          setResults(payload.data ?? []);
-          setDisplayKey(nextKey);
-          setCachedNpcs(nextKey, payload.data ?? []);
-          setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "network" });
-        } catch (searchError) {
-          if (controller.signal.aborted) return;
-          console.error(searchError);
-          setError("Could not refresh NPC results. Showing the last successful search.");
-        } finally {
-          if (abortRef.current === controller) {
-            abortRef.current = null;
-            setIsFetching(false);
-          }
+    const startedAt = performance.now();
+    const cached = getCachedNpcs(nextKey);
+    if (cached) {
+      setResults(cached);
+      setDisplayKey(nextKey);
+      setError(null);
+      setIsFetching(false);
+      setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "cache" });
+      return;
+    }
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setIsFetching(true);
+    setError(null);
+
+    void (async () => {
+      try {
+        const response = await fetch(`/api/npcs?${nextKey}`, { signal: controller.signal });
+        if (!response.ok) throw new Error(`Search failed with ${response.status}`);
+        const payload = (await response.json()) as { data?: NpcSummary[] };
+        if (controller.signal.aborted) return;
+        setResults(payload.data ?? []);
+        setDisplayKey(nextKey);
+        setCachedNpcs(nextKey, payload.data ?? []);
+        setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "network" });
+      } catch (searchError) {
+        if (controller.signal.aborted) return;
+        console.error(searchError);
+        setError("Could not refresh NPC results. Showing the last successful search.");
+      } finally {
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+          setIsFetching(false);
         }
-      })();
-    }, isForcedSearch ? 0 : npcSearchDebounceMs);
+      }
+    })();
+  }, [filters, mode, pathname, submitCount]);
 
-    return () => window.clearTimeout(timer);
-  }, [displayKey, filters, mode, pathname, router, submitCount]);
-
-  const activeQuery = filters.q.trim();
   const totalPages = Math.max(1, Math.ceil(results.length / npcResultsPerPage));
   const visiblePage = Math.min(page, totalPages);
   const pagedResults = results.slice((visiblePage - 1) * npcResultsPerPage, visiblePage * npcResultsPerPage);
-  const hasShortQuery = activeQuery.length > 0 && activeQuery.length < npcSearchAutoQueryMinLength;
   const draftKey = buildSearchParams(filters, mode).toString();
   const showResults = hasActiveFilters(filters) || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading NPCs" : `${results.length} ${mode === "advanced" ? "matches" : "matching NPCs"}`) : "Results";
@@ -382,14 +361,8 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
         ) : showResults ? (
           isFetching ? (
             <ClassLoadingIndicator message="Loading NPCs" detail="Checking spawns, zones, and named flags." />
-          ) : awaitingManualSubmit ? (
-            <SearchPrompt
-              message={
-                hasShortQuery
-                  ? `Type ${npcSearchAutoQueryMinLength}+ characters to auto-search, or press Search to run now.`
-                  : "Press Search to apply these filters."
-              }
-            />
+          ) : draftKey !== displayKey ? (
+            <SearchPrompt message="Press Search to apply these filters." />
           ) : (
             <SearchPrompt message="No NPCs matched this search." />
           )

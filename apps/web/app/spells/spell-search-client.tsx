@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, startTransition, useEffect, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import type { SpellSummary } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
@@ -187,7 +187,6 @@ function SpellTableHeaderRow({ repeated = false }: { repeated?: boolean }) {
 }
 
 export function SpellSearchClient({ initialQuery, initialClassName, initialLevel, initialLevelMode, levelCap }: SpellSearchClientProps) {
-  const router = useRouter();
   const pathname = usePathname();
   const initialFilters: SpellSearchFilters = {
     q: initialQuery,
@@ -200,10 +199,10 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
   const [filters, setFilters] = useState<SpellSearchFilters>(initialFilters);
   const [results, setResults] = useState<SpellSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [isFetching, setIsFetching] = useState(hasActiveFilters(initialFilters));
+  const [isFetching, setIsFetching] = useState(false);
   const [displayKey, setDisplayKey] = useState("");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
-  const [submitCount, setSubmitCount] = useState(hasActiveFilters(initialFilters) ? 1 : 0);
+  const [submitCount, setSubmitCount] = useState(0);
   const [page, setPage] = useState(1);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(buildSearchParams(initialFilters).toString());
@@ -233,7 +232,9 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
     setResolutionMeta(null);
     setPage(1);
     currentUrlKeyRef.current = "";
-    startTransition(() => router.replace(pathname, { scroll: false }));
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", pathname);
+    }
   };
 
   useEffect(() => {
@@ -247,7 +248,9 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
 
     if (nextKey !== currentUrlKeyRef.current) {
       currentUrlKeyRef.current = nextKey;
-      startTransition(() => router.replace(nextHref, { scroll: false }));
+      if (typeof window !== "undefined") {
+        window.history.replaceState(null, "", nextHref);
+      }
     }
 
     abortRef.current?.abort();
@@ -302,7 +305,7 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
         }
       }
     })();
-  }, [filters, pathname, router, submitCount]);
+  }, [filters, pathname, submitCount]);
 
   const totalPages = Math.max(1, Math.ceil(results.length / spellResultsPerPage));
   const visiblePage = Math.min(page, totalPages);

@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useEffect, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import type { ItemSummary } from "@eq-alla/data";
 import { itemTypeFilterOptions } from "@eq-alla/data/item-types";
 import { Button, Input } from "@eq-alla/ui";
@@ -33,8 +33,6 @@ type SearchResolutionMeta = {
   source: "network" | "cache";
 };
 
-const itemSearchDebounceMs = 500;
-const itemSearchAutoQueryMinLength = 3;
 const itemResultsPerPage = 25;
 
 type ClientCacheEntry = {
@@ -77,10 +75,6 @@ function hasActiveFilters(filters: ItemSearchFilters) {
     filters.maxLevel.length > 0 ||
     filters.tradeable.length > 0
   );
-}
-
-function hasAutoSearchableQuery(filters: ItemSearchFilters) {
-  return filters.q.trim().length >= itemSearchAutoQueryMinLength;
 }
 
 function formatDuration(durationMs: number) {
@@ -189,28 +183,6 @@ function setClientCachedItems(key: string, items: ItemSummary[]) {
   persistClientCache();
 }
 
-function canReuseCurrentFilters(current: ItemSearchFilters, next: ItemSearchFilters) {
-  return (
-    current.className === next.className &&
-    current.slot === next.slot &&
-    current.type === next.type &&
-    current.minLevel === next.minLevel &&
-    current.maxLevel === next.maxLevel &&
-    current.tradeable === next.tradeable
-  );
-}
-
-function previewItemsFromCurrent(items: ItemSummary[], current: ItemSearchFilters, next: ItemSearchFilters) {
-  const currentQuery = current.q.trim().toLowerCase();
-  const nextQuery = next.q.trim().toLowerCase();
-
-  if (!currentQuery || !nextQuery || !nextQuery.startsWith(currentQuery) || !canReuseCurrentFilters(current, next)) {
-    return null;
-  }
-
-  return items.filter((item) => item.name.toLowerCase().includes(nextQuery));
-}
-
 function SelectControl({
   label,
   name,
@@ -245,20 +217,17 @@ function SelectControl({
 }
 
 export function ItemSearchClient({ initialFilters, initialItems, initialResultsResolved, frameClassName }: ItemSearchClientProps) {
-  const router = useRouter();
   const pathname = usePathname();
   const [filters, setFilters] = useState(initialFilters);
   const [items, setItems] = useState(initialItems);
   const [error, setError] = useState<string | null>(null);
-  const [isFetching, setIsFetching] = useState(hasActiveFilters(initialFilters) && !initialResultsResolved);
+  const [isFetching, setIsFetching] = useState(false);
   const [displayKey, setDisplayKey] = useState(initialResultsResolved ? buildSearchParams(initialFilters).toString() : "");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
-  const [submitCount, setSubmitCount] = useState(hasActiveFilters(initialFilters) && !initialResultsResolved ? 1 : 0);
-  const [awaitingManualSubmit, setAwaitingManualSubmit] = useState(false);
+  const [submitCount, setSubmitCount] = useState(0);
   const [page, setPage] = useState(1);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(buildSearchParams(initialFilters).toString());
-  const lastResolvedFiltersRef = useRef(initialFilters);
   const lastHandledSubmitRef = useRef(0);
 
   useEffect(() => {
@@ -275,33 +244,6 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
     }
   }, [initialFilters, initialItems, initialResultsResolved]);
 
-  useEffect(() => {
-    if (initialResultsResolved) {
-      return;
-    }
-
-    const key = buildSearchParams(initialFilters).toString();
-    if (!key) {
-      return;
-    }
-
-    const cachedItems = getClientCachedItems(key);
-    if (!cachedItems) {
-      return;
-    }
-
-    setItems(cachedItems);
-    setError(null);
-    setDisplayKey(key);
-    setIsFetching(false);
-    lastResolvedFiltersRef.current = initialFilters;
-    setResolutionMeta({
-      key,
-      durationMs: 0,
-      source: "cache"
-    });
-  }, [initialFilters, initialResultsResolved]);
-
   const setFilter = (key: keyof ItemSearchFilters, value: string) => {
     setFilters((current) => ({ ...current, [key]: value }));
   };
@@ -315,6 +257,7 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
   };
 
   const clearFilters = () => {
+    abortRef.current?.abort();
     setFilters({
       q: "",
       className: "",
@@ -324,6 +267,16 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
       maxLevel: "",
       tradeable: ""
     });
+    setItems([]);
+    setError(null);
+    setDisplayKey("");
+    setIsFetching(false);
+    setResolutionMeta(null);
+    setPage(1);
+    currentUrlKeyRef.current = "";
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", pathname);
+    }
   };
 
   useEffect(() => {
@@ -331,124 +284,96 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
   }, []);
 
   useEffect(() => {
-    const isForcedSearch = submitCount !== lastHandledSubmitRef.current;
-    const timer = window.setTimeout(() => {
-      if (isForcedSearch) {
-        lastHandledSubmitRef.current = submitCount;
+    if (submitCount === 0 || submitCount === lastHandledSubmitRef.current) {
+      return;
+    }
+
+    lastHandledSubmitRef.current = submitCount;
+    const nextKey = buildSearchParams(filters).toString();
+    const nextHref = nextKey ? `${pathname}?${nextKey}` : pathname;
+
+    if (nextKey !== currentUrlKeyRef.current) {
+      currentUrlKeyRef.current = nextKey;
+      if (typeof window !== "undefined") {
+        window.history.replaceState(null, "", nextHref);
       }
+    }
 
-      const nextKey = buildSearchParams(filters).toString();
-      const nextHref = nextKey ? `${pathname}?${nextKey}` : pathname;
+    abortRef.current?.abort();
 
-      if (nextKey !== currentUrlKeyRef.current) {
-        currentUrlKeyRef.current = nextKey;
-        startTransition(() => {
-          router.replace(nextHref, { scroll: false });
+    if (!hasActiveFilters(filters)) {
+      setItems([]);
+      setError(null);
+      setDisplayKey("");
+      setIsFetching(false);
+      setResolutionMeta(null);
+      setPage(1);
+      return;
+    }
+
+    const startedAt = performance.now();
+    const cachedItems = getClientCachedItems(nextKey);
+    if (cachedItems) {
+      setItems(cachedItems);
+      setDisplayKey(nextKey);
+      setError(null);
+      setIsFetching(false);
+      setResolutionMeta({
+        key: nextKey,
+        durationMs: performance.now() - startedAt,
+        source: "cache"
+      });
+      return;
+    }
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setIsFetching(true);
+    setError(null);
+
+    void (async () => {
+      try {
+        const response = await fetch(`/api/items?${nextKey}`, {
+          signal: controller.signal
         });
-      }
 
-      if (nextKey === displayKey && !isForcedSearch) {
-        return;
-      }
+        if (!response.ok) {
+          throw new Error(`Search failed with ${response.status}`);
+        }
 
-      abortRef.current?.abort();
+        const payload = (await response.json()) as { data?: ItemSummary[] };
 
-      if (!hasActiveFilters(filters)) {
-        setItems([]);
-        setError(null);
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setItems(payload.data ?? []);
         setDisplayKey(nextKey);
-        setIsFetching(false);
-        setResolutionMeta(null);
-        setAwaitingManualSubmit(false);
-        return;
-      }
-
-      if (!isForcedSearch && !hasAutoSearchableQuery(filters)) {
-        setItems([]);
-        setError(null);
-        setDisplayKey(nextKey);
-        setIsFetching(false);
-        setResolutionMeta(null);
-        setAwaitingManualSubmit(true);
-        return;
-      }
-
-      setAwaitingManualSubmit(false);
-      const startedAt = performance.now();
-      const cachedItems = getClientCachedItems(nextKey);
-      if (cachedItems) {
-        setItems(cachedItems);
-        setDisplayKey(nextKey);
-        setError(null);
-        setIsFetching(false);
-        lastResolvedFiltersRef.current = filters;
+        setClientCachedItems(nextKey, payload.data ?? []);
         setResolutionMeta({
           key: nextKey,
           durationMs: performance.now() - startedAt,
-          source: "cache"
+          source: "network"
         });
-        return;
-      }
-
-      const previewItems = previewItemsFromCurrent(items, lastResolvedFiltersRef.current, filters);
-      if (previewItems) {
-        setItems(previewItems);
-      }
-
-      const controller = new AbortController();
-      abortRef.current = controller;
-      setIsFetching(true);
-      setError(null);
-
-      void (async () => {
-        try {
-          const response = await fetch(`/api/items?${nextKey}`, {
-            signal: controller.signal
-          });
-
-          if (!response.ok) {
-            throw new Error(`Search failed with ${response.status}`);
-          }
-
-          const payload = (await response.json()) as { data?: ItemSummary[] };
-
-          if (controller.signal.aborted) {
-            return;
-          }
-
-          setItems(payload.data ?? []);
-          setDisplayKey(nextKey);
-          setClientCachedItems(nextKey, payload.data ?? []);
-          lastResolvedFiltersRef.current = filters;
-          setResolutionMeta({
-            key: nextKey,
-            durationMs: performance.now() - startedAt,
-            source: "network"
-          });
-        } catch (searchError) {
-          if (controller.signal.aborted) {
-            return;
-          }
-
-          console.error(searchError);
-          setError("Could not refresh item results. Showing the last successful search.");
-        } finally {
-          if (abortRef.current === controller) {
-            abortRef.current = null;
-            setIsFetching(false);
-          }
+      } catch (searchError) {
+        if (controller.signal.aborted) {
+          return;
         }
-      })();
-    }, isForcedSearch ? 0 : itemSearchDebounceMs);
 
-    return () => window.clearTimeout(timer);
-  }, [displayKey, filters, pathname, router, submitCount]);
+        console.error(searchError);
+        setError("Could not refresh item results. Showing the last successful search.");
+      } finally {
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+          setIsFetching(false);
+        }
+      }
+    })();
+  }, [filters, pathname, submitCount]);
 
-  const activeQuery = filters.q.trim();
   const totalPages = Math.max(1, Math.ceil(items.length / itemResultsPerPage));
   const visiblePage = Math.min(page, totalPages);
   const pagedItems = items.slice((visiblePage - 1) * itemResultsPerPage, visiblePage * itemResultsPerPage);
-  const hasShortQuery = activeQuery.length > 0 && activeQuery.length < itemSearchAutoQueryMinLength;
   const draftKey = buildSearchParams(filters).toString();
   const showResults = hasActiveFilters(filters) || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && items.length === 0 ? "Loading items" : `${items.length} matching items`) : "Results";
@@ -573,14 +498,8 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
         ) : showResults ? (
           isFetching ? (
             <ClassLoadingIndicator detail="Summoning item records from the archive." message="Loading matching items..." />
-          ) : awaitingManualSubmit ? (
-            <SearchPrompt
-              message={
-                hasShortQuery
-                  ? `Type ${itemSearchAutoQueryMinLength}+ characters to auto-search, or press Search to run now.`
-                  : "Press Search to apply these filters."
-              }
-            />
+          ) : draftKey !== displayKey ? (
+            <SearchPrompt message="Press Search to apply these filters." />
           ) : (
             <SearchPrompt message="No items matched this search." />
           )

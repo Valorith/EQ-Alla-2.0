@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import type { PetSummary } from "@eq-alla/data";
 import { Button } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
@@ -183,17 +183,18 @@ function ClassSelector({
 }
 
 export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
-  const router = useRouter();
   const pathname = usePathname();
   const [selectedClasses, setSelectedClasses] = useState(() => normalizeSelectedClasses(initialClasses));
   const [results, setResults] = useState<PetSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [isFetching, setIsFetching] = useState(hasQuery(initialClasses));
+  const [isFetching, setIsFetching] = useState(false);
   const [displayKey, setDisplayKey] = useState("");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
+  const [submitCount, setSubmitCount] = useState(0);
   const [page, setPage] = useState(1);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlValueRef = useRef(buildQueryValue(initialClasses));
+  const lastHandledSubmitRef = useRef(0);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -203,6 +204,11 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
         ? current.filter((entry) => entry !== className)
         : normalizeSelectedClasses([...current, className])
     );
+  };
+
+  const submitSearch = () => {
+    if (!hasQuery(selectedClasses)) return;
+    setSubmitCount((current) => current + 1);
   };
 
   const clearSelection = () => {
@@ -215,17 +221,26 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
     setResolutionMeta(null);
     setPage(1);
     currentUrlValueRef.current = "";
-    startTransition(() => router.replace(pathname, { scroll: false }));
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", pathname);
+    }
   };
 
   useEffect(() => {
+    if (submitCount === 0 || submitCount === lastHandledSubmitRef.current) {
+      return;
+    }
+
+    lastHandledSubmitRef.current = submitCount;
     const nextQueryValue = buildQueryValue(selectedClasses);
     const nextKey = buildSearchKey(selectedClasses);
     const nextHref = nextQueryValue ? `${pathname}?classes=${encodeURIComponent(nextQueryValue)}` : pathname;
 
     if (nextQueryValue !== currentUrlValueRef.current) {
       currentUrlValueRef.current = nextQueryValue;
-      startTransition(() => router.replace(nextHref, { scroll: false }));
+      if (typeof window !== "undefined") {
+        window.history.replaceState(null, "", nextHref);
+      }
     }
 
     abortRef.current?.abort();
@@ -236,6 +251,7 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
       setDisplayKey("");
       setIsFetching(false);
       setResolutionMeta(null);
+      setPage(1);
       return;
     }
 
@@ -276,7 +292,7 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
         }
       }
     })();
-  }, [pathname, router, selectedClasses]);
+  }, [pathname, selectedClasses, submitCount]);
 
   const showResults = hasQuery(selectedClasses) || isFetching || displayKey.length > 0;
   const totalPages = Math.max(1, Math.ceil(results.length / petResultsPerPage));
@@ -287,9 +303,11 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
     ? error
     : isFetching
       ? "Refreshing results..."
-      : selectedClasses.length > 0
-        ? `${selectedClasses.length} class${selectedClasses.length === 1 ? "" : "es"} selected`
-        : "Select one or more classes";
+      : hasQuery(selectedClasses) && buildSearchKey(selectedClasses) === displayKey
+        ? "Filters applied"
+        : hasQuery(selectedClasses)
+          ? "Press Search to apply class filters"
+          : "Select one or more classes";
   const resolvedTiming =
     resolutionMeta && resolutionMeta.key === displayKey && !isFetching
       ? `Loaded in ${formatDuration(resolutionMeta.durationMs)}${resolutionMeta.source === "cache" ? " from cache" : ""}`
@@ -312,6 +330,9 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
         right={
           <div className="flex items-center gap-3">
             <p className="text-xs font-medium text-[#ccb594]">{statusLabel}</p>
+            <Button type="button" className="px-3 py-2 text-xs uppercase tracking-[0.14em]" onClick={submitSearch} disabled={!hasQuery(selectedClasses)}>
+              Search
+            </Button>
             {selectedClasses.length > 0 ? (
               <Button type="button" variant="outline" className="px-3 py-2 text-xs uppercase tracking-[0.14em]" onClick={clearSelection}>
                 Clear
@@ -364,6 +385,8 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
         ) : showResults ? (
           isFetching ? (
             <ClassLoadingIndicator message="Loading pets" detail="Calling companions and familiars to the roster." />
+          ) : buildSearchKey(selectedClasses) !== displayKey ? (
+            <SearchPrompt message="Press Search to apply these class filters." />
           ) : (
             <SearchPrompt message="No pets matched the selected classes." />
           )

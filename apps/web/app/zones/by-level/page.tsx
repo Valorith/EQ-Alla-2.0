@@ -1,4 +1,4 @@
-import { getZonesByLevel } from "@eq-alla/data";
+import { getZonesByLevel, zoneByLevelCap } from "@eq-alla/data";
 import { PageHero, SectionCard } from "../../../components/catalog-shell";
 import { ZonesByLevelMatrix } from "./zones-by-level-matrix";
 
@@ -23,7 +23,7 @@ export default async function ZonesByLevelPage() {
           </p>
         }
       >
-        <ZonesByLevelMatrix zones={zones} />
+        <ZonesByLevelMatrix zones={zones} levelCap={zoneByLevelCap} />
       </SectionCard>
     </>
   );

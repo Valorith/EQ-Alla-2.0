@@ -1,5 +1,30 @@
 import { describe, expect, it } from "vitest";
-import { formatPlayableItemRaceMask, formatZoneEra, getCatalogStats, getItemDetail, getSpellDetail, getZoneDetail, getZonesByEra, getZonesByLevel, itemTypeFilterOptions, listFactions, listItems, listNpcs, listSpells, listZoneEras, listZones, matchesZoneEraFilter, resolveLegacyRoute, searchCatalog, spellSearchLevelCap } from "./index";
+import {
+  formatPlayableItemRaceMask,
+  formatZoneEra,
+  getCatalogStats,
+  getItemDetail,
+  getPetDetail,
+  getSpellDetail,
+  getZoneDetail,
+  getZonesByEra,
+  getZonesByLevel,
+  itemTypeFilterOptions,
+  listFactions,
+  listItems,
+  listNpcs,
+  listPets,
+  listSpells,
+  listZoneEraBrowseDefinitions,
+  listZoneEras,
+  listZones,
+  matchesZoneEraFilter,
+  petSearchLevelCap,
+  resolveLegacyRoute,
+  searchCatalog,
+  spellSearchLevelCap,
+  zoneByLevelCap
+} from "./index";
 import { resolveSpellEffectDirection, summarizeSpellEffects } from "./spell-effects";
 
 describe("catalog services", () => {
@@ -105,9 +130,29 @@ describe("catalog services", () => {
     expect(upperBand.every((spell) => spell.level <= spellSearchLevelCap)).toBe(true);
   });
 
+  it("caps pet listings and pet detail routes at level 60", async () => {
+    const magicianPets = await listPets({ className: "Magician" });
+    const highLevelPet = await getPetDetail(40926);
+
+    expect(magicianPets.length).toBeGreaterThan(0);
+    expect(magicianPets.every((pet) => pet.petLevel <= petSearchLevelCap)).toBe(true);
+    expect(highLevelPet).toBeUndefined();
+  });
+
   it("excludes high-status zones from zones by level", async () => {
     const zones = await getZonesByLevel();
     expect(zones.some((zone) => zone.shortName === "poknowledge")).toBe(false);
+  });
+
+  it("caps zones by level bands and suggested ranges at level 60", async () => {
+    const zones = await getZonesByLevel();
+
+    expect(zones.length).toBeGreaterThan(0);
+    expect(zones.every((zone) => zone.bands.every((band) => band.maxLevel <= zoneByLevelCap))).toBe(true);
+    expect(zones.every((zone) => {
+      const digits = zone.suggestedLevel.match(/\d+/g)?.map(Number) ?? [];
+      return digits.every((value) => value <= zoneByLevelCap);
+    })).toBe(true);
   });
 
   it("hides high-status zones from zone listings and detail routes", async () => {
@@ -190,6 +235,17 @@ describe("catalog services", () => {
     expect(eras).toContain("Faydwer");
     expect(eras).toContain("The Planes of Power");
     expect(eras).toContain("Veil of Alaris");
+  });
+
+  it("marks empty era buckets as disabled for the zones by era landing page", async () => {
+    const eras = await listZoneEraBrowseDefinitions();
+    const faydwer = eras.find((era) => era.label === "Faydwer");
+    const power = eras.find((era) => era.label === "The Planes of Power");
+
+    expect(faydwer?.enabled).toBe(true);
+    expect(faydwer?.zoneCount).toBeGreaterThan(0);
+    expect(power?.enabled).toBe(false);
+    expect(power?.zoneCount).toBe(0);
   });
 
   it("prefers canonical classic zone era labels over raw expansion values", () => {

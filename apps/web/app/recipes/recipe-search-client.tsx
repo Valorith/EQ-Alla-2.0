@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useEffect, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import type { RecipeSummary } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
@@ -34,8 +34,6 @@ type RecipeCacheEntry = {
   touchedAt: number;
 };
 
-const recipeSearchDebounceMs = 500;
-const recipeSearchAutoQueryMinLength = 3;
 const recipeResultsPerPage = 25;
 const recipeSearchCacheTtlMs = 180_000;
 const recipeSearchCacheMaxEntries = 12;
@@ -57,15 +55,6 @@ function buildSearchParams(filters: RecipeFilters) {
 
 function hasQuery(filters: RecipeFilters) {
   return filters.q.trim().length > 0 || filters.tradeskill.length > 0 || filters.minTrivial.length > 0 || filters.maxTrivial.length > 0;
-}
-
-function hasAutoSearchableQuery(filters: RecipeFilters) {
-  return (
-    filters.q.trim().length >= recipeSearchAutoQueryMinLength ||
-    filters.tradeskill.length > 0 ||
-    filters.minTrivial.trim().length > 0 ||
-    filters.maxTrivial.trim().length > 0
-  );
 }
 
 function formatDuration(durationMs: number) {
@@ -140,7 +129,6 @@ function setCachedRecipes(key: string, results: RecipeSummary[]) {
 }
 
 export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMinTrivial, initialMaxTrivial }: RecipeSearchClientProps) {
-  const router = useRouter();
   const pathname = usePathname();
   const [filters, setFilters] = useState<RecipeFilters>({
     q: initialQuery,
@@ -150,32 +138,16 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
   });
   const [results, setResults] = useState<RecipeSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [isFetching, setIsFetching] = useState(
-    hasQuery({ q: initialQuery, tradeskill: initialTradeskill, minTrivial: initialMinTrivial, maxTrivial: initialMaxTrivial })
-  );
+  const [isFetching, setIsFetching] = useState(false);
   const [displayKey, setDisplayKey] = useState("");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
-  const [submitCount, setSubmitCount] = useState(
-    hasQuery({ q: initialQuery, tradeskill: initialTradeskill, minTrivial: initialMinTrivial, maxTrivial: initialMaxTrivial }) ? 1 : 0
-  );
-  const [awaitingManualSubmit, setAwaitingManualSubmit] = useState(false);
+  const [submitCount, setSubmitCount] = useState(0);
   const [page, setPage] = useState(1);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(
     buildSearchParams({ q: initialQuery, tradeskill: initialTradeskill, minTrivial: initialMinTrivial, maxTrivial: initialMaxTrivial }).toString()
   );
   const lastHandledSubmitRef = useRef(0);
-
-  useEffect(() => {
-    const key = buildSearchParams({ q: initialQuery, tradeskill: initialTradeskill, minTrivial: initialMinTrivial, maxTrivial: initialMaxTrivial }).toString();
-    if (!key) return;
-    const cached = getCachedRecipes(key);
-    if (!cached) return;
-    setResults(cached);
-    setDisplayKey(key);
-    setIsFetching(false);
-    setResolutionMeta({ key, durationMs: 0, source: "cache" });
-  }, [initialMaxTrivial, initialMinTrivial, initialQuery, initialTradeskill]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -189,96 +161,94 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
   };
 
   const clearFilters = () => {
+    abortRef.current?.abort();
     setFilters({
       q: "",
       tradeskill: "",
       minTrivial: "",
       maxTrivial: ""
     });
+    setResults([]);
+    setError(null);
+    setDisplayKey("");
+    setIsFetching(false);
+    setResolutionMeta(null);
+    setPage(1);
+    currentUrlKeyRef.current = "";
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", pathname);
+    }
   };
 
   useEffect(() => {
-    const isForcedSearch = submitCount !== lastHandledSubmitRef.current;
-    const timer = window.setTimeout(() => {
-      if (isForcedSearch) lastHandledSubmitRef.current = submitCount;
-      const nextKey = buildSearchParams(filters).toString();
-      const nextHref = nextKey ? `${pathname}?${nextKey}` : pathname;
-      if (nextKey !== currentUrlKeyRef.current) {
-        currentUrlKeyRef.current = nextKey;
-        startTransition(() => router.replace(nextHref, { scroll: false }));
+    if (submitCount === 0 || submitCount === lastHandledSubmitRef.current) {
+      return;
+    }
+
+    lastHandledSubmitRef.current = submitCount;
+    const nextKey = buildSearchParams(filters).toString();
+    const nextHref = nextKey ? `${pathname}?${nextKey}` : pathname;
+    if (nextKey !== currentUrlKeyRef.current) {
+      currentUrlKeyRef.current = nextKey;
+      if (typeof window !== "undefined") {
+        window.history.replaceState(null, "", nextHref);
       }
-      if (nextKey === displayKey && !isForcedSearch) return;
+    }
 
-      abortRef.current?.abort();
+    abortRef.current?.abort();
 
-      if (!hasQuery(filters)) {
-        setResults([]);
-        setError(null);
-        setDisplayKey(nextKey);
-        setIsFetching(false);
-        setResolutionMeta(null);
-        setAwaitingManualSubmit(false);
-        return;
-      }
-
-      if (!isForcedSearch && !hasAutoSearchableQuery(filters)) {
-        setResults([]);
-        setError(null);
-        setDisplayKey(nextKey);
-        setIsFetching(false);
-        setResolutionMeta(null);
-        setAwaitingManualSubmit(true);
-        return;
-      }
-
-      setAwaitingManualSubmit(false);
-      const startedAt = performance.now();
-      const cached = getCachedRecipes(nextKey);
-      if (cached) {
-        setResults(cached);
-        setDisplayKey(nextKey);
-        setError(null);
-        setIsFetching(false);
-        setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "cache" });
-        return;
-      }
-
-      const controller = new AbortController();
-      abortRef.current = controller;
-      setIsFetching(true);
+    if (!hasQuery(filters)) {
+      setResults([]);
       setError(null);
+      setDisplayKey("");
+      setIsFetching(false);
+      setResolutionMeta(null);
+      setPage(1);
+      return;
+    }
 
-      void (async () => {
-        try {
-          const response = await fetch(`/api/recipes?${nextKey}`, { signal: controller.signal });
-          if (!response.ok) throw new Error(`Search failed with ${response.status}`);
-          const payload = (await response.json()) as { data?: RecipeSummary[] };
-          if (controller.signal.aborted) return;
-          setResults(payload.data ?? []);
-          setDisplayKey(nextKey);
-          setCachedRecipes(nextKey, payload.data ?? []);
-          setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "network" });
-        } catch (searchError) {
-          if (controller.signal.aborted) return;
-          console.error(searchError);
-          setError("Could not refresh recipe results. Showing the last successful search.");
-        } finally {
-          if (abortRef.current === controller) {
-            abortRef.current = null;
-            setIsFetching(false);
-          }
+    const startedAt = performance.now();
+    const cached = getCachedRecipes(nextKey);
+    if (cached) {
+      setResults(cached);
+      setDisplayKey(nextKey);
+      setError(null);
+      setIsFetching(false);
+      setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "cache" });
+      return;
+    }
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setIsFetching(true);
+    setError(null);
+
+    void (async () => {
+      try {
+        const response = await fetch(`/api/recipes?${nextKey}`, { signal: controller.signal });
+        if (!response.ok) throw new Error(`Search failed with ${response.status}`);
+        const payload = (await response.json()) as { data?: RecipeSummary[] };
+        if (controller.signal.aborted) return;
+        setResults(payload.data ?? []);
+        setDisplayKey(nextKey);
+        setCachedRecipes(nextKey, payload.data ?? []);
+        setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "network" });
+      } catch (searchError) {
+        if (controller.signal.aborted) return;
+        console.error(searchError);
+        setError("Could not refresh recipe results. Showing the last successful search.");
+      } finally {
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+          setIsFetching(false);
         }
-      })();
-    }, isForcedSearch ? 0 : recipeSearchDebounceMs);
+      }
+    })();
+  }, [filters, pathname, submitCount]);
 
-    return () => window.clearTimeout(timer);
-  }, [displayKey, filters, pathname, router, submitCount]);
-
-  const activeQuery = filters.q.trim();
   const totalPages = Math.max(1, Math.ceil(results.length / recipeResultsPerPage));
   const visiblePage = Math.min(page, totalPages);
   const pagedResults = results.slice((visiblePage - 1) * recipeResultsPerPage, visiblePage * recipeResultsPerPage);
-  const hasShortQuery = activeQuery.length > 0 && activeQuery.length < recipeSearchAutoQueryMinLength;
   const showResults = hasQuery(filters) || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading recipes" : `${results.length} recipes`) : "Results";
   const statusLabel = error ? error : isFetching ? "Refreshing results..." : buildSearchParams(filters).toString() === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
@@ -367,14 +337,8 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
         ) : showResults ? (
           isFetching ? (
             <ClassLoadingIndicator message="Loading recipes" detail="Sifting ingredients, trivials, and results." />
-          ) : awaitingManualSubmit ? (
-            <SearchPrompt
-              message={
-                hasShortQuery
-                  ? `Type ${recipeSearchAutoQueryMinLength}+ characters to auto-search, or press Search to run now.`
-                  : "Press Search to apply these filters."
-              }
-            />
+          ) : buildSearchParams(filters).toString() !== displayKey ? (
+            <SearchPrompt message="Press Search to apply these filters." />
           ) : (
             <SearchPrompt message="No recipes matched this search." />
           )

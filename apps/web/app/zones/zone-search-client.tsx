@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useEffect, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import type { ZoneSummary } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
@@ -31,8 +31,6 @@ type ZoneCacheEntry = {
   touchedAt: number;
 };
 
-const zoneSearchDebounceMs = 500;
-const zoneSearchAutoQueryMinLength = 3;
 const zoneResultsPerPage = 20;
 const zoneSearchCacheTtlMs = 180_000;
 const zoneSearchCacheMaxEntries = 12;
@@ -51,10 +49,6 @@ function buildSearchParams(filters: ZoneFilters) {
 
 function hasActiveFilters(filters: ZoneFilters) {
   return filters.q.trim().length > 0 || filters.era.length > 0;
-}
-
-function hasAutoSearchableQuery(filters: ZoneFilters) {
-  return filters.q.trim().length >= zoneSearchAutoQueryMinLength;
 }
 
 function formatDuration(durationMs: number) {
@@ -129,31 +123,18 @@ function setCachedZones(key: string, results: ZoneSummary[]) {
 }
 
 export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneSearchClientProps) {
-  const router = useRouter();
   const pathname = usePathname();
   const [filters, setFilters] = useState<ZoneFilters>({ q: initialQuery, era: initialEra });
   const [results, setResults] = useState<ZoneSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [isFetching, setIsFetching] = useState(hasActiveFilters({ q: initialQuery, era: initialEra }));
+  const [isFetching, setIsFetching] = useState(false);
   const [displayKey, setDisplayKey] = useState("");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
-  const [submitCount, setSubmitCount] = useState(hasActiveFilters({ q: initialQuery, era: initialEra }) ? 1 : 0);
-  const [awaitingManualSubmit, setAwaitingManualSubmit] = useState(false);
+  const [submitCount, setSubmitCount] = useState(0);
   const [page, setPage] = useState(1);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(buildSearchParams({ q: initialQuery, era: initialEra }).toString());
   const lastHandledSubmitRef = useRef(0);
-
-  useEffect(() => {
-    const key = buildSearchParams({ q: initialQuery, era: initialEra }).toString();
-    if (!key) return;
-    const cached = getCachedZones(key);
-    if (!cached) return;
-    setResults(cached);
-    setDisplayKey(key);
-    setIsFetching(false);
-    setResolutionMeta({ key, durationMs: 0, source: "cache" });
-  }, [initialEra, initialQuery]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -167,91 +148,89 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
   };
 
   const clearFilters = () => {
+    abortRef.current?.abort();
     setFilters({ q: "", era: "" });
+    setResults([]);
+    setError(null);
+    setDisplayKey("");
+    setIsFetching(false);
+    setResolutionMeta(null);
+    setPage(1);
+    currentUrlKeyRef.current = "";
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", pathname);
+    }
   };
 
   useEffect(() => {
-    const isForcedSearch = submitCount !== lastHandledSubmitRef.current;
-    const timer = window.setTimeout(() => {
-      if (isForcedSearch) lastHandledSubmitRef.current = submitCount;
-      const nextKey = buildSearchParams(filters).toString();
-      const nextHref = nextKey ? `${pathname}?${nextKey}` : pathname;
-      if (nextKey !== currentUrlKeyRef.current) {
-        currentUrlKeyRef.current = nextKey;
-        startTransition(() => router.replace(nextHref, { scroll: false }));
+    if (submitCount === 0 || submitCount === lastHandledSubmitRef.current) {
+      return;
+    }
+
+    lastHandledSubmitRef.current = submitCount;
+    const nextKey = buildSearchParams(filters).toString();
+    const nextHref = nextKey ? `${pathname}?${nextKey}` : pathname;
+    if (nextKey !== currentUrlKeyRef.current) {
+      currentUrlKeyRef.current = nextKey;
+      if (typeof window !== "undefined") {
+        window.history.replaceState(null, "", nextHref);
       }
-      if (nextKey === displayKey && !isForcedSearch) return;
+    }
 
-      abortRef.current?.abort();
+    abortRef.current?.abort();
 
-      if (!hasActiveFilters(filters)) {
-        setResults([]);
-        setError(null);
-        setDisplayKey(nextKey);
-        setIsFetching(false);
-        setResolutionMeta(null);
-        setAwaitingManualSubmit(false);
-        return;
-      }
-
-      if (!isForcedSearch && !hasAutoSearchableQuery(filters)) {
-        setResults([]);
-        setError(null);
-        setDisplayKey(nextKey);
-        setIsFetching(false);
-        setResolutionMeta(null);
-        setAwaitingManualSubmit(true);
-        return;
-      }
-
-      setAwaitingManualSubmit(false);
-      const startedAt = performance.now();
-      const cached = getCachedZones(nextKey);
-      if (cached) {
-        setResults(cached);
-        setDisplayKey(nextKey);
-        setError(null);
-        setIsFetching(false);
-        setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "cache" });
-        return;
-      }
-
-      const controller = new AbortController();
-      abortRef.current = controller;
-      setIsFetching(true);
+    if (!hasActiveFilters(filters)) {
+      setResults([]);
       setError(null);
+      setDisplayKey("");
+      setIsFetching(false);
+      setResolutionMeta(null);
+      setPage(1);
+      return;
+    }
 
-      void (async () => {
-        try {
-          const response = await fetch(`/api/zones?${nextKey}`, { signal: controller.signal });
-          if (!response.ok) throw new Error(`Search failed with ${response.status}`);
-          const payload = (await response.json()) as { data?: ZoneSummary[] };
-          if (controller.signal.aborted) return;
-          setResults(payload.data ?? []);
-          setDisplayKey(nextKey);
-          setCachedZones(nextKey, payload.data ?? []);
-          setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "network" });
-        } catch (searchError) {
-          if (controller.signal.aborted) return;
-          console.error(searchError);
-          setError("Could not refresh zone results. Showing the last successful search.");
-        } finally {
-          if (abortRef.current === controller) {
-            abortRef.current = null;
-            setIsFetching(false);
-          }
+    const startedAt = performance.now();
+    const cached = getCachedZones(nextKey);
+    if (cached) {
+      setResults(cached);
+      setDisplayKey(nextKey);
+      setError(null);
+      setIsFetching(false);
+      setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "cache" });
+      return;
+    }
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setIsFetching(true);
+    setError(null);
+
+    void (async () => {
+      try {
+        const response = await fetch(`/api/zones?${nextKey}`, { signal: controller.signal });
+        if (!response.ok) throw new Error(`Search failed with ${response.status}`);
+        const payload = (await response.json()) as { data?: ZoneSummary[] };
+        if (controller.signal.aborted) return;
+        setResults(payload.data ?? []);
+        setDisplayKey(nextKey);
+        setCachedZones(nextKey, payload.data ?? []);
+        setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "network" });
+      } catch (searchError) {
+        if (controller.signal.aborted) return;
+        console.error(searchError);
+        setError("Could not refresh zone results. Showing the last successful search.");
+      } finally {
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+          setIsFetching(false);
         }
-      })();
-    }, isForcedSearch ? 0 : zoneSearchDebounceMs);
+      }
+    })();
+  }, [filters, pathname, submitCount]);
 
-    return () => window.clearTimeout(timer);
-  }, [displayKey, filters, pathname, router, submitCount]);
-
-  const activeQuery = filters.q.trim();
   const totalPages = Math.max(1, Math.ceil(results.length / zoneResultsPerPage));
   const visiblePage = Math.min(page, totalPages);
   const pagedResults = results.slice((visiblePage - 1) * zoneResultsPerPage, visiblePage * zoneResultsPerPage);
-  const hasShortQuery = activeQuery.length > 0 && activeQuery.length < zoneSearchAutoQueryMinLength;
   const draftKey = buildSearchParams(filters).toString();
   const showResults = hasActiveFilters(filters) || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading zones" : `${results.length} zones`) : "Results";
@@ -337,14 +316,8 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
         ) : showResults ? (
           isFetching ? (
             <ClassLoadingIndicator message="Loading zones" detail="Surveying eras, levels, and populations." />
-          ) : awaitingManualSubmit ? (
-            <SearchPrompt
-              message={
-                hasShortQuery
-                  ? `Type ${zoneSearchAutoQueryMinLength}+ characters to auto-search, or press Search to run now.`
-                  : "Press Search to apply these filters."
-              }
-            />
+          ) : draftKey !== displayKey ? (
+            <SearchPrompt message="Press Search to apply these filters." />
           ) : (
             <SearchPrompt message="No zones matched this search." />
           )

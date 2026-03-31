@@ -4,7 +4,7 @@ import { canonicalizeItemTypeName, itemTypeIdFromName, itemTypeNameFromId } from
 import { factions, items, npcs, pets, recipes, spells, spawnGroups, tasks, zones } from "./mock-data";
 import { formatPlayableItemRaceMask, raceNames } from "./race-names";
 import { getSpellEffectName, resolveSpellEffectDirection, summarizeSpellEffects } from "./spell-effects";
-import { formatExpansion, formatZoneEra, getZoneEraLabels, matchesZoneEraFilter } from "./zone-eras";
+import { formatExpansion, formatZoneEra, getZoneEraLabels, listZoneEraDefinitions, matchesZoneEraFilter } from "./zone-eras";
 import { sql } from "kysely";
 import type {
   CatalogStats,
@@ -68,11 +68,13 @@ const databaseEnabled = Boolean(db);
 const itemSearchLimit = 100;
 const itemSearchCacheTtlSeconds = 60;
 const zoneLevelBandSize = 5;
-const zoneLevelBandMaximum = 110;
+export const zoneByLevelCap = 60;
+const zoneLevelBandMaximum = zoneByLevelCap;
 const zoneLevelBandSignificanceFloor = 5;
 const publicZoneStatusCeiling = 1;
 const merchantNpcClasses = [40, 41, 59, 61, 67, 68, 70] as const;
 export const spellSearchLevelCap = 60;
+export const petSearchLevelCap = 60;
 
 const classNames = [
   "Warrior",
@@ -2348,6 +2350,20 @@ export async function listZoneEras() {
   return getZoneEraLabels();
 }
 
+export async function listZoneEraBrowseDefinitions() {
+  const zones = await listZones();
+
+  return listZoneEraDefinitions().map((definition) => {
+    const zoneCount = zones.filter((zone) => matchesZoneEraFilter(zone, definition.label)).length;
+
+    return {
+      ...definition,
+      enabled: zoneCount > 0,
+      zoneCount
+    };
+  });
+}
+
 export async function getZonesByEra(era: string) {
   const all = await listZones();
   return all.filter((zone) => matchesZoneEraFilter(zone, era));
@@ -2450,7 +2466,7 @@ export async function getZonesByLevel() {
           longName: zone.longName,
           era: zone.era,
           hotzone: false,
-          suggestedLevel: zone.levelRange,
+          suggestedLevel: calculateSuggestedZoneLevel(bands),
           bands
         };
       })
@@ -3138,7 +3154,7 @@ export async function listPets(filters: PetFilters = {}): Promise<PetSummary[]> 
           from spells_new s
           inner join pets p on p.type = s.teleport_zone
           inner join npc_types nt on nt.name = s.teleport_zone
-          where ${classColumn} > 0 and ${classColumn} < 255
+          where ${classColumn} > 0 and ${classColumn} < 255 and nt.level <= ${petSearchLevelCap}
           group by s.id, s.name, s.new_icon, spell_level, nt.race, nt.level, nt.class, nt.hp, nt.mana, nt.ac, nt.mindmg, nt.maxdmg
           order by spell_level asc, s.name asc
         `.execute(db!);
@@ -3166,6 +3182,7 @@ export async function listPets(filters: PetFilters = {}): Promise<PetSummary[]> 
     return [...new Map(
       allRows
         .flat()
+        .filter((entry) => entry.petLevel <= petSearchLevelCap)
         .sort((left, right) =>
           left.ownerClassId - right.ownerClassId ||
           left.spellLevel - right.spellLevel ||
@@ -3175,6 +3192,7 @@ export async function listPets(filters: PetFilters = {}): Promise<PetSummary[]> 
     ).values()];
   }, () =>
     pets
+      .filter((pet) => (pet.petLevel ?? numberFromLevelRange(pet.levelRange)) <= petSearchLevelCap)
       .filter((pet) => {
         if (filters.classNames?.length) {
           return filters.classNames.some((className) => includesFolded(pet.ownerClass, className));
@@ -3222,7 +3240,7 @@ export async function getPetDetail(id: number): Promise<PetDetail | undefined> {
       from spells_new s
       inner join pets p on p.type = s.teleport_zone
       inner join npc_types nt on nt.name = s.teleport_zone
-      where s.id = ${id}
+      where s.id = ${id} and nt.level <= ${petSearchLevelCap}
       limit 1
     `.execute(db!);
 
@@ -3251,7 +3269,7 @@ export async function getPetDetail(id: number): Promise<PetDetail | undefined> {
       maxDamage: Number(row.maxdmg ?? 0)
     };
     return detail;
-  }, () => pets.find((pet) => pet.id === id));
+  }, () => pets.find((pet) => pet.id === id && (pet.petLevel ?? numberFromLevelRange(pet.levelRange)) <= petSearchLevelCap));
 }
 
 export function listTasks(q?: string) {

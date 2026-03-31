@@ -7,10 +7,10 @@ import { Input } from "@eq-alla/ui";
 
 type ZonesByLevelMatrixProps = {
   zones: ZoneByLevelSummary[];
+  levelCap: number;
 };
 
 const defaultSelectedLevel = 25;
-const zonesByLevelPickerMaximum = 65;
 
 function bandTone(npcCount: number) {
   if (npcCount >= 20) {
@@ -85,9 +85,9 @@ function buildCellBoxShadow({
   return shadows.length > 0 ? shadows.join(", ") : undefined;
 }
 
-export function ZonesByLevelMatrix({ zones }: ZonesByLevelMatrixProps) {
+export function ZonesByLevelMatrix({ zones, levelCap }: ZonesByLevelMatrixProps) {
   const bands = zones[0]?.bands ?? [];
-  const maximumLevel = Math.min(bands[bands.length - 1]?.maxLevel ?? 110, zonesByLevelPickerMaximum);
+  const maximumLevel = Math.min(bands[bands.length - 1]?.maxLevel ?? levelCap, levelCap);
   const [selectedLevel, setSelectedLevel] = useState(() => clampLevel(defaultSelectedLevel, maximumLevel));
 
   const selectedBandIndex = Math.max(0, Math.floor((selectedLevel - 1) / 5));
