@@ -5,6 +5,7 @@ import {
   formatZoneEra,
   getCatalogStats,
   getItemDetail,
+  getNpcDetail,
   getPetDetail,
   getSpellDetail,
   getZoneDetail,
@@ -122,6 +123,205 @@ describe("catalog services", () => {
     expect(firstSeller?.zone.href).toBe(`/zones/${firstSeller?.zone.shortName}`);
   }, 20_000);
 
+  it("includes merchants on item sold-by lists when their required content flag is enabled", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{ item_id: number; npc_id: number }>`
+      select distinct ml.item as item_id, nt.id as npc_id
+      from merchantlist ml
+      join npc_types nt on nt.merchant_id = ml.merchantid
+      join spawnentry se on se.npcID = nt.id
+      join spawngroup sg on sg.id = se.spawngroupID
+      join spawn2 s2 on s2.spawngroupID = sg.id
+      join zone z on z.short_name = s2.zone and z.version = s2.version
+      join content_flags cf on cf.flag_name = s2.content_flags and coalesce(cf.enabled, 0) <> 0
+      where coalesce(z.min_status, 0) <= ${1}
+        and exists (
+          select 1
+          from discovered_items di
+          where di.item_id = ml.item
+        )
+      order by ml.item asc
+      limit 1
+    `.execute(db!);
+
+    if (!rows.rows[0]) {
+      expect(rows.rows).toEqual([]);
+      return;
+    }
+
+    const item = await getItemDetail(rows.rows[0].item_id);
+
+    expect(item?.soldBy.some((entry) => entry.id === rows.rows[0].npc_id)).toBe(true);
+  }, 20_000);
+
+  it("excludes merchants from item sold-by lists when their required content flag is disabled", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{ item_id: number; npc_id: number }>`
+      select distinct ml.item as item_id, nt.id as npc_id
+      from merchantlist ml
+      join npc_types nt on nt.merchant_id = ml.merchantid
+      join spawnentry se on se.npcID = nt.id
+      join spawngroup sg on sg.id = se.spawngroupID
+      join spawn2 s2 on s2.spawngroupID = sg.id
+      join zone z on z.short_name = s2.zone and z.version = s2.version
+      join content_flags cf on cf.flag_name = s2.content_flags and coalesce(cf.enabled, 0) = 0
+      where coalesce(z.min_status, 0) <= ${1}
+        and exists (
+          select 1
+          from discovered_items di
+          where di.item_id = ml.item
+        )
+      order by ml.item asc
+      limit 1
+    `.execute(db!);
+
+    if (!rows.rows[0]) {
+      expect(rows.rows).toEqual([]);
+      return;
+    }
+
+    const item = await getItemDetail(rows.rows[0].item_id);
+
+    expect(item?.soldBy.some((entry) => entry.id === rows.rows[0].npc_id)).toBe(false);
+  }, 20_000);
+
+  it("excludes merchants from item sold-by lists when their only public spawn is disabled", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{ item_id: number; npc_id: number }>`
+      select distinct ml.item as item_id, nt.id as npc_id
+      from merchantlist ml
+      join npc_types nt on nt.merchant_id = ml.merchantid
+      join spawnentry se on se.npcID = nt.id
+      join spawngroup sg on sg.id = se.spawngroupID
+      join spawn2 s2 on s2.spawngroupID = sg.id
+      join spawn2_disabled s2d on s2d.spawn2_id = s2.id and coalesce(s2d.disabled, 0) <> 0
+      join zone z on z.short_name = s2.zone and z.version = s2.version
+      where coalesce(z.min_status, 0) <= ${1}
+        and exists (
+          select 1
+          from discovered_items di
+          where di.item_id = ml.item
+        )
+        and not exists (
+          select 1
+          from spawnentry se2
+          join spawngroup sg2 on sg2.id = se2.spawngroupID
+          join spawn2 s22 on s22.spawngroupID = sg2.id
+          left join spawn2_disabled s2d2 on s2d2.spawn2_id = s22.id and coalesce(s2d2.disabled, 0) <> 0
+          join zone z2 on z2.short_name = s22.zone and z2.version = s22.version
+          where se2.npcID = nt.id
+            and coalesce(z2.min_status, 0) <= ${1}
+            and s2d2.spawn2_id is null
+        )
+      order by ml.item asc
+      limit 1
+    `.execute(db!);
+
+    if (!rows.rows[0]) {
+      expect(rows.rows).toEqual([]);
+      return;
+    }
+
+    const item = await getItemDetail(rows.rows[0].item_id);
+
+    expect(item?.soldBy.some((entry) => entry.id === rows.rows[0].npc_id)).toBe(false);
+  }, 20_000);
+
+  it("excludes drop NPCs from item drop lists when their only public spawn is disabled", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{ item_id: number; npc_id: number }>`
+      select distinct lde.item_id as item_id, nt.id as npc_id
+      from lootdrop_entries lde
+      join loottable_entries lte on lte.lootdrop_id = lde.lootdrop_id
+      join npc_types nt on nt.loottable_id = lte.loottable_id
+      join spawnentry se on se.npcID = nt.id
+      join spawngroup sg on sg.id = se.spawngroupID
+      join spawn2 s2 on s2.spawngroupID = sg.id
+      join spawn2_disabled s2d on s2d.spawn2_id = s2.id and coalesce(s2d.disabled, 0) <> 0
+      join zone z on z.short_name = s2.zone and z.version = s2.version
+      where coalesce(z.min_status, 0) <= ${1}
+        and exists (
+          select 1
+          from discovered_items di
+          where di.item_id = lde.item_id
+        )
+        and not exists (
+          select 1
+          from spawnentry se2
+          join spawngroup sg2 on sg2.id = se2.spawngroupID
+          join spawn2 s22 on s22.spawngroupID = sg2.id
+          left join spawn2_disabled s2d2 on s2d2.spawn2_id = s22.id and coalesce(s2d2.disabled, 0) <> 0
+          join zone z2 on z2.short_name = s22.zone and z2.version = s22.version
+          where se2.npcID = nt.id
+            and coalesce(z2.min_status, 0) <= ${1}
+            and s2d2.spawn2_id is null
+        )
+      order by lde.item_id asc
+      limit 1
+    `.execute(db!);
+
+    if (!rows.rows[0]) {
+      expect(rows.rows).toEqual([]);
+      return;
+    }
+
+    const item = await getItemDetail(rows.rows[0].item_id);
+
+    expect(item?.droppedBy.some((entry) => entry.id === rows.rows[0].npc_id)).toBe(false);
+  }, 20_000);
+
+  it("hides merchant inventory when the merchant has no enabled public spawn", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{ npc_id: number }>`
+      select distinct nt.id as npc_id
+      from npc_types nt
+      join spawnentry se on se.npcID = nt.id
+      join spawngroup sg on sg.id = se.spawngroupID
+      join spawn2 s2 on s2.spawngroupID = sg.id
+      join zone z on z.short_name = s2.zone and z.version = s2.version
+      left join content_flags cf on cf.flag_name = s2.content_flags
+      where nt.merchant_id > 0
+        and coalesce(z.min_status, 0) <= ${1}
+        and coalesce(s2.content_flags, '') <> ''
+        and coalesce(cf.enabled, 0) = 0
+        and not exists (
+          select 1
+          from spawnentry se2
+          join spawngroup sg2 on sg2.id = se2.spawngroupID
+          join spawn2 s22 on s22.spawngroupID = sg2.id
+          join zone z2 on z2.short_name = s22.zone and z2.version = s22.version
+          left join content_flags cf2 on cf2.flag_name = s22.content_flags
+          where se2.npcID = nt.id
+            and coalesce(z2.min_status, 0) <= ${1}
+            and (
+              coalesce(s22.content_flags, '') = ''
+              or coalesce(cf2.enabled, 0) <> 0
+            )
+        )
+      order by nt.id asc
+      limit 1
+    `.execute(db!);
+
+    if (!rows.rows[0]) {
+      expect(rows.rows).toEqual([]);
+      return;
+    }
+
+    const npc = await getNpcDetail(rows.rows[0].npc_id);
+
+    expect(npc?.sells).toEqual([]);
+  }, 20_000);
+
   it("matches canonical ingredient-only recipe usage rows", async () => {
     const db = getDb();
     expect(db).toBeTruthy();
@@ -200,6 +400,40 @@ describe("catalog services", () => {
     const skeletonPets = await listNpcs({ q: "skel_pet_1_" });
     expect(skeletonPets.some((npc) => npc.race === "Skeleton")).toBe(true);
   });
+
+  it("excludes untrackable NPCs from NPC listings, global search, and direct detail routes", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{ id: number; name: string }>`
+      select nt.id, nt.name
+      from npc_types nt
+      where coalesce(nt.trackable, 0) <> 1
+        and nt.name like '%projection%'
+        and not exists (
+          select 1
+          from npc_types tracked
+          where tracked.name = nt.name
+            and coalesce(tracked.trackable, 0) = 1
+        )
+      order by nt.name asc
+      limit 1
+    `.execute(db!);
+
+    if (!rows.rows[0]) {
+      expect(rows.rows).toEqual([]);
+      return;
+    }
+
+    const query = rows.rows[0].name;
+    const npcResults = await listNpcs({ q: query });
+    const searchHits = await searchCatalog(query);
+    const npcDetail = await getNpcDetail(rows.rows[0].id);
+
+    expect(npcResults.some((npc) => npc.name.replaceAll(" ", "_") === query)).toBe(false);
+    expect(searchHits.some((hit) => hit.type === "npc")).toBe(false);
+    expect(npcDetail).toBeUndefined();
+  }, 60_000);
 
   it("renders readable spell effect translations for trigger focus effects", async () => {
     const spell = await getSpellDetail(38188);
