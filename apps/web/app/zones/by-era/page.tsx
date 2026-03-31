@@ -3,6 +3,8 @@ import { listZoneEraBrowseDefinitions } from "@eq-alla/data";
 import { ArrowRight } from "lucide-react";
 import { PageHero, SectionCard } from "../../../components/catalog-shell";
 
+export const dynamic = "force-dynamic";
+
 export default async function ZonesByEraPage() {
   const eras = await listZoneEraBrowseDefinitions();
 

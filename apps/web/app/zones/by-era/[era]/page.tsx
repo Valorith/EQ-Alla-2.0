@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { getZonesByEra, resolveZoneEraLabel } from "@eq-alla/data";
 import { PageHero, SectionCard, SimpleTable } from "../../../../components/catalog-shell";
 
+export const dynamic = "force-dynamic";
+
 type ZonesByEraDetailPageProps = {
   params: Promise<{ era: string }>;
 };
