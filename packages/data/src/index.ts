@@ -1,5 +1,6 @@
 export * from "./db";
 export * from "./env";
+export * from "./item-types";
 export * from "./legacy-routes";
 export * from "./race-names";
 export * from "./schema-capabilities";

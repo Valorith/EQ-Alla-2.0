@@ -4,6 +4,7 @@ import Link from "next/link";
 import { startTransition, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { ItemSummary } from "@eq-alla/data";
+import { itemTypeFilterOptions } from "@eq-alla/data/item-types";
 import { Button, Input } from "@eq-alla/ui";
 import { PaginationControls, SearchPrompt, SectionCard, SimpleTable } from "../../components/catalog-shell";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
@@ -504,7 +505,7 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
             name="type"
             value={filters.type}
             onChange={(value) => setFilter("type", value)}
-            options={["Armor", "Weapon", "Potion", "2H Blunt"]}
+            options={itemTypeFilterOptions}
           />
           <SelectControl
             label="Min level"

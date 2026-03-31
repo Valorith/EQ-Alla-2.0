@@ -1,5 +1,6 @@
 import { cacheGet, cacheGetOrResolve } from "./cache";
 import { getDb } from "./db";
+import { canonicalizeItemTypeName, itemTypeIdFromName, itemTypeNameFromId } from "./item-types";
 import { factions, items, npcs, pets, recipes, spells, spawnGroups, tasks, zones } from "./mock-data";
 import { formatPlayableItemRaceMask, raceNames } from "./race-names";
 import { getSpellEffectName, summarizeSpellEffects } from "./spell-effects";
@@ -360,53 +361,45 @@ function slotMaskForFilter(slot?: string) {
 function typeClauseForFilter(type?: string) {
   if (!type) return null;
 
-  switch (type.toLowerCase()) {
+  switch (type.trim().toLowerCase()) {
     case "weapon":
-      return sql`damage > 0`;
-    case "1h slashing":
-      return sql`damage > 0 and itemtype = 0`;
-    case "2h slashing":
-      return sql`damage > 0 and itemtype = 1`;
-    case "1h piercing":
-      return sql`damage > 0 and itemtype = 2`;
-    case "1h blunt":
-      return sql`damage > 0 and itemtype = 3`;
-    case "2h blunt":
-      return sql`damage > 0 and itemtype = 4`;
-    case "2h piercing":
-      return sql`damage > 0 and itemtype = 35`;
-    case "hand to hand":
-      return sql`damage > 0 and itemtype = 45`;
-    case "armor":
-      return sql`itemclass = 0 and damage <= 0 and itemtype = 10`;
-    case "miscellaneous":
-      return sql`itemclass = 0 and damage <= 0 and itemtype = 11`;
-    case "food":
-      return sql`itemclass = 0 and damage <= 0 and itemtype = 14`;
-    case "drink":
-      return sql`itemclass = 0 and damage <= 0 and itemtype = 15`;
-    case "arrow":
-      return sql`itemclass = 0 and damage <= 0 and itemtype = 27`;
-    case "jewelry":
-      return sql`itemclass = 0 and damage <= 0 and itemtype = 29`;
-    case "potion":
-      return sql`itemclass = 0 and damage <= 0 and itemtype = 42`;
-    case "augment":
-      return sql`itemclass = 0 and damage <= 0 and itemtype = 54`;
-    case "container":
-      return sql`itemclass = 1`;
-    case "book":
+      return sql`itemclass = 0 and damage > 0`;
+    case "container": {
+      const typeId = itemTypeIdFromName("Container");
+      return typeId !== undefined ? sql`itemclass = 1 or itemtype = ${typeId}` : sql`itemclass = 1`;
+    }
+    case "book": {
+      const bookId = itemTypeIdFromName("Book");
+      const spellBookId = itemTypeIdFromName("Book with Spell Effect");
+      if (bookId !== undefined && spellBookId !== undefined) {
+        return sql`itemclass = 2 or itemtype in (${bookId}, ${spellBookId})`;
+      }
       return sql`itemclass = 2`;
+    }
     default:
-      return null;
+      break;
   }
+
+  const typeId = itemTypeIdFromName(type);
+  return typeId !== undefined ? sql`itemclass = 0 and itemtype = ${typeId}` : null;
+}
+
+function itemTypeMatchesFilter(itemType: string, filterType?: string) {
+  if (!filterType) return true;
+
+  if (filterType.trim().toLowerCase() === "weapon") {
+    return ["1H Slashing", "2H Slashing", "Piercing", "1H Blunt", "2H Blunt", "Archery", "Crossbow", "Throwing v1", "Throwing v2", "2H Piercing", "Hand to Hand"].includes(itemType);
+  }
+
+  const canonical = canonicalizeItemTypeName(filterType);
+  return canonical ? itemType === canonical : includesFolded(itemType, filterType);
 }
 
 function itemMatchesFilters(item: ItemSummary, filters: ItemFilters) {
   if (!includesFolded(item.name, filters.q)) return false;
   if (filters.className && !item.classes.some((klass) => includesFolded(klass, filters.className))) return false;
   if (filters.slot && !includesFolded(item.slot, filters.slot)) return false;
-  if (filters.type && !includesFolded(item.type, filters.type)) return false;
+  if (!itemTypeMatchesFilter(item.type, filters.type)) return false;
   if (typeof filters.tradeable === "boolean" && item.tradeable !== filters.tradeable) return false;
   const itemLevel = effectiveItemLevel(item.levelRequired);
   if (filters.minLevel && itemLevel < filters.minLevel) return false;
@@ -461,74 +454,12 @@ function formatSlotMask(mask: number | null | undefined, itemClass: number | nul
 function formatItemType(itemClass: number | null | undefined, itemType: number | null | undefined, damage?: number | null) {
   if (itemClass === 1) return "Container";
   if (itemClass === 2) return "Book";
-  if ((damage ?? 0) > 0) {
-    const weaponTypes: Record<number, string> = {
-      0: "1H Slashing",
-      1: "2H Slashing",
-      2: "1H Piercing",
-      3: "1H Blunt",
-      4: "2H Blunt",
-      35: "2H Piercing",
-      45: "Hand to Hand"
-    };
-    return weaponTypes[itemType ?? -1] ?? "Weapon";
-  }
-
-  const itemTypes: Record<number, string> = {
-    10: "Armor",
-    11: "Miscellaneous",
-    14: "Food",
-    15: "Drink",
-    27: "Arrow",
-    29: "Jewelry",
-    42: "Potion",
-    54: "Augment"
-  };
-  return itemTypes[itemType ?? -1] ?? "Item";
+  if ((damage ?? 0) > 0 && (itemType ?? -1) < 0) return "Weapon";
+  return itemTypeNameFromId(itemType);
 }
 
 function formatDetailedItemType(itemType: number | null | undefined) {
-  const itemTypes: Record<number, string> = {
-    0: "1HS",
-    1: "2HS",
-    2: "Piercing",
-    3: "1HB",
-    4: "2HB",
-    5: "Archery",
-    7: "Throwing range items",
-    8: "Shield",
-    10: "Armor",
-    11: "Gems",
-    14: "Food",
-    15: "Drink",
-    17: "Combinable",
-    18: "Bandages",
-    19: "Throwing",
-    20: "Scroll",
-    21: "Potion",
-    23: "Wind Instrument",
-    24: "Stringed Instrument",
-    25: "Brass Instrument",
-    26: "Percussion Instrument",
-    27: "Arrow",
-    29: "Jewelry",
-    30: "Skull",
-    31: "Tome",
-    32: "Note",
-    33: "Key",
-    34: "Coin",
-    35: "2H Piercing",
-    36: "Fishing Pole",
-    37: "Fishing Bait",
-    38: "Alcohol",
-    40: "Compass",
-    42: "Poison",
-    45: "Martial",
-    52: "Charm",
-    54: "Augmentation"
-  };
-
-  return itemTypes[itemType ?? -1] ?? "Item";
+  return itemTypeNameFromId(itemType);
 }
 
 function formatWeight(weight: number | null | undefined) {

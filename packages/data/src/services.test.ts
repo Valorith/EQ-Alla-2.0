@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatPlayableItemRaceMask, getCatalogStats, getItemDetail, getSpellDetail, getZoneDetail, getZonesByEra, getZonesByLevel, listFactions, listItems, listNpcs, listSpells, listZoneEras, listZones, resolveLegacyRoute, searchCatalog, spellSearchLevelCap } from "./index";
+import { formatPlayableItemRaceMask, getCatalogStats, getItemDetail, getSpellDetail, getZoneDetail, getZonesByEra, getZonesByLevel, itemTypeFilterOptions, listFactions, listItems, listNpcs, listSpells, listZoneEras, listZones, resolveLegacyRoute, searchCatalog, spellSearchLevelCap } from "./index";
 
 describe("catalog services", () => {
   it("filters items by tradeable flag", async () => {
@@ -31,6 +31,14 @@ describe("catalog services", () => {
     expect(formatPlayableItemRaceMask(1 | 4 | 8)).toBe("Human, Erudite, Wood Elf");
     expect(formatPlayableItemRaceMask(512 | 4096 | 16384)).toBe("Ogre, Iksar, Froglok");
     expect(formatPlayableItemRaceMask(65535)).toBe("ALL");
+  });
+
+  it("exposes the full EQEmu item type filter list", () => {
+    expect(itemTypeFilterOptions).toContain("Crossbow");
+    expect(itemTypeFilterOptions).toContain("Poison");
+    expect(itemTypeFilterOptions).toContain("Placeable");
+    expect(itemTypeFilterOptions).toContain("Container");
+    expect(itemTypeFilterOptions).toContain("None");
   });
 
   it("treats items with no required level as level 1 for level filters", async () => {
