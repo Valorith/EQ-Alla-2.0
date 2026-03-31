@@ -252,6 +252,8 @@ describe("catalog services", () => {
     expect(formatZoneEra("nektulos", 1)).toBe("Antonica");
     expect(formatZoneEra("mistmoore", 1)).toBe("Faydwer");
     expect(formatZoneEra("sebilis", 1)).toBe("Ruins of Kunark");
+    expect(formatZoneEra("chardok", 2)).toBe("Ruins of Kunark");
+    expect(formatZoneEra("veksar", 2)).toBe("Ruins of Kunark");
   });
 
   it("matches classic era filters using zone short names even when expansion data is misleading", () => {

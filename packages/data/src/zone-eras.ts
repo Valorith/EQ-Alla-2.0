@@ -126,13 +126,14 @@ const classicFaydwerShortNames = [
 ] as const;
 
 const classicPlanesShortNames = ["airplane", "fearplane", "hateplane", "hateplaneb"] as const;
+const kunarkOverrideShortNames = ["chardok", "veksar"] as const;
 
 export const zoneEraDefinitions: ZoneEraDefinition[] = [
   { slug: "antonica", label: "Antonica", shortNames: [...classicAntonicaShortNames] },
   { slug: "odus", label: "Odus", shortNames: [...classicOdusShortNames] },
   { slug: "faydwer", label: "Faydwer", shortNames: [...classicFaydwerShortNames] },
   { slug: "planes", label: "Old World Planes", aliases: ["old planes"], shortNames: [...classicPlanesShortNames] },
-  { slug: "kunark", label: "Ruins of Kunark", aliases: ["kunark"], matchEraNames: [expansionNames[1]] },
+  { slug: "kunark", label: "Ruins of Kunark", aliases: ["kunark"], matchEraNames: [expansionNames[1]], shortNames: [...kunarkOverrideShortNames] },
   { slug: "velious", label: "Scars of Velious", aliases: ["velious"], matchEraNames: [expansionNames[2]] },
   { slug: "luclin", label: "Shadows of Luclin", aliases: ["luclin"], matchEraNames: [expansionNames[3]] },
   { slug: "power", label: "The Planes of Power", aliases: ["power", "planes of power"], matchEraNames: [expansionNames[4]] },

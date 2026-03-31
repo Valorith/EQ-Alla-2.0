@@ -26,8 +26,6 @@ type SearchCacheEntry = {
   touchedAt: number;
 };
 
-const globalSearchDebounceMs = 500;
-const globalSearchAutoQueryMinLength = 3;
 const searchCacheTtlMs = 180_000;
 const searchCacheMaxEntries = 12;
 const searchSessionStorageKey = "eq-global-search-cache";
@@ -54,10 +52,6 @@ function buildSearchKey(query: string) {
 
 function hasQuery(query: string) {
   return buildSearchKey(query).length > 0;
-}
-
-function hasAutoSearchableQuery(query: string) {
-  return buildSearchKey(query).length >= globalSearchAutoQueryMinLength;
 }
 
 function formatDuration(durationMs: number) {
@@ -171,38 +165,15 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
   const [query, setQuery] = useState(initialQuery);
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [isFetching, setIsFetching] = useState(hasQuery(initialQuery));
+  const [isFetching, setIsFetching] = useState(false);
   const [displayKey, setDisplayKey] = useState("");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
   const [submitCount, setSubmitCount] = useState(0);
-  const [awaitingManualSubmit, setAwaitingManualSubmit] = useState(false);
   const [activeType, setActiveType] = useState<SearchHit["type"] | null>(null);
   const [page, setPage] = useState(1);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(buildSearchKey(initialQuery));
   const lastHandledSubmitRef = useRef(0);
-
-  useEffect(() => {
-    const key = buildSearchKey(initialQuery);
-    if (!key) {
-      return;
-    }
-
-    const cachedHits = getClientCachedHits(key);
-    if (!cachedHits) {
-      return;
-    }
-
-    setHits(cachedHits);
-    setDisplayKey(key);
-    setIsFetching(false);
-    setError(null);
-    setResolutionMeta({
-      key,
-      durationMs: 0,
-      source: "cache"
-    });
-  }, [initialQuery]);
 
   useEffect(() => {
     return () => abortRef.current?.abort();
@@ -217,111 +188,91 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
   };
 
   useEffect(() => {
-    const isForcedSearch = submitCount !== lastHandledSubmitRef.current;
-    const timer = window.setTimeout(() => {
-      if (isForcedSearch) {
-        lastHandledSubmitRef.current = submitCount;
+    if (submitCount === 0 || submitCount === lastHandledSubmitRef.current) {
+      return;
+    }
+
+    lastHandledSubmitRef.current = submitCount;
+    const nextKey = buildSearchKey(query);
+    const nextHref = nextKey ? `${pathname}?q=${encodeURIComponent(nextKey)}` : pathname;
+
+    if (nextKey !== currentUrlKeyRef.current) {
+      currentUrlKeyRef.current = nextKey;
+      if (typeof window !== "undefined") {
+        window.history.replaceState(null, "", nextHref);
       }
+    }
 
-      const nextKey = buildSearchKey(query);
-      const nextHref = nextKey ? `${pathname}?q=${encodeURIComponent(nextKey)}` : pathname;
+    abortRef.current?.abort();
 
-      if (nextKey !== currentUrlKeyRef.current) {
-        currentUrlKeyRef.current = nextKey;
-        if (typeof window !== "undefined") {
-          window.history.replaceState(null, "", nextHref);
+    if (!nextKey) {
+      setHits([]);
+      setError(null);
+      setDisplayKey("");
+      setIsFetching(false);
+      setResolutionMeta(null);
+      return;
+    }
+
+    const startedAt = performance.now();
+    const cachedHits = getClientCachedHits(nextKey);
+    if (cachedHits) {
+      setHits(cachedHits);
+      setDisplayKey(nextKey);
+      setError(null);
+      setIsFetching(false);
+      setResolutionMeta({
+        key: nextKey,
+        durationMs: performance.now() - startedAt,
+        source: "cache"
+      });
+      return;
+    }
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setIsFetching(true);
+    setError(null);
+
+    void (async () => {
+      try {
+        const response = await fetch(`/api/search?q=${encodeURIComponent(nextKey)}`, {
+          signal: controller.signal
+        });
+
+        if (!response.ok) {
+          throw new Error(`Search failed with ${response.status}`);
         }
-      }
 
-      if (nextKey === displayKey && !isForcedSearch) {
-        return;
-      }
+        const payload = (await response.json()) as { data?: SearchHit[] };
 
-      abortRef.current?.abort();
+        if (controller.signal.aborted) {
+          return;
+        }
 
-      if (!nextKey) {
-        setHits([]);
-        setError(null);
+        setHits(payload.data ?? []);
         setDisplayKey(nextKey);
-        setIsFetching(false);
-        setResolutionMeta(null);
-        setAwaitingManualSubmit(false);
-        return;
-      }
-
-      if (!isForcedSearch && !hasAutoSearchableQuery(query)) {
-        setHits([]);
-        setError(null);
-        setDisplayKey(nextKey);
-        setIsFetching(false);
-        setResolutionMeta(null);
-        setAwaitingManualSubmit(true);
-        return;
-      }
-
-      setAwaitingManualSubmit(false);
-      const startedAt = performance.now();
-      const cachedHits = getClientCachedHits(nextKey);
-      if (cachedHits) {
-        setHits(cachedHits);
-        setDisplayKey(nextKey);
-        setError(null);
-        setIsFetching(false);
+        setClientCachedHits(nextKey, payload.data ?? []);
         setResolutionMeta({
           key: nextKey,
           durationMs: performance.now() - startedAt,
-          source: "cache"
+          source: "network"
         });
-        return;
-      }
-
-      const controller = new AbortController();
-      abortRef.current = controller;
-      setIsFetching(true);
-      setError(null);
-
-      void (async () => {
-        try {
-          const response = await fetch(`/api/search?q=${encodeURIComponent(nextKey)}`, {
-            signal: controller.signal
-          });
-
-          if (!response.ok) {
-            throw new Error(`Search failed with ${response.status}`);
-          }
-
-          const payload = (await response.json()) as { data?: SearchHit[] };
-
-          if (controller.signal.aborted) {
-            return;
-          }
-
-          setHits(payload.data ?? []);
-          setDisplayKey(nextKey);
-          setClientCachedHits(nextKey, payload.data ?? []);
-          setResolutionMeta({
-            key: nextKey,
-            durationMs: performance.now() - startedAt,
-            source: "network"
-          });
-        } catch (searchError) {
-          if (controller.signal.aborted) {
-            return;
-          }
-
-          console.error(searchError);
-          setError("Could not refresh global search results. Showing the last successful search.");
-        } finally {
-          if (abortRef.current === controller) {
-            abortRef.current = null;
-            setIsFetching(false);
-          }
+      } catch (searchError) {
+        if (controller.signal.aborted) {
+          return;
         }
-      })();
-    }, isForcedSearch ? 0 : globalSearchDebounceMs);
 
-    return () => window.clearTimeout(timer);
-  }, [displayKey, pathname, query, submitCount]);
+        console.error(searchError);
+        setError("Could not refresh global search results. Showing the last successful search.");
+      } finally {
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+          setIsFetching(false);
+        }
+      }
+    })();
+  }, [pathname, query, submitCount]);
 
   const activeQuery = buildSearchKey(query);
   const groupedHits = globalSearchOrder
@@ -332,10 +283,9 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
   const totalPages = Math.max(1, Math.ceil(visibleHits.length / globalSearchResultsPerPage));
   const visiblePage = Math.min(page, totalPages);
   const pagedVisibleHits = visibleHits.slice((visiblePage - 1) * globalSearchResultsPerPage, visiblePage * globalSearchResultsPerPage);
-  const hasShortQuery = activeQuery.length > 0 && activeQuery.length < globalSearchAutoQueryMinLength;
   const showResults = activeQuery.length > 0 || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && hits.length === 0 ? "Loading matches" : `${hits.length} matches`) : "Results";
-  const statusLabel = error ? error : isFetching ? "Refreshing results..." : "Search updates automatically";
+  const statusLabel = error ? error : isFetching ? "Refreshing results..." : activeQuery === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
   const resolvedTiming =
     resolutionMeta && resolutionMeta.key === displayKey && !isFetching
       ? `Loaded in ${formatDuration(resolutionMeta.durationMs)}${resolutionMeta.source === "cache" ? " from cache" : ""}`
@@ -433,8 +383,8 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
         ) : showResults ? (
           isFetching ? (
             <ClassLoadingIndicator message="Loading global search" detail="Sweeping items, spells, NPCs, and zones." />
-          ) : awaitingManualSubmit && hasShortQuery ? (
-            <SearchPrompt message={`Type ${globalSearchAutoQueryMinLength}+ characters to auto-search, or press Enter to search now.`} />
+          ) : activeQuery !== displayKey ? (
+            <SearchPrompt message="Press Search to apply this query." />
           ) : (
             <SearchPrompt message="No archive entries matched this search." />
           )

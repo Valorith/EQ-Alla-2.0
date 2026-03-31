@@ -2,6 +2,15 @@ import { listZoneEras, resolveZoneEraLabel } from "@eq-alla/data";
 import { PageHero } from "../../components/catalog-shell";
 import { ZoneSearchClient } from "./zone-search-client";
 
+const zoneSearchEraOptions = [
+  "Antonica",
+  "Odus",
+  "Faydwer",
+  "Old World Planes",
+  "Ruins of Kunark",
+  "Scars of Velious"
+] as const;
+
 type ZonesPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
@@ -9,8 +18,10 @@ type ZonesPageProps = {
 export default async function ZonesPage({ searchParams }: ZonesPageProps) {
   const params = await searchParams;
   const q = typeof params.q === "string" ? params.q : "";
-  const era = typeof params.era === "string" ? resolveZoneEraLabel(params.era) : "";
-  const eraOptions = await listZoneEras();
+  const resolvedEra = typeof params.era === "string" ? resolveZoneEraLabel(params.era) : "";
+  const availableEraOptions = new Set(await listZoneEras());
+  const eraOptions = zoneSearchEraOptions.filter((era) => availableEraOptions.has(era));
+  const era = eraOptions.includes(resolvedEra as (typeof zoneSearchEraOptions)[number]) ? resolvedEra : "";
 
   return (
     <>
