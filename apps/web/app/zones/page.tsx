@@ -3,10 +3,7 @@ import { PageHero } from "../../components/catalog-shell";
 import { ZoneSearchClient } from "./zone-search-client";
 
 const zoneSearchEraOptions = [
-  "Antonica",
-  "Odus",
-  "Faydwer",
-  "Old World Planes",
+  "Classic",
   "Ruins of Kunark",
   "Scars of Velious"
 ] as const;

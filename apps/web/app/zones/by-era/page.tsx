@@ -10,8 +10,8 @@ export default async function ZonesByEraPage() {
 
   return (
     <>
-      <PageHero eyebrow="Zones" title="Zones by Era" description="Browse the legacy era buckets used by the Alla clone, rebuilt with darker in-theme navigation." />
-      <SectionCard title="Browse eras">
+      <PageHero eyebrow="Zones" title="Zones by Expansion" description="Browse zones grouped by the expansion value stored on each database zone record." />
+      <SectionCard title="Browse expansions">
         <div className="grid gap-3 lg:grid-cols-2">
           {eras.map((era) =>
             era.enabled ? (
@@ -25,7 +25,7 @@ export default async function ZonesByEraPage() {
                     {era.label}
                   </p>
                   <p className="mt-1 text-[12px] leading-6 text-[#dfd0ba] group-hover:text-[#f0dfc4]">
-                    {era.zoneCount} public zone{era.zoneCount === 1 ? "" : "s"} in this legacy era bucket.
+                    {era.zoneCount} public zone{era.zoneCount === 1 ? "" : "s"} mapped to this expansion.
                   </p>
                 </div>
                 <ArrowRight className="size-4 shrink-0 text-[#c8af87] transition group-hover:translate-x-0.5 group-hover:text-[#f0ca83]" />
@@ -38,7 +38,7 @@ export default async function ZonesByEraPage() {
               >
                 <div className="min-w-0">
                   <p className="text-[15px] font-semibold tracking-[-0.02em] text-[#d0c2ae]">{era.label}</p>
-                  <p className="mt-1 text-[12px] leading-6 text-[#9a8b78]">No public zones with status 1 are available in this era.</p>
+                  <p className="mt-1 text-[12px] leading-6 text-[#9a8b78]">No public zones with status 1 are available in this expansion.</p>
                 </div>
                 <ArrowRight className="size-4 shrink-0 text-[#7f7466]" />
               </div>

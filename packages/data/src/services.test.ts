@@ -232,40 +232,43 @@ describe("catalog services", () => {
 
   it("exposes the legacy zone era list from the clone", async () => {
     const eras = await listZoneEras();
-    expect(eras).toContain("Faydwer");
-    expect(eras).toContain("The Planes of Power");
+    expect(eras).toContain("Classic");
+    expect(eras).toContain("Planes of Power");
     expect(eras).toContain("Veil of Alaris");
   });
 
-  it("marks empty era buckets as disabled for the zones by era landing page", async () => {
+  it("marks empty expansion buckets as disabled for the zones by era landing page", async () => {
     const eras = await listZoneEraBrowseDefinitions();
-    const faydwer = eras.find((era) => era.label === "Faydwer");
-    const power = eras.find((era) => era.label === "The Planes of Power");
+    const classic = eras.find((era) => era.label === "Classic");
+    const power = eras.find((era) => era.label === "Planes of Power");
 
-    expect(faydwer?.enabled).toBe(true);
-    expect(faydwer?.zoneCount).toBeGreaterThan(0);
+    expect(classic?.enabled).toBe(true);
+    expect(classic?.zoneCount).toBeGreaterThan(0);
     expect(power?.enabled).toBe(false);
     expect(power?.zoneCount).toBe(0);
   });
 
-  it("prefers canonical classic zone era labels over raw expansion values", () => {
-    expect(formatZoneEra("nektulos", 1)).toBe("Antonica");
-    expect(formatZoneEra("mistmoore", 1)).toBe("Faydwer");
+  it("maps zone eras directly from the database expansion value", () => {
+    expect(formatZoneEra("nektulos", 1)).toBe("Ruins of Kunark");
+    expect(formatZoneEra("mistmoore", 1)).toBe("Ruins of Kunark");
     expect(formatZoneEra("sebilis", 1)).toBe("Ruins of Kunark");
-    expect(formatZoneEra("chardok", 2)).toBe("Ruins of Kunark");
-    expect(formatZoneEra("veksar", 2)).toBe("Ruins of Kunark");
+    expect(formatZoneEra("chardok", 2)).toBe("Scars of Velious");
+    expect(formatZoneEra("veksar", 2)).toBe("Scars of Velious");
   });
 
-  it("matches classic era filters using zone short names even when expansion data is misleading", () => {
-    expect(matchesZoneEraFilter({ shortName: "nektulos", era: "Ruins of Kunark" }, "Antonica")).toBe(true);
-    expect(matchesZoneEraFilter({ shortName: "nektulos", era: "Ruins of Kunark" }, "Kunark")).toBe(false);
+  it("keeps legacy classic aliases mapped to the Classic expansion filter", () => {
+    expect(matchesZoneEraFilter({ shortName: "nektulos", era: "Classic" }, "Antonica")).toBe(true);
+    expect(matchesZoneEraFilter({ shortName: "nektulos", era: "Classic" }, "Faydwer")).toBe(true);
+    expect(matchesZoneEraFilter({ shortName: "nektulos", era: "Classic" }, "Kunark")).toBe(false);
   });
 
-  it("resolves clone-style zone era filters and slugs", async () => {
-    const faydwerZones = await getZonesByEra("Faydwer");
+  it("resolves expansion-era filters and legacy classic aliases", async () => {
+    const classicZones = await getZonesByEra("Classic");
+    const antonicaAliasZones = await getZonesByEra("Antonica");
 
-    expect(faydwerZones.some((zone) => zone.shortName === "mistmoore")).toBe(true);
-    expect(faydwerZones.some((zone) => zone.shortName === "poknowledge")).toBe(false);
+    expect(classicZones.some((zone) => zone.shortName === "mistmoore")).toBe(true);
+    expect(classicZones.some((zone) => zone.shortName === "poknowledge")).toBe(false);
+    expect(antonicaAliasZones.map((zone) => zone.shortName)).toEqual(classicZones.map((zone) => zone.shortName));
   });
 
   it("exposes stats and zone detail", async () => {

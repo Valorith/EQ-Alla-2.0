@@ -25,7 +25,7 @@ export default async function ZonesByEraDetailPage({ params }: ZonesByEraDetailP
 
   return (
     <>
-      <PageHero eyebrow="Zones" title={`${normalizedEra} Zones`} description="All zones indexed under this era label in the current catalog." />
+      <PageHero eyebrow="Zones" title={`${normalizedEra} Zones`} description="All zones mapped to this expansion value in the current catalog." />
       <SectionCard title={`${zones.length} zones`}>
         <SimpleTable
           columns={["Zone", "Level range", "Population"]}

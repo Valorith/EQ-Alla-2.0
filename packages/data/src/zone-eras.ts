@@ -4,8 +4,6 @@ export type ZoneEraDefinition = {
   slug: string;
   label: string;
   aliases?: string[];
-  matchEraNames?: string[];
-  shortNames?: string[];
 };
 
 export type ZoneEraBrowseDefinition = ZoneEraDefinition & {
@@ -35,132 +33,30 @@ export const expansionNames: Record<number, string> = {
   18: "Veil of Alaris"
 };
 
-const classicAntonicaShortNames = [
-  "arena",
-  "befallen",
-  "beholder",
-  "blackburrow",
-  "cazicthule",
-  "commons",
-  "eastkarana",
-  "ecommons",
-  "erudsxing",
-  "everfrost",
-  "feerrott",
-  "freporte",
-  "freportn",
-  "freportw",
-  "grobb",
-  "gukbottom",
-  "gukta",
-  "guktop",
-  "halas",
-  "halls",
-  "highkeep",
-  "highpass",
-  "highpasshold",
-  "innothule",
-  "jaggedpine",
-  "kithicor",
-  "lakerathe",
-  "lavastorm",
-  "misty",
-  "najena",
-  "nedaria",
-  "nektulos",
-  "neriaka",
-  "neriakb",
-  "neriakc",
-  "neriakd",
-  "northkarana",
-  "nro",
-  "oasis",
-  "oggok",
-  "oot",
-  "qey2hh1",
-  "paw",
-  "permafrost",
-  "qcat",
-  "qeynos",
-  "qeynos2",
-  "qeytoqrg",
-  "qrg",
-  "rathemtn",
-  "rivervale",
-  "runnyeye",
-  "soldunga",
-  "soldungb",
-  "solrotower",
-  "southkarana",
-  "sro",
-  "westkarana"
-] as const;
-
-const classicOdusShortNames = [
-  "erudnext",
-  "erudnint",
-  "erudsxing",
-  "hole",
-  "kerraridge",
-  "paineel",
-  "stonebrunt",
-  "tox",
-  "warrens"
-] as const;
-
-const classicFaydwerShortNames = [
-  "akanon",
-  "butcher",
-  "cauldron",
-  "crushbone",
-  "felwithea",
-  "felwitheb",
-  "gfaydark",
-  "kaladima",
-  "kaladimb",
-  "kedge",
-  "lfaydark",
-  "mistmoore",
-  "steamfont",
-  "unrest"
-] as const;
-
-const classicPlanesShortNames = ["airplane", "fearplane", "hateplane", "hateplaneb"] as const;
-const kunarkOverrideShortNames = ["chardok", "veksar"] as const;
-
 export const zoneEraDefinitions: ZoneEraDefinition[] = [
-  { slug: "antonica", label: "Antonica", shortNames: [...classicAntonicaShortNames] },
-  { slug: "odus", label: "Odus", shortNames: [...classicOdusShortNames] },
-  { slug: "faydwer", label: "Faydwer", shortNames: [...classicFaydwerShortNames] },
-  { slug: "planes", label: "Old World Planes", aliases: ["old planes"], shortNames: [...classicPlanesShortNames] },
-  { slug: "kunark", label: "Ruins of Kunark", aliases: ["kunark"], matchEraNames: [expansionNames[1]], shortNames: [...kunarkOverrideShortNames] },
-  { slug: "velious", label: "Scars of Velious", aliases: ["velious"], matchEraNames: [expansionNames[2]] },
-  { slug: "luclin", label: "Shadows of Luclin", aliases: ["luclin"], matchEraNames: [expansionNames[3]] },
-  { slug: "power", label: "The Planes of Power", aliases: ["power", "planes of power"], matchEraNames: [expansionNames[4]] },
-  { slug: "ykesha", label: "The Legacy of Ykesha", aliases: ["legacy of ykesha", "ykesha"], matchEraNames: [expansionNames[5]] },
   {
-    slug: "ldon",
-    label: "The Lost Dungeons of Norrath",
-    aliases: ["lost dungeons of norrath", "ldon"],
-    matchEraNames: [expansionNames[6]]
+    slug: "classic",
+    label: expansionNames[0],
+    aliases: ["antonica", "odus", "faydwer", "old world planes", "old planes"]
   },
-  { slug: "god", label: "The Gates of Discord", aliases: ["gates of discord", "god"], matchEraNames: [expansionNames[7]] },
-  { slug: "omens", label: "The Omens of War", aliases: ["omens of war", "omens"], matchEraNames: [expansionNames[8]] },
-  { slug: "don", label: "Dragons of Norrath", aliases: ["don"], matchEraNames: [expansionNames[9]] },
-  { slug: "dod", label: "Depths of Darkhollow", aliases: ["dod"], matchEraNames: [expansionNames[10]] },
-  { slug: "por", label: "Prophecy of Ro", aliases: ["por"], matchEraNames: [expansionNames[11]] },
-  {
-    slug: "tss",
-    label: "The Serpent's Spine",
-    aliases: ["serpent's spine", "the serpents spine", "tss"],
-    matchEraNames: [expansionNames[12]]
-  },
-  { slug: "tbs", label: "The Buried Sea", aliases: ["buried sea", "tbs"], matchEraNames: [expansionNames[13]] },
-  { slug: "sof", label: "Secrets of Faydwer", aliases: ["sof"], matchEraNames: [expansionNames[14]] },
-  { slug: "sod", label: "Seeds of Destruction", aliases: ["sod"], matchEraNames: [expansionNames[15]] },
-  { slug: "uf", label: "Underfoot", aliases: ["uf"], matchEraNames: [expansionNames[16]] },
-  { slug: "hot", label: "House of Thule", aliases: ["hot"], matchEraNames: [expansionNames[17]] },
-  { slug: "voa", label: "Veil of Alaris", aliases: ["voa"], matchEraNames: [expansionNames[18]] }
+  { slug: "kunark", label: expansionNames[1], aliases: ["kunark"] },
+  { slug: "velious", label: expansionNames[2], aliases: ["velious"] },
+  { slug: "luclin", label: expansionNames[3], aliases: ["luclin"] },
+  { slug: "power", label: expansionNames[4], aliases: ["power", "the planes of power"] },
+  { slug: "ykesha", label: expansionNames[5], aliases: ["ykesha", "the legacy of ykesha"] },
+  { slug: "ldon", label: expansionNames[6], aliases: ["ldon", "the lost dungeons of norrath"] },
+  { slug: "god", label: expansionNames[7], aliases: ["god", "the gates of discord"] },
+  { slug: "omens", label: expansionNames[8], aliases: ["omens", "the omens of war"] },
+  { slug: "don", label: expansionNames[9], aliases: ["don"] },
+  { slug: "dod", label: expansionNames[10], aliases: ["dod"] },
+  { slug: "por", label: expansionNames[11], aliases: ["por"] },
+  { slug: "tss", label: expansionNames[12], aliases: ["tss", "serpent's spine", "the serpents spine"] },
+  { slug: "tbs", label: expansionNames[13], aliases: ["tbs", "buried sea"] },
+  { slug: "sof", label: expansionNames[14], aliases: ["sof"] },
+  { slug: "sod", label: expansionNames[15], aliases: ["sod"] },
+  { slug: "uf", label: expansionNames[16], aliases: ["uf"] },
+  { slug: "hot", label: expansionNames[17], aliases: ["hot"] },
+  { slug: "voa", label: expansionNames[18], aliases: ["voa"] }
 ];
 
 function normalizeZoneEraValue(value: string) {
@@ -169,7 +65,7 @@ function normalizeZoneEraValue(value: string) {
 
 function buildZoneEraCandidates(definition: ZoneEraDefinition) {
   return new Set(
-    [definition.slug, definition.label, ...(definition.aliases ?? []), ...(definition.matchEraNames ?? [])]
+    [definition.slug, definition.label, ...(definition.aliases ?? [])]
       .filter(Boolean)
       .map(normalizeZoneEraValue)
   );
@@ -197,30 +93,19 @@ export function resolveZoneEraLabel(input: string | null | undefined) {
   return resolveZoneEra(input)?.label ?? (input?.trim() || "");
 }
 
-export function resolveZoneEraByShortName(shortName: string | null | undefined) {
-  const normalizedShortName = shortName?.trim().toLowerCase();
-  if (!normalizedShortName) return undefined;
-  return zoneEraDefinitions.find((definition) => definition.shortNames?.includes(normalizedShortName));
-}
-
-export function formatZoneEra(shortName: string | null | undefined, expansion: number | null | undefined) {
-  return resolveZoneEraByShortName(shortName)?.label ?? formatExpansion(expansion);
+export function formatZoneEra(_shortName: string | null | undefined, expansion: number | null | undefined) {
+  return formatExpansion(expansion);
 }
 
 export function matchesZoneEraFilter(zone: Pick<ZoneSummary, "shortName" | "era">, filter: string | null | undefined) {
   if (!filter?.trim()) return true;
 
   const definition = resolveZoneEra(filter);
+  const normalizedZoneEra = normalizeZoneEraValue(resolveZoneEraLabel(zone.era) || zone.era);
+
   if (!definition) {
-    return normalizeZoneEraValue(zone.era).includes(normalizeZoneEraValue(filter));
+    return normalizedZoneEra.includes(normalizeZoneEraValue(filter));
   }
 
-  const zoneDefinition = resolveZoneEraByShortName(zone.shortName);
-  const normalizedShortName = zone.shortName.toLowerCase();
-  if (definition.shortNames?.includes(normalizedShortName)) {
-    return true;
-  }
-
-  const zoneEra = normalizeZoneEraValue(zoneDefinition?.label ?? zone.era);
-  return [...buildZoneEraCandidates(definition)].includes(zoneEra);
+  return buildZoneEraCandidates(definition).has(normalizedZoneEra);
 }
