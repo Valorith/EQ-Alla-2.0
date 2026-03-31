@@ -67,6 +67,7 @@ const sourceMode = db ? "live" : "database-unavailable";
 const databaseEnabled = Boolean(db);
 const itemSearchLimit = 100;
 const itemSearchCacheTtlSeconds = 60;
+const catalogSearchTypeLimit = 24;
 const zoneLevelBandSize = 5;
 export const zoneByLevelCap = 60;
 const zoneLevelBandMaximum = zoneByLevelCap;
@@ -1394,6 +1395,7 @@ export async function getCatalogStats(): Promise<CatalogStats> {
 export async function searchCatalog(query: string): Promise<SearchHit[]> {
   const key = `search:${query.toLowerCase()}`;
   const cached = await cacheGet<SearchHit[]>(key);
+  const loweredQuery = query.toLowerCase();
 
   if (cached) {
     return cached;
@@ -1411,8 +1413,14 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
           from items i
           where ${discoveredItemClause("i.id")}
             and Name like ${like(query)}
-          order by Name asc
-          limit 8
+          order by
+            case
+              when lower(Name) = ${loweredQuery} then 0
+              when lower(Name) like ${`${loweredQuery}%`} then 1
+              else 2
+            end,
+            Name asc
+          limit ${catalogSearchTypeLimit}
         `.execute(db!),
         sql<Record<string, unknown>>`
           select id, name, new_icon, skill, cast_on_you, classes1, classes2, classes3, classes4, classes5, classes6, classes7, classes8,
@@ -1421,7 +1429,7 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
           where name like ${like(query)}
             and (${sql.join(spellSearchClassClauses, sql` or `)})
           order by name asc
-          limit 8
+          limit ${catalogSearchTypeLimit}
         `.execute(db!),
         sql<{ id: number; name: string; race: number; level: number; zone_name: string | null }>`
           select nt.id, nt.name, nt.race, nt.level, min(ps.long_name) as zone_name
@@ -1433,7 +1441,7 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
             and ${sql.raw(trackableNpcCondition("nt"))}
           group by nt.id, nt.name, nt.race, nt.level
           order by nt.name asc
-          limit 8
+          limit ${catalogSearchTypeLimit}
         `.execute(db!),
         sql<{ short_name: string; long_name: string; expansion: number; min_level: number; max_level: number }>`
           select short_name, long_name, expansion, min_level, max_level
@@ -1442,14 +1450,14 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
             and coalesce(min_status, 0) <= ${publicZoneStatusCeiling}
             and (short_name like ${like(query)} or long_name like ${like(query)})
           order by long_name asc
-          limit 8
+          limit ${catalogSearchTypeLimit}
         `.execute(db!),
         sql<{ id: number; name: string }>`
           select id, name
           from faction_list
           where name like ${like(query)}
           order by name asc
-          limit 8
+          limit ${catalogSearchTypeLimit}
         `.execute(db!),
         sql<{ id: number; name: string; tradeskill: number; trivial: number }>`
           select id, name, tradeskill, trivial
@@ -1457,7 +1465,7 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
           where name like ${like(query)}
             and ${sql.raw(enabledRecipeCondition("tradeskill_recipe"))}
           order by name asc
-          limit 8
+          limit ${catalogSearchTypeLimit}
         `.execute(db!)
       ]);
 
