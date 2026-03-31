@@ -232,7 +232,7 @@ export function ItemDetailPreview({ item, className = "" }: { item: ItemDetail; 
 
   return (
     <section
-      className={`rounded-[12px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,29,38,0.96),rgba(14,19,27,0.94))] px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.3)] backdrop-blur-sm sm:px-4 sm:py-3 ${className}`.trim()}
+      className={`w-fit max-w-full rounded-[12px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,29,38,0.96),rgba(14,19,27,0.94))] px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.3)] backdrop-blur-sm sm:px-4 sm:py-3 ${className}`.trim()}
     >
       <div className="space-y-3">
         <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start">
