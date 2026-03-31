@@ -1598,14 +1598,19 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
 
     if (!row) return undefined;
 
-    const droppedByRowsPromise = sql<{ id: number; name: string }>`
-      select distinct nt.id, nt.name
+    const droppedByRowsPromise = sql<{ id: number; name: string; short_name: string; long_name: string }>`
+      select distinct nt.id, nt.name, z.short_name, z.long_name
       from lootdrop_entries lde
       join loottable_entries lte on lte.lootdrop_id = lde.lootdrop_id
       join npc_types nt on nt.loottable_id = lte.loottable_id
+      join spawnentry se on se.npcID = nt.id
+      join spawngroup sg on sg.id = se.spawngroupID
+      join spawn2 s2 on s2.spawngroupID = sg.id
+      join zone z on z.short_name = s2.zone and z.version = s2.version
+        and coalesce(z.min_status, 0) <= ${publicZoneStatusCeiling}
       where lde.item_id = ${id}
-      order by nt.name asc
-      limit 40
+      order by z.long_name asc, nt.name asc
+      limit 160
     `.execute(db!);
 
     const droppedZoneRowsPromise = sql<{ short_name: string; long_name: string }>`
@@ -1766,7 +1771,16 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       focusEffect: buildEffect(row.focuseffect, row.focuslevel),
       clickEffect: buildEffect(row.clickeffect, row.clicklevel2, { castType: effectCastTypes[Number(row.clicktype ?? 0)] }),
       stats,
-      droppedBy: droppedByRows.rows.map((entry) => ({ id: entry.id, name: entry.name, href: `/npcs/${entry.id}` })),
+      droppedBy: droppedByRows.rows.map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        href: `/npcs/${entry.id}`,
+        zone: {
+          shortName: entry.short_name,
+          longName: entry.long_name,
+          href: `/zones/${entry.short_name}`
+        }
+      })),
       soldBy: soldByRows.rows.map((entry) => ({ id: entry.id, name: entry.name, href: `/npcs/${entry.id}` })),
       usedInRecipes: recipeRows.rows.map((entry) => ({ id: entry.id, name: entry.name, href: `/recipes/${entry.id}` }))
     };

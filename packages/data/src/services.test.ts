@@ -22,6 +22,16 @@ describe("catalog services", () => {
     expect(noDropShawls.some((item) => item.id === 1175)).toBe(true);
   });
 
+  it("includes grouped zone context for item drop NPCs", async () => {
+    const item = await getItemDetail(1001);
+    const firstDrop = item?.droppedBy[0];
+
+    expect(item?.droppedBy.length).toBeGreaterThan(0);
+    expect(firstDrop?.zone.shortName.length).toBeGreaterThan(0);
+    expect(firstDrop?.zone.longName.length).toBeGreaterThan(0);
+    expect(firstDrop?.zone.href).toBe(`/zones/${firstDrop?.zone.shortName}`);
+  });
+
   it("normalizes whitespace in item search queries", async () => {
     const trimmed = await listItems({ q: "fiend" });
     const spaced = await listItems({ q: "  fiend  " });

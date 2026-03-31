@@ -57,7 +57,14 @@ export const items: ItemDetail[] = [
       { label: "Strength", value: "+6" },
       { label: "Magic Resist", value: "+8" }
     ],
-    droppedBy: [{ id: 3001, name: "a mistmoore guard", href: "/npcs/3001" }],
+    droppedBy: [
+      {
+        id: 3001,
+        name: "a mistmoore guard",
+        href: "/npcs/3001",
+        zone: { shortName: "mistmoore", longName: "Castle Mistmoore", href: "/zones/mistmoore" }
+      }
+    ],
     soldBy: [],
     usedInRecipes: [{ id: 9001, name: "Runed Reinforcement", href: "/recipes/9001" }]
   },
@@ -110,7 +117,14 @@ export const items: ItemDetail[] = [
       { label: "Intelligence", value: "+12" },
       { label: "Focus", value: "Improved Healing III" }
     ],
-    droppedBy: [{ id: 3002, name: "Matron V'Lyra", href: "/npcs/3002" }],
+    droppedBy: [
+      {
+        id: 3002,
+        name: "Matron V'Lyra",
+        href: "/npcs/3002",
+        zone: { shortName: "mistmoore", longName: "Castle Mistmoore", href: "/zones/mistmoore" }
+      }
+    ],
     soldBy: [],
     usedInRecipes: []
   },

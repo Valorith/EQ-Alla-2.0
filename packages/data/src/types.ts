@@ -64,7 +64,12 @@ export type ItemDetail = ItemSummary & {
   focusEffect?: { id: number; name: string; href: string; level?: number };
   clickEffect?: { id: number; name: string; href: string; level?: number; castType?: string };
   stats: Array<{ label: string; value: string }>;
-  droppedBy: Array<{ id: number; name: string; href: string }>;
+  droppedBy: Array<{
+    id: number;
+    name: string;
+    href: string;
+    zone: { shortName: string; longName: string; href: string };
+  }>;
   soldBy: Array<{ id: number; name: string; href: string }>;
   usedInRecipes: Array<{ id: number; name: string; href: string }>;
 };
