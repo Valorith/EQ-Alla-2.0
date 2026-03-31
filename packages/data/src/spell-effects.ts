@@ -209,6 +209,18 @@ export function getSpellEffectName(effectId: number) {
   return normalizeSpellEffectName(spellEffectNames[effectId] ?? `Effect ${effectId}`);
 }
 
+export function resolveSpellEffectDirection(label: string, value: number) {
+  if (label.includes("In/Decrease")) {
+    return label.replace("In/Decrease", value < 0 ? "Decrease" : "Increase");
+  }
+
+  if (label.startsWith("Increase") && value < 0) {
+    return label.replace("Increase", "Decrease");
+  }
+
+  return label;
+}
+
 export function summarizeSpellEffects(row: Record<string, unknown>) {
   const labels: string[] = [];
 
@@ -219,7 +231,8 @@ export function summarizeSpellEffects(row: Record<string, unknown>) {
       continue;
     }
 
-    const label = getSpellEffectName(effectId);
+    const base = Number(row[`effect_base_value${slot}`] ?? 0);
+    const label = resolveSpellEffectDirection(getSpellEffectName(effectId), base);
 
     if (label && !labels.includes(label)) {
       labels.push(label);

@@ -3,7 +3,7 @@ import { getDb } from "./db";
 import { canonicalizeItemTypeName, itemTypeIdFromName, itemTypeNameFromId } from "./item-types";
 import { factions, items, npcs, pets, recipes, spells, spawnGroups, tasks, zones } from "./mock-data";
 import { formatPlayableItemRaceMask, raceNames } from "./race-names";
-import { getSpellEffectName, summarizeSpellEffects } from "./spell-effects";
+import { getSpellEffectName, resolveSpellEffectDirection, summarizeSpellEffects } from "./spell-effects";
 import { formatExpansion, formatZoneEra, getZoneEraLabels, matchesZoneEraFilter } from "./zone-eras";
 import { sql } from "kysely";
 import type {
@@ -792,14 +792,7 @@ function formatNumericEffectLabel(label: string, value: number) {
     return label;
   }
 
-  let nextLabel = label;
-  if (label.includes("In/Decrease")) {
-    nextLabel = label.replace("In/Decrease", value < 0 ? "Decrease" : "Increase");
-  } else if (label.startsWith("Increase") && value < 0) {
-    nextLabel = label.replace("Increase", "Decrease");
-  } else if (label.startsWith("Decrease") && value < 0) {
-    nextLabel = label.replace("Decrease", "Increase");
-  }
+  const nextLabel = resolveSpellEffectDirection(label, value);
 
   return `${nextLabel} by ${Math.abs(value)}`;
 }
@@ -1832,6 +1825,8 @@ export async function listSpells(filters: SpellFilters = {}) {
 
     const rows = await sql<Record<string, unknown>>`
       select id, name, new_icon, skill, effectid1, effectid2, effectid3, effectid4, effectid5, effectid6, effectid7, effectid8, effectid9, effectid10, effectid11, effectid12,
+             effect_base_value1, effect_base_value2, effect_base_value3, effect_base_value4, effect_base_value5, effect_base_value6,
+             effect_base_value7, effect_base_value8, effect_base_value9, effect_base_value10, effect_base_value11, effect_base_value12,
              cast_on_you, cast_on_other, you_cast, spell_fades, mana, targettype, classes1, classes2, classes3, classes4, classes5, classes6, classes7, classes8,
              classes9, classes10, classes11, classes12, classes13, classes14, classes15, classes16
       from spells_new

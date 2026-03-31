@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatPlayableItemRaceMask, formatZoneEra, getCatalogStats, getItemDetail, getSpellDetail, getZoneDetail, getZonesByEra, getZonesByLevel, itemTypeFilterOptions, listFactions, listItems, listNpcs, listSpells, listZoneEras, listZones, matchesZoneEraFilter, resolveLegacyRoute, searchCatalog, spellSearchLevelCap } from "./index";
+import { resolveSpellEffectDirection, summarizeSpellEffects } from "./spell-effects";
 
 describe("catalog services", () => {
   it("filters items by tradeable flag", async () => {
@@ -63,6 +64,26 @@ describe("catalog services", () => {
     expect(effectTexts).toContain("Focus: Trigger on Cast (25% chance to cast Soul Flay Effect)");
     expect(effectTexts).toContain("Limit: Target (Life Tap)");
     expect(effectTexts).toContain("Limit: Min Level 51");
+  });
+
+  it("keeps spell effect increase/decrease direction aligned with the stored values", () => {
+    expect(resolveSpellEffectDirection("Increase Hitpoints", -750)).toBe("Decrease Hitpoints");
+    expect(resolveSpellEffectDirection("Increase hate", -400)).toBe("Decrease hate");
+    expect(resolveSpellEffectDirection("Decrease Spell Mana Cost", 10)).toBe("Decrease Spell Mana Cost");
+    expect(resolveSpellEffectDirection("In/Decrease Movement", -45)).toBe("Decrease Movement");
+  });
+
+  it("summarizes spell search effects using sign-aware labels", () => {
+    const summary = summarizeSpellEffects({
+      effectid1: 0,
+      effect_base_value1: -1200,
+      effectid2: 92,
+      effect_base_value2: -350,
+      effectid3: 132,
+      effect_base_value3: 10
+    });
+
+    expect(summary).toBe("Decrease Hitpoints • Decrease hate • Decrease Spell Mana Cost");
   });
 
   it("caps spell search results at level 60", async () => {
