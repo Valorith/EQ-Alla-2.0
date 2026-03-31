@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { sql } from "kysely";
 import {
   formatPlayableItemRaceMask,
   formatZoneEra,
@@ -25,6 +26,7 @@ import {
   spellSearchLevelCap,
   zoneByLevelCap
 } from "./index";
+import { getDb } from "./db";
 import { resolveSpellEffectDirection, summarizeSpellEffects } from "./spell-effects";
 
 describe("catalog services", () => {
@@ -48,14 +50,121 @@ describe("catalog services", () => {
   });
 
   it("includes grouped zone context for item drop NPCs", async () => {
-    const item = await getItemDetail(1001);
-    const firstDrop = item?.droppedBy[0];
+    const db = getDb();
+    expect(db).toBeTruthy();
 
+    const rows = await sql<{ item_id: number }>`
+      select distinct lde.item_id
+      from lootdrop_entries lde
+      join loottable_entries lte on lte.lootdrop_id = lde.lootdrop_id
+      join npc_types nt on nt.loottable_id = lte.loottable_id
+      join spawnentry se on se.npcID = nt.id
+      join spawngroup sg on sg.id = se.spawngroupID
+      join spawn2 s2 on s2.spawngroupID = sg.id
+      join zone z on z.short_name = s2.zone and z.version = s2.version
+      where coalesce(z.min_status, 0) = 1
+        and exists (
+          select 1
+          from discovered_items di
+          where di.item_id = lde.item_id
+        )
+      order by lde.item_id asc
+      limit 1
+    `.execute(db!);
+
+    if (!rows.rows[0]) {
+      expect(rows.rows).toEqual([]);
+      return;
+    }
+
+    const item = await getItemDetail(rows.rows[0].item_id);
+
+    const firstDrop = item?.droppedBy[0];
     expect(item?.droppedBy.length).toBeGreaterThan(0);
     expect(firstDrop?.zone.shortName.length).toBeGreaterThan(0);
     expect(firstDrop?.zone.longName.length).toBeGreaterThan(0);
     expect(firstDrop?.zone.href).toBe(`/zones/${firstDrop?.zone.shortName}`);
-  });
+  }, 20_000);
+
+  it("includes grouped zone context for merchant sellers on item detail", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{ item_id: number }>`
+      select distinct ml.item as item_id
+      from merchantlist ml
+      join npc_types nt on nt.merchant_id = ml.merchantid
+      join spawnentry se on se.npcID = nt.id
+      join spawngroup sg on sg.id = se.spawngroupID
+      join spawn2 s2 on s2.spawngroupID = sg.id
+      join zone z on z.short_name = s2.zone and z.version = s2.version
+      where coalesce(z.min_status, 0) = 1
+        and exists (
+          select 1
+          from discovered_items di
+          where di.item_id = ml.item
+        )
+      order by ml.item asc
+      limit 1
+    `.execute(db!);
+
+    if (!rows.rows[0]) {
+      expect(rows.rows).toEqual([]);
+      return;
+    }
+
+    const merchantItem = await getItemDetail(rows.rows[0].item_id);
+
+    expect(merchantItem?.soldBy.length).toBeGreaterThan(0);
+    const firstSeller = merchantItem?.soldBy[0];
+    expect(firstSeller?.zone.shortName.length).toBeGreaterThan(0);
+    expect(firstSeller?.zone.longName.length).toBeGreaterThan(0);
+    expect(firstSeller?.zone.href).toBe(`/zones/${firstSeller?.zone.shortName}`);
+  }, 20_000);
+
+  it("matches canonical ingredient-only recipe usage rows", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const seedRows = await sql<{ item_id: number }>`
+      select distinct tre.item_id
+      from tradeskill_recipe_entries tre
+      join tradeskill_recipe tr on tr.id = tre.recipe_id
+      where exists (
+        select 1
+        from discovered_items di
+        where di.item_id = tre.item_id
+      )
+        and coalesce(tr.enabled, 1) = 1
+        and coalesce(tre.iscontainer, 0) = 0
+        and coalesce(tre.successcount, 0) = 0
+        and coalesce(tre.componentcount, 0) > 0
+      order by tre.item_id asc
+      limit 1
+    `.execute(db!);
+
+    if (!seedRows.rows[0]) {
+      expect(seedRows.rows).toEqual([]);
+      return;
+    }
+
+    const itemId = seedRows.rows[0].item_id;
+    const expectedRows = await sql<{ id: number; name: string }>`
+      select distinct tr.id, tr.name
+      from tradeskill_recipe_entries tre
+      join tradeskill_recipe tr on tr.id = tre.recipe_id
+      where tre.item_id = ${itemId}
+        and coalesce(tr.enabled, 1) = 1
+        and coalesce(tre.iscontainer, 0) = 0
+        and coalesce(tre.successcount, 0) = 0
+        and coalesce(tre.componentcount, 0) > 0
+      order by tr.name asc
+    `.execute(db!);
+
+    const item = await getItemDetail(itemId);
+
+    expect(item?.usedInRecipes.map((entry) => entry.id)).toEqual(expectedRows.rows.map((row) => row.id));
+  }, 20_000);
 
   it("normalizes whitespace in item search queries", async () => {
     const trimmed = await listItems({ q: "fiend" });

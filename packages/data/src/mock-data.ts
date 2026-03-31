@@ -173,7 +173,14 @@ export const items: ItemDetail[] = [
       { label: "Charges", value: "5" }
     ],
     droppedBy: [],
-    soldBy: [{ id: 3003, name: "Scholar Alquen", href: "/npcs/3003" }],
+    soldBy: [
+      {
+        id: 3003,
+        name: "Scholar Alquen",
+        href: "/npcs/3003",
+        zone: { shortName: "poknowledge", longName: "The Plane of Knowledge", href: "/zones/poknowledge" }
+      }
+    ],
     usedInRecipes: [{ id: 9002, name: "Traveler's Kit", href: "/recipes/9002" }]
   }
 ];

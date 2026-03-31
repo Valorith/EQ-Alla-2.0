@@ -70,7 +70,12 @@ export type ItemDetail = ItemSummary & {
     href: string;
     zone: { shortName: string; longName: string; href: string };
   }>;
-  soldBy: Array<{ id: number; name: string; href: string }>;
+  soldBy: Array<{
+    id: number;
+    name: string;
+    href: string;
+    zone: { shortName: string; longName: string; href: string };
+  }>;
   usedInRecipes: Array<{ id: number; name: string; href: string }>;
 };
 

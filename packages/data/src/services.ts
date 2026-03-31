@@ -72,6 +72,7 @@ export const zoneByLevelCap = 60;
 const zoneLevelBandMaximum = zoneByLevelCap;
 const zoneLevelBandSignificanceFloor = 5;
 const publicZoneStatusCeiling = 1;
+const itemRelationshipZoneStatus = 1;
 const merchantNpcClasses = [40, 41, 59, 61, 67, 68, 70] as const;
 export const spellSearchLevelCap = 60;
 export const petSearchLevelCap = 60;
@@ -1609,7 +1610,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       join spawngroup sg on sg.id = se.spawngroupID
       join spawn2 s2 on s2.spawngroupID = sg.id
       join zone z on z.short_name = s2.zone and z.version = s2.version
-        and coalesce(z.min_status, 0) <= ${publicZoneStatusCeiling}
+        and coalesce(z.min_status, 0) = ${itemRelationshipZoneStatus}
       where lde.item_id = ${id}
       order by z.long_name asc, nt.name asc
       limit 160
@@ -1624,19 +1625,24 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       join spawngroup sg on sg.id = se.spawngroupID
       join spawn2 s2 on s2.spawngroupID = sg.id
       join zone z on z.short_name = s2.zone and z.version = s2.version
-        and coalesce(z.min_status, 0) <= ${publicZoneStatusCeiling}
+        and coalesce(z.min_status, 0) = ${itemRelationshipZoneStatus}
       where lde.item_id = ${id}
       order by z.long_name asc
       limit 20
     `.execute(db!);
 
-    const soldByRowsPromise = sql<{ id: number; name: string }>`
-      select distinct nt.id, nt.name
+    const soldByRowsPromise = sql<{ id: number; name: string; short_name: string; long_name: string }>`
+      select distinct nt.id, nt.name, z.short_name, z.long_name
       from merchantlist ml
       join npc_types nt on nt.merchant_id = ml.merchantid
+      join spawnentry se on se.npcID = nt.id
+      join spawngroup sg on sg.id = se.spawngroupID
+      join spawn2 s2 on s2.spawngroupID = sg.id
+      join zone z on z.short_name = s2.zone and z.version = s2.version
+        and coalesce(z.min_status, 0) = ${itemRelationshipZoneStatus}
       where ml.item = ${id}
-      order by nt.name asc
-      limit 40
+      order by z.long_name asc, nt.name asc
+      limit 160
     `.execute(db!);
 
     const recipeRowsPromise = sql<{ id: number; name: string }>`
@@ -1644,6 +1650,10 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       from tradeskill_recipe_entries tre
       join tradeskill_recipe tr on tr.id = tre.recipe_id
       where tre.item_id = ${id}
+        and coalesce(tr.enabled, 1) = 1
+        and coalesce(tre.iscontainer, 0) = 0
+        and coalesce(tre.successcount, 0) = 0
+        and coalesce(tre.componentcount, 0) > 0
       order by tr.name asc
       limit 40
     `.execute(db!);
@@ -1783,7 +1793,16 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
           href: `/zones/${entry.short_name}`
         }
       })),
-      soldBy: soldByRows.rows.map((entry) => ({ id: entry.id, name: entry.name, href: `/npcs/${entry.id}` })),
+      soldBy: soldByRows.rows.map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        href: `/npcs/${entry.id}`,
+        zone: {
+          shortName: entry.short_name,
+          longName: entry.long_name,
+          href: `/zones/${entry.short_name}`
+        }
+      })),
       usedInRecipes: recipeRows.rows.map((entry) => ({ id: entry.id, name: entry.name, href: `/recipes/${entry.id}` }))
     };
     detail.stats.push({ label: "Value", value: `${coinValue.pp}pp ${coinValue.gp}gp ${coinValue.sp}sp ${coinValue.cp}cp` });

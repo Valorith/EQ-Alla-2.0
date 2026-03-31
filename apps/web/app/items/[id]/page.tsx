@@ -46,10 +46,12 @@ function RelatedSection({
   );
 }
 
-function GroupedNpcDropsSection({
+function GroupedNpcSection({
+  title,
   entries,
   emptyText
 }: {
+  title: string;
   entries: Array<{
     href: string;
     label: string;
@@ -77,7 +79,7 @@ function GroupedNpcDropsSection({
   return (
     <section className="space-y-3">
       <div className="rounded-[10px] border border-white/10 bg-[linear-gradient(180deg,rgba(47,54,66,0.96),rgba(35,41,52,0.92))] px-3 py-2 text-[16px] font-semibold text-[#ddd2b5] shadow-[0_10px_24px_rgba(0,0,0,0.2)]">
-        Dropped by NPCs
+        {title}
       </div>
       {groups.length > 0 ? (
         <div className="rounded-[10px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,23,31,0.94),rgba(11,15,22,0.92))] px-4 py-4 shadow-[0_14px_30px_rgba(0,0,0,0.28)]">
@@ -134,7 +136,8 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
           emptyText="No zone drop data recorded."
         />
 
-        <GroupedNpcDropsSection
+        <GroupedNpcSection
+          title="Dropped by NPCs"
           entries={item.droppedBy.map((entry) => ({
             href: entry.href,
             label: entry.name,
@@ -144,9 +147,13 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
         />
 
         <div className="grid gap-6 lg:grid-cols-2">
-          <PaginatedRelatedSection
+          <GroupedNpcSection
             title="Sold by merchants"
-            items={item.soldBy.map((entry) => ({ href: entry.href, label: entry.name }))}
+            entries={item.soldBy.map((entry) => ({
+              href: entry.href,
+              label: entry.name,
+              zone: { href: entry.zone.href, label: entry.zone.longName }
+            }))}
             emptyText="This item is not sold by merchants."
           />
           <PaginatedRelatedSection
