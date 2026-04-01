@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ZoneByLevelSummary, ZoneLevelBand } from "@eq-alla/data";
-import { Input } from "@eq-alla/ui";
+import { Button, Input } from "@eq-alla/ui";
 
 type ZonesByLevelMatrixProps = {
   zones: ZoneByLevelSummary[];
@@ -89,7 +90,10 @@ export function ZonesByLevelMatrix({ zones, levelCap }: ZonesByLevelMatrixProps)
   const bands = zones[0]?.bands ?? [];
   const maximumLevel = Math.min(bands[bands.length - 1]?.maxLevel ?? levelCap, levelCap);
   const [selectedLevel, setSelectedLevel] = useState(() => clampLevel(defaultSelectedLevel, maximumLevel));
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const stickyZoneColumnRef = useRef<HTMLTableCellElement | null>(null);
   const headerRefs = useRef<Array<HTMLTableCellElement | null>>([]);
   const hasMountedRef = useRef(false);
 
@@ -105,24 +109,75 @@ export function ZonesByLevelMatrix({ zones, levelCap }: ZonesByLevelMatrixProps)
 
   useEffect(() => {
     const container = scrollContainerRef.current;
+
+    if (!container) {
+      return;
+    }
+
+    const updateScrollButtons = () => {
+      const maxScrollLeft = container.scrollWidth - container.clientWidth;
+      setCanScrollLeft(container.scrollLeft > 1);
+      setCanScrollRight(container.scrollLeft < maxScrollLeft - 1);
+    };
+
+    updateScrollButtons();
+    container.addEventListener("scroll", updateScrollButtons, { passive: true });
+    window.addEventListener("resize", updateScrollButtons);
+
+    return () => {
+      container.removeEventListener("scroll", updateScrollButtons);
+      window.removeEventListener("resize", updateScrollButtons);
+    };
+  }, []);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
     const activeHeader = headerRefs.current[selectedBandIndex];
+    const stickyZoneColumn = stickyZoneColumnRef.current;
 
     if (!container || !activeHeader) {
       return;
     }
 
-    if (!hasMountedRef.current) {
-      hasMountedRef.current = true;
+    const stickyZoneWidth = stickyZoneColumn?.offsetWidth ?? 0;
+    const columnLeft = activeHeader.offsetLeft;
+    const columnRight = columnLeft + activeHeader.offsetWidth;
+    const visibleLeft = container.scrollLeft + stickyZoneWidth;
+    const visibleRight = container.scrollLeft + container.clientWidth;
+    let nextLeft = container.scrollLeft;
+
+    if (columnLeft < visibleLeft) {
+      nextLeft = Math.max(0, columnLeft - stickyZoneWidth);
+    } else if (columnRight > visibleRight) {
+      nextLeft = Math.max(0, columnRight - container.clientWidth);
+    }
+
+    const behavior = hasMountedRef.current ? "smooth" : "auto";
+    hasMountedRef.current = true;
+
+    if (Math.abs(nextLeft - container.scrollLeft) > 1) {
+      container.scrollTo({
+        left: nextLeft,
+        behavior
+      });
+    }
+  }, [selectedBandIndex]);
+
+  function scrollMatrix(direction: "left" | "right") {
+    const container = scrollContainerRef.current;
+
+    if (!container) {
       return;
     }
 
-    const nextLeft = activeHeader.offsetLeft - (container.clientWidth - activeHeader.offsetWidth) / 2;
+    const stickyZoneWidth = stickyZoneColumnRef.current?.offsetWidth ?? 0;
+    const scrollStep = Math.max(220, Math.floor((container.clientWidth - stickyZoneWidth) * 0.72));
 
-    container.scrollTo({
-      left: Math.max(0, nextLeft),
+    container.scrollBy({
+      left: direction === "left" ? -scrollStep : scrollStep,
       behavior: "smooth"
     });
-  }, [selectedBandIndex]);
+  }
 
   return (
     <div className="space-y-5">
@@ -175,6 +230,39 @@ export function ZonesByLevelMatrix({ zones, levelCap }: ZonesByLevelMatrixProps)
         </div>
       </div>
 
+      <div className="flex flex-col gap-3 rounded-[24px] border border-[#7b603b]/18 bg-[linear-gradient(180deg,rgba(24,21,19,0.78),rgba(13,17,24,0.82))] px-4 py-4 shadow-[0_18px_36px_rgba(0,0,0,0.2)] sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#d7b472]">Matrix navigation</p>
+          <p className="text-sm leading-6 text-[#c7b79b]">
+            Sweep through earlier and later hunting bands without reaching for the scrollbar.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => scrollMatrix("left")}
+            disabled={!canScrollLeft}
+            aria-label="Scroll the zones by level matrix left"
+            title="Scroll left"
+            className="size-12 rounded-2xl border-[#e4c48a]/20 bg-[linear-gradient(180deg,rgba(34,31,28,0.92),rgba(18,21,27,0.9))] p-0 text-[#f0d4a3] shadow-[0_10px_24px_rgba(0,0,0,0.22)] hover:border-[#f0c36a]/42 hover:bg-[linear-gradient(180deg,rgba(56,43,28,0.94),rgba(28,25,22,0.92))] disabled:border-white/8 disabled:bg-white/4 disabled:text-[#7f7464] disabled:shadow-none"
+          >
+            <ChevronLeft className="size-5 shrink-0" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => scrollMatrix("right")}
+            disabled={!canScrollRight}
+            aria-label="Scroll the zones by level matrix right"
+            title="Scroll right"
+            className="size-12 rounded-2xl border-[#e4c48a]/20 bg-[linear-gradient(180deg,rgba(34,31,28,0.92),rgba(18,21,27,0.9))] p-0 text-[#f0d4a3] shadow-[0_10px_24px_rgba(0,0,0,0.22)] hover:border-[#f0c36a]/42 hover:bg-[linear-gradient(180deg,rgba(56,43,28,0.94),rgba(28,25,22,0.92))] disabled:border-white/8 disabled:bg-white/4 disabled:text-[#7f7464] disabled:shadow-none"
+          >
+            <ChevronRight className="size-5 shrink-0" />
+          </Button>
+        </div>
+      </div>
+
       <div
         ref={scrollContainerRef}
         className="eq-zones-level-scroll overflow-auto rounded-[28px] border border-[#7b603b]/18 bg-[linear-gradient(180deg,rgba(10,14,20,0.86),rgba(13,16,22,0.8))] shadow-[0_24px_50px_rgba(0,0,0,0.28)] max-h-[72vh]"
@@ -182,7 +270,12 @@ export function ZonesByLevelMatrix({ zones, levelCap }: ZonesByLevelMatrixProps)
         <table className="min-w-full border-collapse text-left text-sm">
           <thead className="bg-[linear-gradient(180deg,rgba(215,164,95,0.1),rgba(255,255,255,0.02))] text-[#d7c09a]">
             <tr>
-              <th className={`min-w-[220px] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.24em] ${stickyHeaderCell}`}>Zone</th>
+              <th
+                ref={stickyZoneColumnRef}
+                className={`min-w-[220px] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.24em] ${stickyHeaderCell}`}
+              >
+                Zone
+              </th>
               <th className={`min-w-[124px] px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.24em] ${stickyHeaderBandCell}`}>Suggested</th>
               <th className={`min-w-[110px] px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.24em] ${stickyHeaderBandCell}`}>Era</th>
               {bands.map((band, index) => (
