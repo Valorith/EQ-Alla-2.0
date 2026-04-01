@@ -141,7 +141,7 @@ function EffectBlock({
         <span className="font-semibold text-[#d8ceb4]">{title}: </span>
         <Link
           href={effect.href}
-          className="font-medium text-[#7ab8ff] underline decoration-[1.5px] underline-offset-2 transition hover:text-[#a7d2ff] hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7ab8ff]/35"
+          className="font-semibold text-sky-300 underline underline-offset-3 decoration-2 transition hover:text-sky-200 hover:decoration-[3px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/35"
         >
           {effect.name}
         </Link>
