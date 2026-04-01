@@ -28,13 +28,12 @@ export default async function ZonesByEraDetailPage({ params }: ZonesByEraDetailP
       <PageHero eyebrow="Zones" title={`${normalizedEra} Zones`} description="All zones mapped to this expansion value in the current catalog." />
       <SectionCard title={`${zones.length} zones`}>
         <SimpleTable
-          columns={["Zone", "Level range", "Population"]}
+          columns={["Zone", "Level range"]}
           rows={zones.map((zone) => [
             <Link key={zone.shortName} href={`/zones/${zone.shortName}`} className="font-medium hover:underline">
               {zone.longName}
             </Link>,
-            zone.levelRange,
-            zone.population
+            zone.levelRange
           ])}
         />
       </SectionCard>
