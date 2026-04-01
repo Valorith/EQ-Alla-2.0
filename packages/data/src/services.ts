@@ -863,14 +863,21 @@ function formatSpellDuration(row: Record<string, unknown>, minimumLevel: number)
   return `${formatSeconds(duration * 6)} (${duration} ticks)`;
 }
 
-function formatNumericEffectLabel(label: string, value: number) {
+function formatNumericEffectLabel(label: string, value: number, effectId?: number) {
   if (value === 0) {
     return label;
   }
 
-  const nextLabel = resolveSpellEffectDirection(label, value);
+  const nextLabel = resolveSpellEffectDirection(label, value, effectId);
 
   return `${nextLabel} by ${Math.abs(value)}`;
+}
+
+function formatLegacyPercentDeltaEffect(label: string, storedValue: number, effectId: number) {
+  const nextLabel = resolveSpellEffectDirection(label, storedValue, effectId);
+  const amount = Math.abs(storedValue - 100);
+
+  return amount > 0 ? `${nextLabel} by ${amount}%` : nextLabel;
 }
 
 function effectSpellIdFromValues(effectId: number, base: number, limit: number) {
@@ -921,6 +928,9 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, spe
   const referencedSpell = formatReferencedSpell(spellId, spellNames);
 
   switch (effectId) {
+    case 11:
+    case 89:
+      return formatLegacyPercentDeltaEffect(label, base, effectId);
     case 21:
       return `${label} (${Math.abs(base) / 1000} sec)`;
     case 22:
@@ -980,7 +990,7 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, spe
       return Math.abs(base) > 0 ? `${label} (${Math.abs(base) * 6} sec)` : label;
     default:
       if (base !== 0) {
-        return formatNumericEffectLabel(label, base);
+        return formatNumericEffectLabel(label, base, effectId);
       }
       if (limit !== 0) {
         return `${label} (${limit})`;

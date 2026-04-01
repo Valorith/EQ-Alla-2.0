@@ -1,4 +1,5 @@
 const ignoredSpellEffectIds = new Set([10, 254]);
+const negativeValuesThatStillRepresentIncreases = new Set([59]);
 
 const spellEffectNames: Record<number, string> = {
   0: "Increase Hitpoints",
@@ -209,9 +210,20 @@ export function getSpellEffectName(effectId: number) {
   return normalizeSpellEffectName(spellEffectNames[effectId] ?? `Effect ${effectId}`);
 }
 
-export function resolveSpellEffectDirection(label: string, value: number) {
+export function resolveSpellEffectDirection(label: string, value: number, effectId?: number) {
+  switch (effectId) {
+    case 11:
+      return value < 100 ? "Decrease Attack Speed" : "Increase Attack Speed";
+    case 89:
+      return value < 100 ? "Decrease Player Size" : "Increase Player Size";
+  }
+
   if (label.includes("In/Decrease")) {
     return label.replace("In/Decrease", value < 0 ? "Decrease" : "Increase");
+  }
+
+  if (value < 0 && effectId !== undefined && negativeValuesThatStillRepresentIncreases.has(effectId)) {
+    return label;
   }
 
   if (label.startsWith("Increase") && value < 0) {
@@ -232,7 +244,7 @@ export function summarizeSpellEffects(row: Record<string, unknown>) {
     }
 
     const base = Number(row[`effect_base_value${slot}`] ?? 0);
-    const label = resolveSpellEffectDirection(getSpellEffectName(effectId), base);
+    const label = resolveSpellEffectDirection(getSpellEffectName(effectId), base, effectId);
 
     if (label && !labels.includes(label)) {
       labels.push(label);

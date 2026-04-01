@@ -492,21 +492,40 @@ describe("catalog services", () => {
   it("keeps spell effect increase/decrease direction aligned with the stored values", () => {
     expect(resolveSpellEffectDirection("Increase Hitpoints", -750)).toBe("Decrease Hitpoints");
     expect(resolveSpellEffectDirection("Increase hate", -400)).toBe("Decrease hate");
+    expect(resolveSpellEffectDirection("In/Decrease Attack Speed", 85, 11)).toBe("Decrease Attack Speed");
+    expect(resolveSpellEffectDirection("Increase Damage Shield", -3, 59)).toBe("Increase Damage Shield");
+    expect(resolveSpellEffectDirection("Increase Player Size", 66, 89)).toBe("Decrease Player Size");
     expect(resolveSpellEffectDirection("Decrease Spell Mana Cost", 10)).toBe("Decrease Spell Mana Cost");
     expect(resolveSpellEffectDirection("In/Decrease Movement", -45)).toBe("Decrease Movement");
   });
 
   it("summarizes spell search effects using sign-aware labels", () => {
     const summary = summarizeSpellEffects({
-      effectid1: 0,
-      effect_base_value1: -1200,
-      effectid2: 92,
-      effect_base_value2: -350,
-      effectid3: 132,
-      effect_base_value3: 10
+      effectid1: 89,
+      effect_base_value1: 66,
+      effectid2: 11,
+      effect_base_value2: 85,
+      effectid3: 59,
+      effect_base_value3: -3,
+      effectid4: 132,
+      effect_base_value4: 10
     });
 
-    expect(summary).toBe("Decrease Hitpoints • Decrease hate • Decrease Spell Mana Cost");
+    expect(summary).toBe("Decrease Player Size • Decrease Attack Speed • Increase Damage Shield • Decrease Spell Mana Cost");
+  });
+
+  it("renders legacy encoded percent effects the way classic Alla-style text expects", async () => {
+    const shrink = await getSpellDetail(345);
+    const thistlecoat = await getSpellDetail(515);
+    const turgur = await getSpellDetail(1588);
+
+    const shrinkEffects = shrink?.effects.map((entry) => entry.text) ?? [];
+    const thistlecoatEffects = thistlecoat?.effects.map((entry) => entry.text) ?? [];
+    const turgurEffects = turgur?.effects.map((entry) => entry.text) ?? [];
+
+    expect(shrinkEffects).toContain("Decrease Player Size by 34%");
+    expect(thistlecoatEffects).toContain("Increase Damage Shield by 1");
+    expect(turgurEffects).toContain("Decrease Attack Speed by 15%");
   });
 
   it("caps spell search results at level 60", async () => {
