@@ -8,7 +8,7 @@ type SpawnGroupPageProps = {
 
 export default async function SpawnGroupPage({ params }: SpawnGroupPageProps) {
   const { id } = await params;
-  const group = getSpawnGroupDetail(Number(id));
+  const group = await getSpawnGroupDetail(Number(id));
 
   if (!group) notFound();
 

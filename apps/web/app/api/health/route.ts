@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
-import { env, getSourceMode, hasDatabaseConfig, pingDatabase, useMockData } from "@eq-alla/data";
+import { env, getSourceMode, hasDatabaseConfig, pingDatabase } from "@eq-alla/data";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const mockData = useMockData();
   const databaseConfigured = hasDatabaseConfig();
-  const databaseReachable = mockData ? true : databaseConfigured ? await pingDatabase() : false;
-  const ok = mockData || databaseReachable;
-  const mode = mockData ? "mock" : getSourceMode();
+  const databaseReachable = databaseConfigured ? await pingDatabase() : false;
+  const ok = databaseReachable;
+  const mode = getSourceMode();
 
   return NextResponse.json(
     {
@@ -16,7 +15,7 @@ export async function GET() {
       mode,
       checks: {
         database: {
-          required: !mockData,
+          required: true,
           configured: databaseConfigured,
           reachable: databaseReachable
         },

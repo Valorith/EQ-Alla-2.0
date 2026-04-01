@@ -1,7 +1,5 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
-import { execFile as execFileCallback } from "node:child_process";
 import mysql from "mysql2/promise";
 import sharp from "sharp";
 
@@ -14,7 +12,6 @@ const mockAppearances = [
   { raceId: 6, gender: 1, texture: 0, helmTexture: 0 },
   { raceId: 1, gender: 0, texture: 0, helmTexture: 0 }
 ];
-const execFile = promisify(execFileCallback);
 
 function parseEnv(contents) {
   const values = {};
@@ -43,16 +40,61 @@ function parseEnv(contents) {
 }
 
 async function loadEnv() {
-  const env = {};
+  const env = { ...process.env };
 
   for (const filename of [".env.local", ".env", "env.local", "env"]) {
     const candidate = path.join(repoRoot, filename);
     try {
-      Object.assign(env, parseEnv(await fs.readFile(candidate, "utf8")));
+      const parsed = parseEnv(await fs.readFile(candidate, "utf8"));
+
+      for (const [key, value] of Object.entries(parsed)) {
+        if (env[key] === undefined) {
+          env[key] = value;
+        }
+      }
     } catch {}
   }
 
+  applyDatabaseFallbacks(env);
   return env;
+}
+
+function setEnvIfMissing(env, key, value) {
+  if (!value || env[key] !== undefined) {
+    return;
+  }
+
+  env[key] = value;
+}
+
+function applyDatabaseFallbacks(env) {
+  setEnvIfMissing(env, "EQ_DB_HOST", env.MYSQLHOST);
+  setEnvIfMissing(env, "EQ_DB_PORT", env.MYSQLPORT);
+  setEnvIfMissing(env, "EQ_DB_NAME", env.MYSQLDATABASE);
+  setEnvIfMissing(env, "EQ_DB_USER", env.MYSQLUSER);
+  setEnvIfMissing(env, "EQ_DB_PASSWORD", env.MYSQLPASSWORD);
+
+  const connectionUrl = env.DATABASE_URL ?? env.MYSQL_URL;
+  if (!connectionUrl) {
+    return;
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(connectionUrl);
+  } catch {
+    return;
+  }
+
+  if (parsed.protocol !== "mysql:" && parsed.protocol !== "mysql2:") {
+    return;
+  }
+
+  setEnvIfMissing(env, "EQ_DB_HOST", parsed.hostname || undefined);
+  setEnvIfMissing(env, "EQ_DB_PORT", parsed.port || undefined);
+  setEnvIfMissing(env, "EQ_DB_NAME", parsed.pathname.replace(/^\//, "") || undefined);
+  setEnvIfMissing(env, "EQ_DB_USER", parsed.username ? decodeURIComponent(parsed.username) : undefined);
+  setEnvIfMissing(env, "EQ_DB_PASSWORD", parsed.password ? decodeURIComponent(parsed.password) : undefined);
 }
 
 function normalizeAppearance(appearance) {
@@ -115,15 +157,13 @@ async function ensureDirectory() {
 
 async function fetchAsset(filename) {
   try {
-    await execFile("curl", [
-      "--fail",
-      "--silent",
-      "--show-error",
-      "--location",
-      `${assetBaseUrl}/${filename}`,
-      "--output",
-      path.join(targetDir, filename)
-    ]);
+    const response = await fetch(`${assetBaseUrl}/${filename}`);
+    if (!response.ok) {
+      return false;
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    await fs.writeFile(path.join(targetDir, filename), buffer);
     return true;
   } catch {
     return false;

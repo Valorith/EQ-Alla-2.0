@@ -52,15 +52,17 @@ export function SectionCard({
   title,
   children,
   right,
-  className = ""
+  className = "",
+  allowOverflow = false
 }: {
   title: string;
   children: ReactNode;
   right?: ReactNode;
   className?: string;
+  allowOverflow?: boolean;
 }) {
   return (
-    <Card className={`overflow-hidden border-white/10 bg-black/22 ${className}`.trim()}>
+    <Card className={`${allowOverflow ? "overflow-visible" : "overflow-hidden"} border-white/10 bg-black/22 ${className}`.trim()}>
       <CardContent className="space-y-5">
         <div className="flex flex-col gap-2 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
           <h3 className="font-[var(--font-display)] text-[1.25rem] font-semibold tracking-[-0.03em] text-white">{title}</h3>

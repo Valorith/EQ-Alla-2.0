@@ -53,6 +53,34 @@ describe("catalog services", () => {
     expect(noDropShawls.some((item) => item.id === 1175)).toBe(true);
   });
 
+  it("supports multi-select class and slot filters for item lists", async () => {
+    const filtered = await listItems({
+      classNames: ["Warrior", "Paladin"],
+      slots: ["Wrist", "Primary"]
+    });
+
+    expect(filtered.length).toBeGreaterThan(0);
+    expect(filtered.some((item) => item.classes.includes("All") && item.slot.includes("Wrist"))).toBe(true);
+    expect(
+      filtered.some(
+        (item) =>
+          item.slot.includes("Primary") &&
+          (item.classes.includes("Warrior") || item.classes.includes("Paladin"))
+      )
+    ).toBe(true);
+    expect(
+      filtered.every((item) => {
+        const classMatch =
+          item.classes.includes("All") ||
+          item.classes.includes("Warrior") ||
+          item.classes.includes("Paladin");
+        const slotMatch = item.slot.includes("Wrist") || item.slot.includes("Primary");
+
+        return classMatch && slotMatch;
+      })
+    ).toBe(true);
+  });
+
   it("includes grouped zone context for item drop NPCs", async () => {
     const db = getDb();
     expect(db).toBeTruthy();
@@ -88,6 +116,60 @@ describe("catalog services", () => {
     expect(firstDrop?.zone.shortName.length).toBeGreaterThan(0);
     expect(firstDrop?.zone.longName.length).toBeGreaterThan(0);
     expect(firstDrop?.zone.href).toBe(`/zones/${firstDrop?.zone.shortName}`);
+  }, 20_000);
+
+  it("includes per-npc drop chance and multiplier for item detail drops", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{
+      item_id: number;
+      npc_id: number;
+      probability: number;
+      multiplier: number;
+      chance: number;
+      short_name: string;
+    }>`
+      select lde.item_id,
+             nt.id as npc_id,
+             lte.probability,
+             lte.multiplier,
+             lde.chance,
+             z.short_name
+      from lootdrop_entries lde
+      join loottable_entries lte on lte.lootdrop_id = lde.lootdrop_id
+      join npc_types nt on nt.loottable_id = lte.loottable_id
+      join spawnentry se on se.npcID = nt.id
+      join spawngroup sg on sg.id = se.spawngroupID
+      join spawn2 s2 on s2.spawngroupID = sg.id
+      join zone z on z.short_name = s2.zone and z.version = s2.version
+      where coalesce(z.min_status, 0) = 1
+        and coalesce(nt.trackable, 0) = 1
+        and nt.class not in (40, 41, 59, 61, 67, 68, 70)
+        and nt.race not in (127, 240)
+        and exists (
+          select 1
+          from discovered_items di
+          where di.item_id = lde.item_id
+        )
+      order by lde.item_id asc, z.long_name asc, nt.name asc
+      limit 1
+    `.execute(db!);
+
+    if (!rows.rows[0]) {
+      expect(rows.rows).toEqual([]);
+      return;
+    }
+
+    const sample = rows.rows[0];
+    const item = await getItemDetail(sample.item_id);
+    const matchingDrop = item?.droppedBy.find(
+      (entry) => entry.id === sample.npc_id && entry.zone.shortName === sample.short_name
+    );
+
+    expect(matchingDrop).toBeTruthy();
+    expect(matchingDrop?.multiplier).toBe(Number(sample.multiplier ?? 1));
+    expect(matchingDrop?.dropChance).toBeCloseTo((Number(sample.chance ?? 0) * Number(sample.probability ?? 0)) / 100, 6);
   }, 20_000);
 
   it("includes grouped zone context for merchant sellers on item detail", async () => {

@@ -223,6 +223,7 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
   const [submitCount, setSubmitCount] = useState(0);
   const [page, setPage] = useState(1);
   const abortRef = useRef<AbortController | null>(null);
+  const autoSubmittedInitialQueryRef = useRef(false);
   const currentUrlKeyRef = useRef(
     buildSearchKey({
       q: initialQuery,
@@ -243,6 +244,20 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
   const lastHandledSubmitRef = useRef(0);
 
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  useEffect(() => {
+    if (autoSubmittedInitialQueryRef.current) {
+      return;
+    }
+
+    if (!hasQuery(filters)) {
+      autoSubmittedInitialQueryRef.current = true;
+      return;
+    }
+
+    autoSubmittedInitialQueryRef.current = true;
+    setSubmitCount((current) => current + 1);
+  }, [filters]);
 
   const setFilter = (key: keyof FactionFilters, value: string | boolean) => {
     setFilters((current) => ({

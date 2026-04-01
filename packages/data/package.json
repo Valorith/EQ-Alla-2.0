@@ -7,6 +7,7 @@
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./item-search-filters": "./src/item-search-filters.ts",
     "./item-types": "./src/item-types.ts",
     "./legacy-routes": "./src/legacy-routes.ts"
   },

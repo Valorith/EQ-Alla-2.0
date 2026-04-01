@@ -69,6 +69,8 @@ export type ItemDetail = ItemSummary & {
     id: number;
     name: string;
     href: string;
+    dropChance: number;
+    multiplier: number;
     zone: { shortName: string; longName: string; href: string };
   }>;
   soldBy: Array<{

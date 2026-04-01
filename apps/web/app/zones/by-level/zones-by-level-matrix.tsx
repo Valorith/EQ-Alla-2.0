@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ZoneByLevelSummary, ZoneLevelBand } from "@eq-alla/data";
 import { Input } from "@eq-alla/ui";
 
@@ -89,6 +89,9 @@ export function ZonesByLevelMatrix({ zones, levelCap }: ZonesByLevelMatrixProps)
   const bands = zones[0]?.bands ?? [];
   const maximumLevel = Math.min(bands[bands.length - 1]?.maxLevel ?? levelCap, levelCap);
   const [selectedLevel, setSelectedLevel] = useState(() => clampLevel(defaultSelectedLevel, maximumLevel));
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const headerRefs = useRef<Array<HTMLTableCellElement | null>>([]);
+  const hasMountedRef = useRef(false);
 
   const selectedBandIndex = Math.max(0, Math.floor((selectedLevel - 1) / 5));
   const selectedBand = bands[selectedBandIndex];
@@ -97,6 +100,29 @@ export function ZonesByLevelMatrix({ zones, levelCap }: ZonesByLevelMatrixProps)
   const selectedColumnHeaderFrame = "bg-[linear-gradient(180deg,rgba(213,165,90,0.16),rgba(213,165,90,0.05))]";
   const stickyHeaderCell =
     "sticky left-0 top-0 z-40 bg-[linear-gradient(180deg,rgba(47,39,31,0.98),rgba(29,26,24,0.98))] shadow-[8px_0_18px_rgba(0,0,0,0.2)]";
+  const stickyHeaderBandCell =
+    "sticky top-0 z-30 bg-[linear-gradient(180deg,rgba(41,36,31,0.98),rgba(24,24,28,0.96))] backdrop-blur-sm";
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    const activeHeader = headerRefs.current[selectedBandIndex];
+
+    if (!container || !activeHeader) {
+      return;
+    }
+
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+
+    const nextLeft = activeHeader.offsetLeft - (container.clientWidth - activeHeader.offsetWidth) / 2;
+
+    container.scrollTo({
+      left: Math.max(0, nextLeft),
+      behavior: "smooth"
+    });
+  }, [selectedBandIndex]);
 
   return (
     <div className="space-y-5">
@@ -149,17 +175,23 @@ export function ZonesByLevelMatrix({ zones, levelCap }: ZonesByLevelMatrixProps)
         </div>
       </div>
 
-      <div className="overflow-x-auto overflow-y-visible rounded-[28px] border border-[#7b603b]/18 bg-[linear-gradient(180deg,rgba(10,14,20,0.86),rgba(13,16,22,0.8))] shadow-[0_24px_50px_rgba(0,0,0,0.28)]">
+      <div
+        ref={scrollContainerRef}
+        className="eq-zones-level-scroll overflow-auto rounded-[28px] border border-[#7b603b]/18 bg-[linear-gradient(180deg,rgba(10,14,20,0.86),rgba(13,16,22,0.8))] shadow-[0_24px_50px_rgba(0,0,0,0.28)] max-h-[72vh]"
+      >
         <table className="min-w-full border-collapse text-left text-sm">
           <thead className="bg-[linear-gradient(180deg,rgba(215,164,95,0.1),rgba(255,255,255,0.02))] text-[#d7c09a]">
             <tr>
               <th className={`min-w-[220px] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.24em] ${stickyHeaderCell}`}>Zone</th>
-              <th className="min-w-[124px] px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.24em]">Suggested</th>
-              <th className="min-w-[110px] px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.24em]">Era</th>
+              <th className={`min-w-[124px] px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.24em] ${stickyHeaderBandCell}`}>Suggested</th>
+              <th className={`min-w-[110px] px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.24em] ${stickyHeaderBandCell}`}>Era</th>
               {bands.map((band, index) => (
                 <th
                   key={band.label}
-                  className={`sticky top-0 z-30 min-w-[74px] px-2 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.18em] ${
+                  ref={(element) => {
+                    headerRefs.current[index] = element;
+                  }}
+                  className={`min-w-[74px] px-2 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.18em] ${stickyHeaderBandCell} ${
                     index === selectedBandIndex ? `${selectedColumnHeaderFrame} text-[#f0d4a3]` : ""
                   }`}
                   style={{

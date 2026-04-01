@@ -8,10 +8,9 @@ type ItemsPageProps = {
 export default async function ItemsPage({ searchParams }: ItemsPageProps) {
   const params = await searchParams;
   const q = typeof params.q === "string" ? params.q : "";
-  const className = typeof params.class === "string" ? params.class : "";
-  const slot = typeof params.slot === "string" ? params.slot : "";
+  const classNames = Array.isArray(params.class) ? params.class.filter((value): value is string => typeof value === "string") : typeof params.class === "string" ? [params.class] : [];
+  const slots = Array.isArray(params.slot) ? params.slot.filter((value): value is string => typeof value === "string") : typeof params.slot === "string" ? [params.slot] : [];
   const type = typeof params.type === "string" ? params.type : "";
-  const tradeable = params.tradeable === "true" ? true : params.tradeable === "false" ? false : undefined;
   const frameClassName =
     "border-[#7b603b]/20 bg-[linear-gradient(180deg,rgba(38,32,28,0.82),rgba(18,20,25,0.8))] shadow-[0_18px_44px_rgba(0,0,0,0.24)] backdrop-blur-md";
 
@@ -28,12 +27,11 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
         initialResultsResolved={false}
         initialFilters={{
           q,
-          className,
-          slot,
+          classNames,
+          slots,
           type,
           minLevel: typeof params.minLevel === "string" ? params.minLevel : "",
-          maxLevel: typeof params.maxLevel === "string" ? params.maxLevel : "",
-          tradeable: tradeable === true ? "true" : tradeable === false ? "false" : ""
+          maxLevel: typeof params.maxLevel === "string" ? params.maxLevel : ""
         }}
       />
     </div>

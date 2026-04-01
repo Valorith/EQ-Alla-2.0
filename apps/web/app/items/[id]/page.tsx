@@ -14,7 +14,7 @@ function RelatedSection({
   emptyText
 }: {
   title: string;
-  items: Array<{ href: string; label: string }>;
+  items: Array<{ href: string; label: string; suffix?: string }>;
   emptyText: string;
 }) {
   return (
@@ -55,21 +55,22 @@ function GroupedNpcSection({
   entries: Array<{
     href: string;
     label: string;
+    suffix?: string;
     zone: { href: string; label: string };
   }>;
   emptyText: string;
 }) {
-  const groups = entries.reduce<Array<{ zone: { href: string; label: string }; items: Array<{ href: string; label: string }> }>>(
+  const groups = entries.reduce<Array<{ zone: { href: string; label: string }; items: Array<{ href: string; label: string; suffix?: string }> }>>(
     (accumulator, entry) => {
       const currentGroup = accumulator.find((group) => group.zone.href === entry.zone.href);
       if (currentGroup) {
-        currentGroup.items.push({ href: entry.href, label: entry.label });
+        currentGroup.items.push({ href: entry.href, label: entry.label, suffix: entry.suffix });
         return accumulator;
       }
 
       accumulator.push({
         zone: entry.zone,
-        items: [{ href: entry.href, label: entry.label }]
+        items: [{ href: entry.href, label: entry.label, suffix: entry.suffix }]
       });
       return accumulator;
     },
@@ -101,6 +102,7 @@ function GroupedNpcSection({
                       >
                         {entry.label}
                       </Link>
+                      {entry.suffix ? <span className="text-[#d8ccb7]"> {entry.suffix}</span> : null}
                     </li>
                   ))}
                 </ul>
@@ -115,6 +117,17 @@ function GroupedNpcSection({
       )}
     </section>
   );
+}
+
+function formatDropChance(value: number) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return "0%";
+  }
+
+  return (Math.round(value * 1000) / 1000)
+    .toFixed(3)
+    .replace(/\.0+$/, "")
+    .replace(/(\.\d*?)0+$/, "$1") + "%";
 }
 
 export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
@@ -141,6 +154,7 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
           entries={item.droppedBy.map((entry) => ({
             href: entry.href,
             label: entry.name,
+            suffix: `(${formatDropChance(entry.dropChance)} x ${entry.multiplier})`,
             zone: { href: entry.zone.href, label: entry.zone.longName }
           }))}
           emptyText="No NPC drop data recorded."

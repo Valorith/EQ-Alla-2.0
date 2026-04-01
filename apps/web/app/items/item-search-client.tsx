@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { ItemSummary } from "@eq-alla/data";
+import { itemClassFilterOptions, itemSlotFilterOptions } from "@eq-alla/data/item-search-filters";
 import { itemTypeFilterOptions } from "@eq-alla/data/item-types";
 import { Button, Input } from "@eq-alla/ui";
 import { PaginationControls, SearchPrompt, SectionCard, SimpleTable } from "../../components/catalog-shell";
@@ -12,12 +13,11 @@ import { ItemIcon } from "../../components/item-icon";
 
 type ItemSearchFilters = {
   q: string;
-  className: string;
-  slot: string;
+  classNames: string[];
+  slots: string[];
   type: string;
   minLevel: string;
   maxLevel: string;
-  tradeable: string;
 };
 
 type ItemSearchClientProps = {
@@ -55,12 +55,15 @@ function buildSearchParams(filters: ItemSearchFilters) {
     params.set("q", query);
   }
 
-  if (filters.className) params.set("class", filters.className);
-  if (filters.slot) params.set("slot", filters.slot);
+  for (const className of filters.classNames) {
+    params.append("class", className);
+  }
+  for (const slot of filters.slots) {
+    params.append("slot", slot);
+  }
   if (filters.type) params.set("type", filters.type);
   if (filters.minLevel) params.set("minLevel", filters.minLevel);
   if (filters.maxLevel) params.set("maxLevel", filters.maxLevel);
-  if (filters.tradeable) params.set("tradeable", filters.tradeable);
 
   return params;
 }
@@ -68,12 +71,11 @@ function buildSearchParams(filters: ItemSearchFilters) {
 function hasActiveFilters(filters: ItemSearchFilters) {
   return (
     filters.q.trim().length > 0 ||
-    filters.className.length > 0 ||
-    filters.slot.length > 0 ||
+    filters.classNames.length > 0 ||
+    filters.slots.length > 0 ||
     filters.type.length > 0 ||
     filters.minLevel.length > 0 ||
-    filters.maxLevel.length > 0 ||
-    filters.tradeable.length > 0
+    filters.maxLevel.length > 0
   );
 }
 
@@ -216,6 +218,119 @@ function SelectControl({
   );
 }
 
+function formatMultiSelectSummary(values: string[]) {
+  if (values.length === 0) {
+    return "Any";
+  }
+
+  if (values.length <= 2) {
+    return values.join(", ");
+  }
+
+  return `${values.length} selected`;
+}
+
+function MultiSelectDropdown({
+  label,
+  name,
+  values,
+  options,
+  onChange
+}: {
+  label: string;
+  name: string;
+  values: string[];
+  options: string[];
+  onChange: (values: string[]) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const summary = formatMultiSelectSummary(values);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
+  const toggleValue = (option: string) => {
+    onChange(values.includes(option) ? values.filter((value) => value !== option) : [...values, option]);
+  };
+
+  return (
+    <div ref={containerRef} className="relative grid gap-2 text-sm">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">{label}</span>
+      <button
+        type="button"
+        name={name}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((current) => !current)}
+        className="flex h-11 w-full items-center justify-between rounded-xl border border-[var(--border-strong)] bg-[var(--panel)] px-4 text-left text-sm text-[var(--foreground)] outline-none transition hover:border-[color:rgba(215,164,95,0.38)] focus:border-[var(--accent)] focus:shadow-[0_0_0_4px_rgba(215,164,95,0.12)]"
+      >
+        <span className={values.length === 0 ? "text-[var(--muted)]" : ""}>{summary}</span>
+        <span className="text-xs text-[var(--muted)]">{isOpen ? "▲" : "▼"}</span>
+      </button>
+      {isOpen ? (
+        <div className="absolute top-full z-30 mt-2 w-full overflow-hidden rounded-xl border border-[var(--border-strong)] bg-[var(--panel)] shadow-[0_18px_44px_rgba(0,0,0,0.3)] backdrop-blur-md">
+          <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-2 text-[11px] uppercase tracking-[0.16em] text-[var(--muted)]">
+            <span>{values.length === 0 ? "Any" : `${values.length} selected`}</span>
+            {values.length > 0 ? (
+              <button
+                type="button"
+                className="font-semibold text-[#d7a45f] transition hover:text-[#f0c98a]"
+                onClick={() => onChange([])}
+              >
+                Clear
+              </button>
+            ) : null}
+          </div>
+          <div role="listbox" aria-multiselectable="true" className="max-h-72 overflow-y-auto py-1">
+            {options.map((option) => {
+              const checked = values.includes(option);
+
+              return (
+                <label
+                  key={option}
+                  className="flex cursor-pointer items-center gap-3 px-4 py-2 text-sm text-[var(--foreground)] transition hover:bg-white/7"
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleValue(option)}
+                    className="size-4 rounded border-[var(--border-strong)] bg-transparent text-[#d7a45f] focus:ring-[#c69a5f]"
+                  />
+                  <span>{option}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function ItemSearchClient({ initialFilters, initialItems, initialResultsResolved, frameClassName }: ItemSearchClientProps) {
   const pathname = usePathname();
   const [filters, setFilters] = useState(initialFilters);
@@ -244,7 +359,7 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
     }
   }, [initialFilters, initialItems, initialResultsResolved]);
 
-  const setFilter = (key: keyof ItemSearchFilters, value: string) => {
+  const setFilter = <K extends keyof ItemSearchFilters>(key: K, value: ItemSearchFilters[K]) => {
     setFilters((current) => ({ ...current, [key]: value }));
   };
 
@@ -260,12 +375,11 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
     abortRef.current?.abort();
     setFilters({
       q: "",
-      className: "",
-      slot: "",
+      classNames: [],
+      slots: [],
       type: "",
       minLevel: "",
-      maxLevel: "",
-      tradeable: ""
+      maxLevel: ""
     });
     setItems([]);
     setError(null);
@@ -397,7 +511,8 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
     <>
       <SectionCard
         title="Filters"
-        className={frameClassName}
+        className={`relative z-20 ${frameClassName}`.trim()}
+        allowOverflow
         right={<p className="text-xs font-medium text-[#ccb594]">{statusLabel}</p>}
       >
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -417,14 +532,20 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
               placeholder="Runed Mithril..."
             />
           </label>
-          <SelectControl
+          <MultiSelectDropdown
             label="Class"
             name="class"
-            value={filters.className}
-            onChange={(value) => setFilter("className", value)}
-            options={["Warrior", "Paladin", "Cleric", "Wizard", "Shaman"]}
+            values={filters.classNames}
+            onChange={(values) => setFilter("classNames", values)}
+            options={[...itemClassFilterOptions]}
           />
-          <SelectControl label="Slot" name="slot" value={filters.slot} onChange={(value) => setFilter("slot", value)} options={["Wrist", "Primary", "Inventory"]} />
+          <MultiSelectDropdown
+            label="Slot"
+            name="slot"
+            values={filters.slots}
+            onChange={(values) => setFilter("slots", values)}
+            options={[...itemSlotFilterOptions, "Inventory"]}
+          />
           <SelectControl
             label="Item type"
             name="type"
@@ -446,13 +567,6 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
             onChange={(value) => setFilter("maxLevel", value)}
             options={["20", "35", "50", "60", "65"]}
           />
-          <SelectControl
-            label="Tradeable"
-            name="tradeable"
-            value={filters.tradeable}
-            onChange={(value) => setFilter("tradeable", value)}
-            options={["true", "false"]}
-          />
           <div className="flex items-end gap-3 md:col-span-2 xl:col-span-4">
             <Button type="button" className="w-full sm:w-auto" onClick={submitSearch}>
               Search
@@ -464,7 +578,7 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
         </div>
       </SectionCard>
 
-      <SectionCard title={resultTitle} className={frameClassName}>
+      <SectionCard title={resultTitle} className={`relative z-0 ${frameClassName}`.trim()}>
         {showResults && items.length > 0 ? (
           <>
             <SimpleTable
