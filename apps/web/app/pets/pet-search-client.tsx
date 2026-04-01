@@ -198,6 +198,34 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  useEffect(() => {
+    const nextSelectedClasses = normalizeSelectedClasses(initialClasses);
+    const nextQueryValue = buildQueryValue(nextSelectedClasses);
+    const nextKey = buildSearchKey(nextSelectedClasses);
+
+    setSelectedClasses(nextSelectedClasses);
+    currentUrlValueRef.current = nextQueryValue;
+    abortRef.current?.abort();
+
+    if (!nextKey) {
+      setResults([]);
+      setError(null);
+      setDisplayKey("");
+      setIsFetching(false);
+      setResolutionMeta(null);
+      setPage(1);
+      return;
+    }
+
+    setResults([]);
+    setError(null);
+    setDisplayKey("");
+    setIsFetching(false);
+    setResolutionMeta(null);
+    setPage(1);
+    setSubmitCount((current) => current + 1);
+  }, [initialClasses]);
+
   const toggleClass = (className: string) => {
     setSelectedClasses((current) =>
       current.includes(className)

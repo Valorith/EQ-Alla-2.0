@@ -151,6 +151,38 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  useEffect(() => {
+    const nextFilters: RecipeFilters = {
+      q: initialQuery,
+      tradeskill: initialTradeskill,
+      minTrivial: initialMinTrivial,
+      maxTrivial: initialMaxTrivial
+    };
+    const nextKey = buildSearchParams(nextFilters).toString();
+
+    setFilters(nextFilters);
+    currentUrlKeyRef.current = nextKey;
+    abortRef.current?.abort();
+
+    if (!nextKey) {
+      setResults([]);
+      setError(null);
+      setDisplayKey("");
+      setIsFetching(false);
+      setResolutionMeta(null);
+      setPage(1);
+      return;
+    }
+
+    setResults([]);
+    setError(null);
+    setDisplayKey("");
+    setIsFetching(false);
+    setResolutionMeta(null);
+    setPage(1);
+    setSubmitCount((current) => current + 1);
+  }, [initialMaxTrivial, initialMinTrivial, initialQuery, initialTradeskill]);
+
   const setFilter = (key: keyof RecipeFilters, value: string) => {
     setFilters((current) => ({ ...current, [key]: value }));
   };

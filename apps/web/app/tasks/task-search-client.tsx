@@ -127,6 +127,32 @@ export function TaskSearchClient({ initialQuery }: TaskSearchClientProps) {
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  useEffect(() => {
+    const nextKey = buildSearchKey(initialQuery);
+
+    setQuery(initialQuery);
+    currentUrlKeyRef.current = nextKey;
+    abortRef.current?.abort();
+
+    if (!nextKey) {
+      setResults([]);
+      setError(null);
+      setDisplayKey("");
+      setIsFetching(false);
+      setResolutionMeta(null);
+      setPage(1);
+      return;
+    }
+
+    setResults([]);
+    setError(null);
+    setDisplayKey("");
+    setIsFetching(false);
+    setResolutionMeta(null);
+    setPage(1);
+    setSubmitCount((current) => current + 1);
+  }, [initialQuery]);
+
   const submitSearch = () => {
     if (!hasQuery(query)) return;
     setSubmitCount((current) => current + 1);

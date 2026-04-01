@@ -165,6 +165,32 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  useEffect(() => {
+    const nextKey = buildSearchParams(initialFilters, mode).toString();
+
+    setFilters(initialFilters);
+    currentUrlKeyRef.current = nextKey;
+    abortRef.current?.abort();
+
+    if (!nextKey) {
+      setResults([]);
+      setError(null);
+      setDisplayKey("");
+      setIsFetching(false);
+      setResolutionMeta(null);
+      setPage(1);
+      return;
+    }
+
+    setResults([]);
+    setError(null);
+    setDisplayKey("");
+    setIsFetching(false);
+    setResolutionMeta(null);
+    setPage(1);
+    setSubmitCount((current) => current + 1);
+  }, [initialFilters, mode]);
+
   const setFilter = (key: keyof NpcFilters, value: string) => {
     setFilters((current) => ({ ...current, [key]: value }));
   };

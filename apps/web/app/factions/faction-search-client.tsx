@@ -77,6 +77,21 @@ function mapRelationshipLabelToValue(label: string) {
   }
 }
 
+function mapRelationshipValueToLabel(value: string) {
+  switch (value) {
+    case "raises":
+      return "Raises";
+    case "lowers":
+      return "Lowers";
+    case "both":
+      return "Both";
+    case "none":
+      return "No NPC Modifiers";
+    default:
+      return "";
+  }
+}
+
 function describeRelationships(faction: FactionSummary) {
   if (faction.raisedByCount > 0 && faction.loweredByCount > 0) {
     return `${faction.raisedByCount} raise, ${faction.loweredByCount} lower`;
@@ -201,20 +216,13 @@ function TextFilterField({
 
 export function FactionSearchClient({ initialQuery, initialZone, initialRelationship, initialViewAll }: FactionSearchClientProps) {
   const pathname = usePathname();
-  const [filters, setFilters] = useState<FactionFilters>({
+  const initialFilters: FactionFilters = {
     q: initialQuery,
     zone: initialZone,
-    relationship: initialRelationship === "raises"
-      ? "Raises"
-      : initialRelationship === "lowers"
-        ? "Lowers"
-        : initialRelationship === "both"
-          ? "Both"
-          : initialRelationship === "none"
-            ? "No NPC Modifiers"
-            : "",
+    relationship: mapRelationshipValueToLabel(initialRelationship),
     viewAll: initialViewAll
-  });
+  };
+  const [filters, setFilters] = useState<FactionFilters>(initialFilters);
   const [results, setResults] = useState<FactionSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isFetching, setIsFetching] = useState(false);
@@ -223,41 +231,36 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
   const [submitCount, setSubmitCount] = useState(0);
   const [page, setPage] = useState(1);
   const abortRef = useRef<AbortController | null>(null);
-  const autoSubmittedInitialQueryRef = useRef(false);
-  const currentUrlKeyRef = useRef(
-    buildSearchKey({
-      q: initialQuery,
-      zone: initialZone,
-      relationship:
-        initialRelationship === "raises"
-          ? "Raises"
-          : initialRelationship === "lowers"
-            ? "Lowers"
-            : initialRelationship === "both"
-              ? "Both"
-              : initialRelationship === "none"
-                ? "No NPC Modifiers"
-                : "",
-      viewAll: initialViewAll
-    })
-  );
+  const currentUrlKeyRef = useRef(buildSearchKey(initialFilters));
   const lastHandledSubmitRef = useRef(0);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
   useEffect(() => {
-    if (autoSubmittedInitialQueryRef.current) {
+    const nextKey = buildSearchKey(initialFilters);
+
+    setFilters(initialFilters);
+    currentUrlKeyRef.current = nextKey;
+    abortRef.current?.abort();
+
+    if (!nextKey) {
+      setResults([]);
+      setError(null);
+      setDisplayKey("");
+      setIsFetching(false);
+      setResolutionMeta(null);
+      setPage(1);
       return;
     }
 
-    if (!hasQuery(filters)) {
-      autoSubmittedInitialQueryRef.current = true;
-      return;
-    }
-
-    autoSubmittedInitialQueryRef.current = true;
+    setResults([]);
+    setError(null);
+    setDisplayKey("");
+    setIsFetching(false);
+    setResolutionMeta(null);
+    setPage(1);
     setSubmitCount((current) => current + 1);
-  }, [filters]);
+  }, [initialQuery, initialRelationship, initialViewAll, initialZone]);
 
   const setFilter = (key: keyof FactionFilters, value: string | boolean) => {
     setFilters((current) => ({

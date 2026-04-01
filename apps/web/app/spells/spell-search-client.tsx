@@ -210,6 +210,38 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  useEffect(() => {
+    const nextFilters: SpellSearchFilters = {
+      q: initialQuery,
+      className: initialClassName,
+      level: initialLevel,
+      levelMode: initialLevelMode
+    };
+    const nextKey = buildSearchParams(nextFilters).toString();
+
+    setFilters(nextFilters);
+    currentUrlKeyRef.current = nextKey;
+    abortRef.current?.abort();
+
+    if (!nextKey) {
+      setResults([]);
+      setError(null);
+      setDisplayKey("");
+      setIsFetching(false);
+      setResolutionMeta(null);
+      setPage(1);
+      return;
+    }
+
+    setResults([]);
+    setError(null);
+    setDisplayKey("");
+    setIsFetching(false);
+    setResolutionMeta(null);
+    setPage(1);
+    setSubmitCount((current) => current + 1);
+  }, [initialClassName, initialLevel, initialLevelMode, initialQuery]);
+
   const setFilter = (key: keyof SpellSearchFilters, value: string) => {
     setFilters((current) => ({
       ...current,

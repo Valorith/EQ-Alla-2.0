@@ -359,6 +359,46 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
     }
   }, [initialFilters, initialItems, initialResultsResolved]);
 
+  useEffect(() => {
+    const nextKey = buildSearchParams(initialFilters).toString();
+
+    setFilters(initialFilters);
+    currentUrlKeyRef.current = nextKey;
+    abortRef.current?.abort();
+
+    if (!nextKey) {
+      setItems([]);
+      setError(null);
+      setDisplayKey("");
+      setIsFetching(false);
+      setResolutionMeta(null);
+      setPage(1);
+      return;
+    }
+
+    if (initialResultsResolved) {
+      setItems(initialItems);
+      setError(null);
+      setDisplayKey(nextKey);
+      setIsFetching(false);
+      setResolutionMeta({
+        key: nextKey,
+        durationMs: 0,
+        source: "cache"
+      });
+      setPage(1);
+      return;
+    }
+
+    setItems([]);
+    setError(null);
+    setDisplayKey("");
+    setIsFetching(false);
+    setResolutionMeta(null);
+    setPage(1);
+    setSubmitCount((current) => current + 1);
+  }, [initialFilters, initialItems, initialResultsResolved]);
+
   const setFilter = <K extends keyof ItemSearchFilters>(key: K, value: ItemSearchFilters[K]) => {
     setFilters((current) => ({ ...current, [key]: value }));
   };

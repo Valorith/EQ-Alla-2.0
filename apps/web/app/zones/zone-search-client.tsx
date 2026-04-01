@@ -138,6 +138,33 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  useEffect(() => {
+    const nextFilters: ZoneFilters = { q: initialQuery, era: initialEra };
+    const nextKey = buildSearchParams(nextFilters).toString();
+
+    setFilters(nextFilters);
+    currentUrlKeyRef.current = nextKey;
+    abortRef.current?.abort();
+
+    if (!nextKey) {
+      setResults([]);
+      setError(null);
+      setDisplayKey("");
+      setIsFetching(false);
+      setResolutionMeta(null);
+      setPage(1);
+      return;
+    }
+
+    setResults([]);
+    setError(null);
+    setDisplayKey("");
+    setIsFetching(false);
+    setResolutionMeta(null);
+    setPage(1);
+    setSubmitCount((current) => current + 1);
+  }, [initialEra, initialQuery]);
+
   const setFilter = (key: keyof ZoneFilters, value: string) => {
     setFilters((current) => ({ ...current, [key]: value }));
   };
