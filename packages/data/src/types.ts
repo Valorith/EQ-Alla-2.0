@@ -63,6 +63,7 @@ export type ItemDetail = ItemSummary & {
   wornEffect?: { id: number; name: string; href: string; level?: number };
   focusEffect?: { id: number; name: string; href: string; level?: number };
   clickEffect?: { id: number; name: string; href: string; level?: number; castType?: string };
+  spellScrollEffect?: { id: number; name: string; href: string };
   stats: Array<{ label: string; value: string }>;
   droppedBy: Array<{
     id: number;

@@ -1664,6 +1664,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       clickeffect: number;
       clicklevel2: number;
       clicktype: number;
+      scrolleffect: number;
       lore: string | null;
       source: string | null;
       size: number;
@@ -1677,7 +1678,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
              astr, asta, aagi, adex, aint, awis, acha, mr, fr, cr, dr, pr,
              augslot1type, augslot1visible, augslot2type, augslot2visible, augslot3type, augslot3visible,
              augslot4type, augslot4visible, augslot5type, augslot5visible, augslot6type, augslot6visible,
-             proceffect, proclevel2, procrate, worneffect, wornlevel, focuseffect, focuslevel, clickeffect, clicklevel2, clicktype,
+             proceffect, proclevel2, procrate, worneffect, wornlevel, focuseffect, focuslevel, clickeffect, clicklevel2, clicktype, scrolleffect,
              lore, source, size, weight, light, price, icon
       from items i
       where i.id = ${id}
@@ -1752,7 +1753,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       limit 40
     `.execute(db!);
 
-    const effectNameMapPromise = spellNamesById([row.proceffect, row.worneffect, row.focuseffect, row.clickeffect].map(Number));
+    const effectNameMapPromise = spellNamesById([row.proceffect, row.worneffect, row.focuseffect, row.clickeffect, row.scrolleffect].map(Number));
 
     const [droppedByRows, droppedZoneRows, soldByRows, recipeRows, effectNameMap] = await Promise.all([
       droppedByRowsPromise,
@@ -1880,6 +1881,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       wornEffect: buildEffect(row.worneffect, row.wornlevel),
       focusEffect: buildEffect(row.focuseffect, row.focuslevel),
       clickEffect: buildEffect(row.clickeffect, row.clicklevel2, { castType: effectCastTypes[Number(row.clicktype ?? 0)] }),
+      spellScrollEffect: buildEffect(row.scrolleffect, null),
       stats,
       droppedBy: droppedByRows.rows.map((entry) => ({
         id: entry.id,

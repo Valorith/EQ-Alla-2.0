@@ -287,6 +287,7 @@ export function ItemDetailPreview({ item, className = "" }: { item: ItemDetail; 
           <EffectBlock title="Worn Effect" effect={item.wornEffect} />
           <EffectBlock title="Focus Effect" effect={item.focusEffect} />
           <EffectBlock title="Click Effect" effect={item.clickEffect} />
+          <EffectBlock title="Spell Scroll Effect" effect={item.spellScrollEffect} />
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-[14px] leading-5">
