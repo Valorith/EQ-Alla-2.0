@@ -23,8 +23,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const isHome = pathname === "/";
   const showSidebarSearch = !routesWithInlineSearch.has(pathname);
   const mainShellClassName = isHome
-    ? "min-w-0 xl:col-[1/-1] xl:row-start-1"
-    : "min-w-0 rounded-[28px] border border-white/10 bg-black/20 p-3 backdrop-blur-sm xl:max-w-[1320px] xl:p-4";
+    ? "min-w-0 xl:col-[1/-1] xl:row-start-1 xl:self-start"
+    : "min-w-0 w-full rounded-[28px] border border-white/10 bg-black/20 p-3 backdrop-blur-sm xl:max-w-[1320px] xl:justify-self-center xl:self-start xl:p-4";
 
   const navGroups = [
     {

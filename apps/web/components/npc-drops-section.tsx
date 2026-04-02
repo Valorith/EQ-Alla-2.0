@@ -9,10 +9,17 @@ import { ItemIcon } from "./item-icon";
 
 type DropGroup = NpcDetail["drops"][number];
 
+function formatPercent(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: value > 0 && value < 1 ? 3 : 2
+  }).format(value);
+}
+
 function DropGroupHeader({ group }: { group: DropGroup }) {
   return (
     <p className="text-[13px] font-semibold uppercase tracking-[0.18em] text-[#c5a869]">
-      With a probability of {group.probability}% (multiplier: {group.multiplier})
+      With a probability of {formatPercent(group.probability)}% (multiplier: {group.multiplier})
     </p>
   );
 }
@@ -34,7 +41,7 @@ function DropListView({ drops }: { drops: DropGroup[] }) {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[15px] font-semibold text-[#e6e0d2] transition group-hover:text-white">{entry.name}</p>
                   <p className="text-[12px] uppercase tracking-[0.18em] text-[#9f8e79]">
-                    {entry.type} • {entry.chance}% ({entry.globalChance}% global)
+                    {entry.type} • {formatPercent(entry.chance)}% within roll • {formatPercent(entry.globalChance)}% overall per kill
                   </p>
                 </div>
               </Link>
@@ -68,12 +75,12 @@ function DropCardView({ drops }: { drops: DropGroup[] }) {
                 </div>
                 <div className="mt-5 flex items-end justify-between gap-4 border-t border-white/8 pt-3">
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8e7d68]">Loot chance</p>
-                    <p className="mt-1 text-[1.25rem] font-semibold tracking-[-0.03em] text-[#f1eadc]">{entry.chance}%</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8e7d68]">Within roll</p>
+                    <p className="mt-1 text-[1.25rem] font-semibold tracking-[-0.03em] text-[#f1eadc]">{formatPercent(entry.chance)}%</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8e7d68]">Global</p>
-                    <p className="mt-1 text-sm font-medium text-[#d8ceb4]">{entry.globalChance}%</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8e7d68]">Overall per kill</p>
+                    <p className="mt-1 text-sm font-medium text-[#d8ceb4]">{formatPercent(entry.globalChance)}%</p>
                   </div>
                 </div>
               </Link>
@@ -115,7 +122,13 @@ export function NpcDropsSection({ drops }: { drops: DropGroup[] }) {
       }
     >
       {drops.length > 0 ? (
-        view === "list" ? <DropListView drops={drops} /> : <DropCardView drops={drops} />
+        <div className="space-y-5">
+          <p className="text-sm leading-6 text-[#aeb8ca]">
+            “Overall per kill” is the effective drop chance after the lootdrop roll probability is applied. “Within roll” is the item&apos;s
+            chance inside that lootdrop once the roll happens.
+          </p>
+          {view === "list" ? <DropListView drops={drops} /> : <DropCardView drops={drops} />}
+        </div>
       ) : (
         <p className="text-[15px] leading-6 text-[#aeb8ca]">No loot entries were found for this NPC.</p>
       )}

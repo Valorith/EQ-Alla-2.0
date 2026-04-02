@@ -55,7 +55,7 @@ export function SectionCard({
   className = "",
   allowOverflow = false
 }: {
-  title: string;
+  title: ReactNode;
   children: ReactNode;
   right?: ReactNode;
   className?: string;

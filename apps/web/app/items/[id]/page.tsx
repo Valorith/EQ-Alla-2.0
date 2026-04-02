@@ -137,12 +137,12 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
   if (!item) notFound();
 
   return (
-    <div className="max-w-[1240px] space-y-8 text-[#e6e0d2]">
-      <div className="inline-block max-w-full space-y-3 align-top">
+    <div className="w-full space-y-8 text-[#e6e0d2]">
+      <div className="flex w-full justify-center">
         <ItemDetailPreview item={item} className="max-w-[650px]" />
       </div>
 
-      <div className="max-w-[1080px] space-y-6">
+      <div className="w-full space-y-6">
         <RelatedSection
           title="Dropped in Zones"
           items={item.droppedInZones.map((entry) => ({ href: entry.href, label: entry.longName }))}

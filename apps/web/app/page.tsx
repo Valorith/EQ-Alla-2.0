@@ -70,7 +70,11 @@ function HomePageBody({ query }: { query: string }) {
         </form>
       </section>
 
-      {hasResults ? <SearchClient initialQuery={query} /> : null}
+      {hasResults ? (
+        <div className="xl:pl-[306px]">
+          <SearchClient initialQuery={query} />
+        </div>
+      ) : null}
     </div>
   );
 }

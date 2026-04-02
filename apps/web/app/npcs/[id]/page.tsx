@@ -49,6 +49,9 @@ export default async function NpcDetailPage({ params }: NpcDetailPageProps) {
   const { id } = await params;
   const npc = await getNpcDetail(Number(id));
   const useAiNpcModels = process.env.NPC_MODEL_ASSET_SET === "ai";
+  const npcModelFallbackAssetBaseUrls = useAiNpcModels
+    ? ["/assets/npc-models", "https://cdn.jsdelivr.net/gh/EQEmuTools/eq-asset-preview@master/assets/npc_models"]
+    : ["https://cdn.jsdelivr.net/gh/EQEmuTools/eq-asset-preview@master/assets/npc_models"];
 
   if (!npc) notFound();
 
@@ -138,7 +141,7 @@ export default async function NpcDetailPage({ params }: NpcDetailPageProps) {
             appearance={npc.appearance}
             npcName={npc.name}
             assetBaseUrl={useAiNpcModels ? "/assets/npc-models-ai" : "/assets/npc-models"}
-            fallbackAssetBaseUrl={useAiNpcModels ? "/assets/npc-models" : undefined}
+            fallbackAssetBaseUrls={npcModelFallbackAssetBaseUrls}
           />
 
           <SectionCard title="This NPC Casts">
