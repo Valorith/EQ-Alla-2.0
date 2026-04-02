@@ -46,6 +46,18 @@ const globalSearchLabels: Record<SearchHit["type"], string> = {
   spawngroup: "Spawn Groups"
 };
 
+function renderSearchHitIcon(hit: SearchHit) {
+  if (hit.type === "item" && hit.icon) {
+    return <ItemIcon icon={hit.icon} name={hit.title} size="xs" tooltipItemId={Number(hit.id)} />;
+  }
+
+  if (hit.type === "spell" && hit.icon) {
+    return <SpellIcon icon={hit.icon} name={hit.title} />;
+  }
+
+  return <span aria-hidden="true" className="block size-8" />;
+}
+
 function buildSearchKey(query: string) {
   return query.trim();
 }
@@ -377,17 +389,18 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
             <div className="rounded-2xl border border-[#7b603b]/20 bg-[linear-gradient(180deg,rgba(35,30,27,0.86),rgba(18,20,24,0.84))] px-4 py-4 shadow-[0_18px_44px_rgba(0,0,0,0.24)] backdrop-blur-md">
               <ul className="space-y-2">
                 {pagedVisibleHits.map((hit) => (
-                  <li key={hit.href} className="text-left text-sm text-[#e8dfcf]">
-                    <Link href={hit.href} className="inline-flex items-center gap-2 font-medium hover:underline">
-                      {hit.type === "item" && hit.icon ? <ItemIcon icon={hit.icon} name={hit.title} size="xs" tooltipItemId={Number(hit.id)} /> : null}
-                      {hit.type === "spell" && hit.icon ? <SpellIcon icon={hit.icon} name={hit.title} /> : null}
-                      <span>{hit.title}</span>
-                    </Link>
-                    {hit.subtitle || hit.tags.length > 0 ? (
-                      <span className="ml-2 text-xs text-[#aa9d89]">
-                        {[hit.subtitle, hit.tags.join(" • ")].filter(Boolean).join(" • ")}
-                      </span>
-                    ) : null}
+                  <li key={hit.href} className="grid grid-cols-[2rem_minmax(0,1fr)] items-start gap-x-3 text-left text-sm text-[#e8dfcf]">
+                    <div className="pt-0.5">{renderSearchHitIcon(hit)}</div>
+                    <div className="min-w-0">
+                      <Link href={hit.href} className="block truncate font-medium hover:underline">
+                        {hit.title}
+                      </Link>
+                      {hit.subtitle || hit.tags.length > 0 ? (
+                        <p className="mt-0.5 text-xs leading-5 text-[#aa9d89]">
+                          {[hit.subtitle, hit.tags.join(" • ")].filter(Boolean).join(" • ")}
+                        </p>
+                      ) : null}
+                    </div>
                   </li>
                 ))}
               </ul>
