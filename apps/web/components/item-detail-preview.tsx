@@ -1,7 +1,10 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { ItemDetail } from "@eq-alla/data";
+import { CoinDisplay } from "./coin-display";
 import { ItemIcon } from "./item-icon";
+
+type StatRow = { label: string; value: ReactNode; show?: boolean };
 
 const classAbbreviations: Record<string, string> = {
   Bard: "BRD",
@@ -101,7 +104,7 @@ function StatPairList({
   rows,
   alignValuesRight = false
 }: {
-  rows: Array<{ label: string; value: ReactNode; show?: boolean }>;
+  rows: StatRow[];
   alignValuesRight?: boolean;
 }) {
   return (
@@ -113,6 +116,10 @@ function StatPairList({
         ))}
     </div>
   );
+}
+
+function hasVisibleRows(rows: StatRow[]) {
+  return rows.some((row) => row.show !== false);
 }
 
 function EffectBlock({
@@ -168,67 +175,83 @@ function EffectBlock({
   );
 }
 
-function CoinPill({ label, value, src }: { label: string; value: number; src: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className="tabular-nums">{value}</span>
-      <img src={src} alt="" aria-hidden="true" className="size-[14px] object-contain" title={label} />
-    </span>
-  );
-}
-
 export function ItemDetailPreview({ item, className = "" }: { item: ItemDetail; className?: string }) {
   const isWeapon = item.damage > 0;
   const classDisplay = abbreviateClassDisplay(item.classDisplay);
   const raceDisplay = abbreviateRaceDisplay(item.raceDisplay);
+  const hasCoinValue = item.coinValue.pp > 0 || item.coinValue.gp > 0 || item.coinValue.sp > 0 || item.coinValue.cp > 0;
+  const modifierLabels = new Set(["Skill Mod", "Bard Modifier"]);
+  const isModifierStat = (entry: ItemDetail["stats"][number]) =>
+    modifierLabels.has(entry.label) ||
+    (entry.section === "offense" && entry.label.endsWith(" Damage") && String(entry.value).startsWith("+"));
+  const isTopDamageStat = (entry: ItemDetail["stats"][number]) =>
+    entry.section === "offense" &&
+    !isModifierStat(entry) &&
+    (entry.label.endsWith(" Dmg") || entry.label === "Bane Damage" || entry.label === "Bane Damage (Race)");
+  const statRowsForSections = (...sections: Array<ItemDetail["stats"][number]["section"]>) =>
+    item.stats
+      .filter((entry) => sections.includes(entry.section))
+      .map((entry) => ({ label: entry.label, value: entry.value }));
 
-  const overviewRows = [
+  const overviewRows: StatRow[] = [
     { label: "Size", value: item.size },
     { label: "Weight", value: item.weight },
     { label: isWeapon ? "Skill" : "Item Type", value: isWeapon ? item.skill : item.itemTypeLabel }
   ];
 
-  const primaryValueRows = isWeapon
+  const primaryRows: StatRow[] = statRowsForSections("primary");
+  const weaponRows: StatRow[] = isWeapon
     ? [
         { label: "Base Damage", value: item.damage, show: item.damage > 0 },
         { label: "Delay", value: item.delay, show: item.delay > 0 },
         { label: "Damage bonus", value: item.damageBonus, show: item.damageBonus > 0 },
         { label: "Range", value: item.range, show: item.range > 0 }
       ]
-    : [
-        { label: "AC", value: item.ac, show: item.ac > 0 },
-        { label: "HP", value: item.hp, show: item.hp > 0 },
-        { label: "Mana", value: item.mana, show: item.mana > 0 },
-        { label: "End", value: item.endurance, show: item.endurance > 0 }
-      ];
-
-  const attributeRows = [
-    { label: "Strength", value: item.stats.find((entry) => entry.label === "Strength")?.value, show: item.stats.some((entry) => entry.label === "Strength") },
-    { label: "Stamina", value: item.stats.find((entry) => entry.label === "Stamina")?.value, show: item.stats.some((entry) => entry.label === "Stamina") },
-    { label: "Intelligence", value: item.stats.find((entry) => entry.label === "Intelligence")?.value, show: item.stats.some((entry) => entry.label === "Intelligence") },
-    { label: "Wisdom", value: item.stats.find((entry) => entry.label === "Wisdom")?.value, show: item.stats.some((entry) => entry.label === "Wisdom") },
-    { label: "Agility", value: item.stats.find((entry) => entry.label === "Agility")?.value, show: item.stats.some((entry) => entry.label === "Agility") },
-    { label: "Dexterity", value: item.stats.find((entry) => entry.label === "Dexterity")?.value, show: item.stats.some((entry) => entry.label === "Dexterity") },
-    { label: "Charisma", value: item.stats.find((entry) => entry.label === "Charisma")?.value, show: item.stats.some((entry) => entry.label === "Charisma") }
-  ];
-
-  const resistRows = [
-    { label: "Magic Resist", value: item.stats.find((entry) => entry.label === "Magic Resist")?.value, show: item.stats.some((entry) => entry.label === "Magic Resist") },
-    { label: "Fire Resist", value: item.stats.find((entry) => entry.label === "Fire Resist")?.value, show: item.stats.some((entry) => entry.label === "Fire Resist") },
-    { label: "Cold Resist", value: item.stats.find((entry) => entry.label === "Cold Resist")?.value, show: item.stats.some((entry) => entry.label === "Cold Resist") },
-    { label: "Disease Resist", value: item.stats.find((entry) => entry.label === "Disease Resist")?.value, show: item.stats.some((entry) => entry.label === "Disease Resist") },
-    { label: "Poison Resist", value: item.stats.find((entry) => entry.label === "Poison Resist")?.value, show: item.stats.some((entry) => entry.label === "Poison Resist") }
-  ];
-
-  const utilityRows = [
-    { label: "HP Regen", value: item.hpRegen, show: item.hpRegen > 0 },
-    { label: "Mana Regen", value: item.manaRegen, show: item.manaRegen > 0 },
-    { label: "Endurance Regen", value: item.enduranceRegen, show: item.enduranceRegen > 0 },
-    { label: "Attack", value: item.attack, show: item.attack > 0 && !isWeapon },
-    { label: "Haste", value: `${item.haste}%`, show: item.haste > 0 },
+    : [];
+  weaponRows.push(
+    ...item.stats
+      .filter(isTopDamageStat)
+      .map((entry) => ({ label: entry.label, value: entry.value }))
+  );
+  const attributeRows: StatRow[] = statRowsForSections("attributes", "heroics");
+  const resistRows: StatRow[] = statRowsForSections("resists");
+  const modifierRows: StatRow[] = item.stats.filter(isModifierStat).map((entry) => ({ label: entry.label, value: entry.value }));
+  const supportRows: StatRow[] = [
+    ...item.stats
+      .filter(
+        (entry) =>
+          (entry.section === "offense" || entry.section === "defense" || entry.section === "utility") &&
+          !isModifierStat(entry) &&
+          !isTopDamageStat(entry)
+      )
+      .map((entry) => ({ label: entry.label, value: entry.value })),
     { label: "Req Level", value: item.levelRequired, show: item.levelRequired > 0 },
     { label: "Rec Level", value: item.recommendedLevel, show: item.recommendedLevel > 0 }
   ];
+
+  const topColumns: Array<{ key: string; rows: StatRow[] }> = [
+    { key: "overview", rows: overviewRows },
+    { key: "primary", rows: primaryRows },
+    { key: "weapon", rows: weaponRows }
+  ].filter((column) => hasVisibleRows(column.rows));
+
+  const showSupportRowsInTop = !isWeapon && topColumns.length < 3 && hasVisibleRows(supportRows) && !hasVisibleRows(attributeRows) && !hasVisibleRows(resistRows);
+
+  if (showSupportRowsInTop) {
+    topColumns.push({ key: "support", rows: supportRows });
+  }
+
+  const lowerColumns: Array<{ key: string; rows: StatRow[] }> = [
+    { key: "attributes", rows: attributeRows },
+    { key: "resists", rows: resistRows },
+    ...(showSupportRowsInTop ? [] : [{ key: "support", rows: supportRows }])
+  ].filter((column) => hasVisibleRows(column.rows));
+
+  const hasLowerColumns = lowerColumns.length > 0;
+  const statGridColumnCount = Math.max(topColumns.length, lowerColumns.length, 1);
+  const statGridStyle: CSSProperties = {
+    gridTemplateColumns: `repeat(${statGridColumnCount}, max-content)`
+  };
 
   return (
     <section
@@ -253,17 +276,35 @@ export function ItemDetailPreview({ item, className = "" }: { item: ItemDetail; 
         </div>
 
         <div className="space-y-4">
-          <div className="grid justify-start gap-x-4 gap-y-2.5 sm:grid-cols-[max-content_max-content]">
-            <StatPairList rows={overviewRows} alignValuesRight />
-            <StatPairList rows={primaryValueRows} alignValuesRight />
-          </div>
-
-          <div className="grid justify-start gap-x-4 gap-y-2.5 sm:grid-cols-[max-content_max-content_max-content]">
-            <StatPairList rows={attributeRows} alignValuesRight />
-            <StatPairList rows={resistRows} alignValuesRight />
-            <StatPairList rows={utilityRows} alignValuesRight />
+          <div className="grid justify-start gap-x-4 gap-y-2.5" style={statGridStyle}>
+            {topColumns.map((column, index) => (
+              <div
+                key={column.key}
+                className="min-w-max"
+                style={{ gridColumn: index + 1, gridRow: 1 }}
+              >
+                <StatPairList rows={column.rows} alignValuesRight />
+              </div>
+            ))}
+            {hasLowerColumns
+              ? lowerColumns.map((column, index) => (
+                <div
+                  key={column.key}
+                  className="min-w-max"
+                  style={{ gridColumn: index + 1, gridRow: 2 }}
+                >
+                  <StatPairList rows={column.rows} alignValuesRight />
+                </div>
+              ))
+              : null}
           </div>
         </div>
+
+        {hasVisibleRows(modifierRows) ? (
+          <div className="min-w-max">
+            <StatPairList rows={modifierRows} />
+          </div>
+        ) : null}
 
         {item.augmentSlots.length > 0 ? (
           <div className="space-y-0.5">
@@ -290,15 +331,12 @@ export function ItemDetailPreview({ item, className = "" }: { item: ItemDetail; 
           <EffectBlock title="Spell Scroll Effect" effect={item.spellScrollEffect} />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 text-[14px] leading-5">
-          <span className="font-semibold text-[#d8ceb4]">Value:</span>
-          <div className="flex flex-wrap items-center gap-2">
-            <CoinPill label="PP" value={item.coinValue.pp} src="/coins/pp.png" />
-            <CoinPill label="GP" value={item.coinValue.gp} src="/coins/gp.png" />
-            <CoinPill label="SP" value={item.coinValue.sp} src="/coins/sp.png" />
-            <CoinPill label="CP" value={item.coinValue.cp} src="/coins/cp.png" />
+        {hasCoinValue ? (
+          <div className="flex flex-wrap items-center gap-2 text-[14px] leading-5">
+            <span className="font-semibold text-[#d8ceb4]">Value:</span>
+            <CoinDisplay value={item.coinValue} />
           </div>
-        </div>
+        ) : null}
       </div>
     </section>
   );

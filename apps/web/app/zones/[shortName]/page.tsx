@@ -1,6 +1,27 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Compass, Crosshair, Leaf, Shield, Skull, Sparkles, Swords } from "lucide-react";
+import type { ComponentType, SVGProps } from "react";
+import type { LucideIcon } from "lucide-react";
+import {
+  Anvil,
+  Beer,
+  BookOpenText,
+  BrickWallFire,
+  Bug,
+  Compass,
+  CookingPot,
+  Crosshair,
+  FlameKindling,
+  FlaskConical,
+  Gem,
+  Leaf,
+  Shield,
+  Skull,
+  Sparkles,
+  Swords,
+  Shirt,
+  Wrench
+} from "lucide-react";
 import { getZoneDetail } from "@eq-alla/data";
 import { ZoneResourceLedger } from "../../../components/zone-resource-ledger";
 
@@ -33,6 +54,35 @@ const modeMeta: Record<ZoneMode, { title: string; description: string }> = {
 function formatCount(value: number) {
   return new Intl.NumberFormat("en-US").format(value);
 }
+
+type CraftingStationIcon = ComponentType<{ className?: string }>;
+
+function PotteryWheelIcon({ className }: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M9 6c0-1.1 1.3-2 3-2s3 .9 3 2-1.3 2-3 2-3-.9-3-2Z" />
+      <path d="M9 6v1.2c0 1.1-.6 1.7-1.3 2.4-.9.8-1.7 1.8-1.7 3.5 0 3.1 2.7 5.7 6 5.7s6-2.6 6-5.7c0-1.7-.8-2.7-1.7-3.5-.7-.7-1.3-1.3-1.3-2.4V6" />
+      <path d="M8.2 11.2c1 .5 2.4.8 3.8.8s2.8-.3 3.8-.8" />
+    </svg>
+  );
+}
+
+const craftingStationIcons: Record<string, CraftingStationIcon> = {
+  alchemy: FlaskConical,
+  tinkering: Wrench,
+  poisoncrafting: Skull,
+  research: BookOpenText,
+  baking: CookingPot,
+  tailoring: Shirt,
+  blacksmithing: Anvil,
+  fletching: Crosshair,
+  brewing: Beer,
+  jewelcraft: Gem,
+  "pottery-wheel": PotteryWheelIcon,
+  "pottery-kiln": FlameKindling,
+  "fly-making": Bug,
+  experiment: Sparkles
+};
 
 function FactBlock({ label, value }: { label: string; value: string }) {
   return (
@@ -99,7 +149,8 @@ export default async function ZoneDetailPage({ params, searchParams }: ZoneDetai
   };
 
   const activeMeta = modeMeta[mode];
-  const ledgerBestiary = mode === "named" ? zone.bestiary.filter((entry) => entry.named) : zone.bestiary;
+  const activeNamedNpcIds = new Set(zone.namedNpcs.map((entry) => entry.id));
+  const ledgerBestiary = mode === "named" ? zone.bestiary.filter((entry) => activeNamedNpcIds.has(entry.id)) : zone.bestiary;
 
   return (
     <div className="space-y-5 sm:space-y-6">
@@ -131,9 +182,43 @@ export default async function ZoneDetailPage({ params, searchParams }: ZoneDetai
               <FactBlock label="Encounter Spread" value={zone.encounterRange} />
               <FactBlock label="Safe Point" value={zone.safePoint} />
               <FactBlock label="Bestiary" value={`${formatCount(zone.bestiary.length)} entries`} />
-              <FactBlock label="Notable Encounters" value={`${formatCount(zone.namedNpcs.length)} indexed`} />
+              <FactBlock label="Notable NPCs" value={`${formatCount(zone.namedNpcs.length)} indexed`} />
               <FactBlock label="Zone Equipment" value={`${formatCount(zone.itemDrops.length)} drops`} />
+              <FactBlock label="Crafting Stations" value={`${formatCount(zone.craftingStations)} stations`} />
             </dl>
+
+            {zone.craftingServices.length > 0 ? (
+              <div className="space-y-3 border-b border-white/10 pb-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b99a67]">Crafting Stations</p>
+                  <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8f7f68]">
+                    {formatCount(zone.craftingServices.length)} types
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-3">
+                  {zone.craftingServices.map((service) => {
+                    const Icon = craftingStationIcons[service.slug] ?? Sparkles;
+                    const tooltip = `${service.label}: ${formatCount(service.count)} station${service.count === 1 ? "" : "s"}`;
+                    const iconClassName = service.slug === "pottery-wheel" ? "size-9" : "size-7";
+
+                    return (
+                      <div key={service.slug} className="flex w-[88px] flex-col items-center gap-1.5 text-center">
+                        <span
+                          title={tooltip}
+                          aria-label={tooltip}
+                          className="inline-flex size-14 items-center justify-center rounded-full border border-[#d3ac67]/20 bg-[radial-gradient(circle_at_30%_30%,rgba(220,180,110,0.2),rgba(255,255,255,0.04))] text-[#f2d39a] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-[#d3ac67]/38 hover:text-[#f8dfb2]"
+                        >
+                          <Icon className={iconClassName} />
+                        </span>
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#a89270]">
+                          {service.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <aside className="border-t border-white/10 px-5 py-6 sm:px-7 xl:border-l xl:border-t-0 xl:px-6 xl:py-8">
@@ -151,7 +236,7 @@ export default async function ZoneDetailPage({ params, searchParams }: ZoneDetai
                   </div>
                   <div className="flex items-center gap-3">
                     <Sparkles className="size-4 text-[#dcb46e]" />
-                    <span>{formatCount(zone.namedNpcs.length)} notable encounters indexed</span>
+                    <span>{formatCount(zone.namedNpcs.length)} notable NPCs indexed</span>
                   </div>
                 </div>
               </div>
@@ -172,7 +257,7 @@ export default async function ZoneDetailPage({ params, searchParams }: ZoneDetai
 
               {zone.namedNpcs.length > 0 ? (
                 <div className="space-y-3 border-t border-white/10 pt-5">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b99a67]">Notable Encounters</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b99a67]">Notable NPCs</p>
                   <div className="space-y-2">
                     {zone.namedNpcs.slice(0, 6).map((entry) => (
                       <Link

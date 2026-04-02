@@ -36,6 +36,21 @@ export type ItemSummary = {
   delay: number;
 };
 
+export type ItemDetailStatSection =
+  | "primary"
+  | "attributes"
+  | "resists"
+  | "heroics"
+  | "offense"
+  | "defense"
+  | "utility";
+
+export type ItemDetailStat = {
+  label: string;
+  value: string;
+  section: ItemDetailStatSection;
+};
+
 export type ItemDetail = ItemSummary & {
   icon: string;
   lore: string;
@@ -64,7 +79,7 @@ export type ItemDetail = ItemSummary & {
   focusEffect?: { id: number; name: string; href: string; level?: number };
   clickEffect?: { id: number; name: string; href: string; level?: number; castType?: string };
   spellScrollEffect?: { id: number; name: string; href: string };
-  stats: Array<{ label: string; value: string }>;
+  stats: ItemDetailStat[];
   droppedBy: Array<{
     id: number;
     name: string;
@@ -149,7 +164,14 @@ export type NpcDetail = NpcSummary & {
     multiplier: number;
     items: Array<{ id: number; name: string; href: string; type: string; icon: string; chance: number; globalChance: number }>;
   }>;
-  sells: Array<{ id: number; name: string; href: string; icon: string; price: string }>;
+  sells: Array<{
+    id: number;
+    name: string;
+    href: string;
+    icon: string;
+    price: string;
+    coinValue: { pp: number; gp: number; sp: number; cp: number } | null;
+  }>;
   spawnGroups: Array<{ id: number; name: string; href: string }>;
   spawnZones: Array<{ shortName: string; longName: string; href: string }>;
   factionHits: {
@@ -232,11 +254,19 @@ export type ZoneForageEntry = {
   skill: number;
 };
 
+export type ZoneCraftingService = {
+  slug: string;
+  label: string;
+  count: number;
+};
+
 export type ZoneDetail = ZoneSummary & {
   hotzone: boolean;
   safePoint: string;
   encounterRange: string;
   spawnPoints: number;
+  craftingStations: number;
+  craftingServices: ZoneCraftingService[];
   rules: string[];
   resources: ZoneResourceLink[];
   bestiary: ZoneBestiaryEntry[];
@@ -270,6 +300,17 @@ export type RecipeSummary = {
   result: string;
 };
 
+export type RecipeStationRequirement = {
+  slug: string;
+  label: string;
+};
+
+export type RecipeStationZone = {
+  shortName: string;
+  longName: string;
+  href: string;
+};
+
 export type PetSummary = {
   id: number;
   spellId: number;
@@ -292,6 +333,8 @@ export type RecipeDetail = RecipeSummary & {
   container: string;
   notes: string;
   containers: Array<{ id: number; name: string; href?: string; icon: string }>;
+  requiredStations: RecipeStationRequirement[];
+  availableZonesByStation: Array<RecipeStationRequirement & { zones: RecipeStationZone[] }>;
   creates: Array<{ id: number; name: string; href: string; count: number; icon: string }>;
   ingredients: Array<{ id: number; name: string; href: string; count: number; icon: string }>;
 };

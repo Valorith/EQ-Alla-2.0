@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { getNpcDetail } from "@eq-alla/data";
 import { ItemIcon } from "../../../components/item-icon";
 import { PageHero, SectionCard } from "../../../components/catalog-shell";
+import { CoinDisplay } from "../../../components/coin-display";
 import { NpcDropsSection } from "../../../components/npc-drops-section";
 import { NpcModelPreview } from "../../../components/npc-model-preview";
 import { SpellIcon } from "../../../components/spell-icon";
@@ -178,7 +179,11 @@ export default async function NpcDetailPage({ params }: NpcDetailPageProps) {
                     <ItemIcon icon={entry.icon} name={entry.name} size="sm" tooltipItemId={entry.id} />
                     <div className="min-w-0">
                       <p className="truncate text-[15px] font-semibold text-[#e6e0d2] transition group-hover:text-white">{entry.name}</p>
-                      <p className="text-[12px] uppercase tracking-[0.18em] text-[#9f8e79]">{entry.price}</p>
+                      {entry.coinValue ? (
+                        <CoinDisplay value={entry.coinValue} className="pt-0.5 text-[12px] text-[#9f8e79]" />
+                      ) : (
+                        <p className="text-[12px] uppercase tracking-[0.18em] text-[#9f8e79]">{entry.price}</p>
+                      )}
                     </div>
                   </Link>
                 ))}

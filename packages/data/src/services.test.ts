@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { sql } from "kysely";
 import {
@@ -51,6 +54,248 @@ describe("catalog services", () => {
     expect(prayerShawl?.flags.includes("No Drop")).toBe(true);
     expect(tradeableClothCaps.some((item) => item.id === 1001)).toBe(true);
     expect(noDropShawls.some((item) => item.id === 1175)).toBe(true);
+  });
+
+  it("includes damage shield stats shown in-game for cloak of death", async () => {
+    const item = await getItemDetail(80056);
+
+    expect(item).toBeTruthy();
+    expect(item?.stats).toContainEqual({
+      label: "Damage Shield",
+      value: "25",
+      section: "defense"
+    });
+  });
+
+  it("maps canonical item stat columns into item detail stats", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const statColumns = [
+      { column: "damageshield", label: "Damage Shield" },
+      { column: "shielding", label: "Shielding" },
+      { column: "spellshield", label: "Spell Shield" },
+      { column: "avoidance", label: "Avoidance" },
+      { column: "accuracy", label: "Accuracy" },
+      { column: "strikethrough", label: "Strike Through" },
+      { column: "stunresist", label: "Stun Resist" },
+      { column: "dotshielding", label: "DoT Shielding" },
+      { column: "svcorruption", label: "Corruption Resist" },
+      { column: "heroic_str", label: "Heroic Strength" },
+      { column: "healamt", label: "Heal Amount" },
+      { column: "spelldmg", label: "Spell Damage" },
+      { column: "clairvoyance", label: "Clairvoyance" },
+      { column: "backstabdmg", label: "Backstab Damage" },
+      { column: "banedmgamt", label: "Bane Damage" },
+      { column: "banedmgraceamt", label: "Bane Damage (Race)" },
+      { column: "skillmodvalue", label: "Skill Mod" },
+      { column: "bardvalue", label: "Bard Modifier" }
+    ] as const;
+
+    for (const statColumn of statColumns) {
+      const sampleRows = await sql<{ id: number }>`
+        select i.id
+        from items i
+        where exists (
+          select 1
+          from discovered_items di
+          where di.item_id = i.id
+        )
+          and coalesce(${sql.raw(statColumn.column)}, 0) <> 0
+        order by i.id asc
+        limit 1
+      `.execute(db!);
+
+      if (!sampleRows.rows[0]) {
+        continue;
+      }
+
+      const item = await getItemDetail(sampleRows.rows[0].id);
+      expect(item?.stats.some((entry) => entry.label === statColumn.label)).toBe(true);
+    }
+  }, 20_000);
+
+  it("formats skill modifiers with resolved skill names", async () => {
+    const item = await getItemDetail(25210);
+
+    expect(item).toBeTruthy();
+    expect(item?.stats).toContainEqual({
+      label: "Skill Mod",
+      value: "Taunt: +5%",
+      section: "utility"
+    });
+  });
+
+  it("resolves all discovered item skill modifiers to canonical EQEmu skill names", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{ item_id: number; skillmodtype: number }>`
+      select min(i.id) as item_id, i.skillmodtype
+      from items i
+      where coalesce(i.skillmodvalue, 0) <> 0
+        and exists (
+          select 1
+          from discovered_items di
+          where di.item_id = i.id
+        )
+      group by i.skillmodtype
+      order by i.skillmodtype asc
+    `.execute(db!);
+
+    expect(rows.rows.length).toBeGreaterThan(0);
+
+    for (const row of rows.rows) {
+      const item = await getItemDetail(row.item_id);
+      const skillMod = item?.stats.find((entry) => entry.label === "Skill Mod");
+
+      expect(skillMod).toBeTruthy();
+      expect(skillMod?.value).not.toMatch(/^Skill \d+:/);
+    }
+  }, 20_000);
+
+  it("formats extra damage with the correct weapon skill label", async () => {
+    const item = await getItemDetail(25210);
+
+    expect(item).toBeTruthy();
+    expect(item?.stats).toContainEqual({
+      label: "1HS Damage",
+      value: "+5",
+      section: "offense"
+    });
+  });
+
+  it("applies manual NPC zone overrides outside the content database", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const sampleRows = await sql<{ npc_id: number; item_id: number }>`
+      select nt.id as npc_id, lde.item_id
+      from npc_types nt
+      join spawnentry se on se.npcID = nt.id
+      join spawngroup sg on sg.id = se.spawngroupID
+      join spawn2 s2 on s2.spawngroupID = sg.id
+      left join spawn2_disabled s2d
+        on s2d.spawn2_id = s2.id
+       and coalesce(s2d.disabled, 0) <> 0
+      join zone z
+        on z.short_name = s2.zone
+       and coalesce(z.version, 0) = 0
+       and coalesce(z.min_status, 0) <= 1
+      join loottable_entries lte on lte.loottable_id = nt.loottable_id
+      join lootdrop_entries lde on lde.lootdrop_id = lte.lootdrop_id
+      where ${sql.raw("coalesce(nt.trackable, 0) = 1")}
+        and lower(trim(coalesce(nt.name, ''))) <> 'bazaar'
+        and s2d.spawn2_id is null
+        and exists (
+          select 1
+          from discovered_items di
+          where di.item_id = lde.item_id
+        )
+      order by nt.level desc, nt.name asc, lde.item_id asc
+      limit 25
+    `.execute(db!);
+
+    if (!sampleRows.rows[0]) {
+      expect(sampleRows.rows).toEqual([]);
+      return;
+    }
+
+    let sample: { npc_id: number; item_id: number } | undefined;
+
+    for (const candidate of sampleRows.rows) {
+      const item = await getItemDetail(candidate.item_id);
+      if (item?.droppedBy.some((entry) => entry.id === candidate.npc_id)) {
+        sample = candidate;
+        break;
+      }
+    }
+
+    expect(sample).toBeTruthy();
+    if (!sample) {
+      return;
+    }
+
+    const existingNpc = await getNpcDetail(sample.npc_id);
+    expect(existingNpc).toBeTruthy();
+
+    const existingZoneShortNames = existingNpc?.spawnZones.map((zone) => zone.shortName) ?? [];
+    const zoneRows = existingZoneShortNames.length > 0
+      ? await sql<{ short_name: string; long_name: string }>`
+          select short_name, long_name
+          from zone
+          where coalesce(version, 0) = 0
+            and coalesce(min_status, 0) <= 1
+            and short_name not in (${sql.join(existingZoneShortNames.map((value) => sql`${value}`), sql`, `)})
+          order by long_name asc
+          limit 1
+        `.execute(db!)
+      : await sql<{ short_name: string; long_name: string }>`
+          select short_name, long_name
+          from zone
+          where coalesce(version, 0) = 0
+            and coalesce(min_status, 0) <= 1
+          order by long_name asc
+          limit 1
+        `.execute(db!);
+
+    if (!zoneRows.rows[0]) {
+      expect(zoneRows.rows).toEqual([]);
+      return;
+    }
+
+    const overrideZone = zoneRows.rows[0];
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "eq-alla-manual-zones-"));
+    const overridePath = path.join(tempDir, "manual-npc-zone-overrides.json");
+    const previousOverridePath = process.env.EQ_MANUAL_NPC_ZONE_OVERRIDES_PATH;
+
+    fs.writeFileSync(
+      overridePath,
+      JSON.stringify([{ npcId: sample.npc_id, zoneShortName: overrideZone.short_name }], null, 2),
+      "utf8"
+    );
+
+    process.env.EQ_MANUAL_NPC_ZONE_OVERRIDES_PATH = overridePath;
+
+    try {
+      const npc = await getNpcDetail(sample.npc_id);
+      const item = await getItemDetail(sample.item_id);
+      const zone = await getZoneDetail(overrideZone.short_name);
+
+      expect(npc?.spawnZones.some((entry) => entry.shortName === overrideZone.short_name)).toBe(true);
+      expect(npc?.zone.includes(overrideZone.long_name)).toBe(true);
+      expect(item?.droppedBy.some((entry) => entry.id === sample.npc_id && entry.zone.shortName === overrideZone.short_name)).toBe(true);
+      expect(item?.droppedInZones.some((entry) => entry.shortName === overrideZone.short_name)).toBe(true);
+      expect(zone?.bestiary.some((entry) => entry.id === sample.npc_id)).toBe(true);
+      expect(zone?.itemDrops.some((entry) => entry.id === sample.item_id)).toBe(true);
+    } finally {
+      if (previousOverridePath === undefined) {
+        delete process.env.EQ_MANUAL_NPC_ZONE_OVERRIDES_PATH;
+      } else {
+        process.env.EQ_MANUAL_NPC_ZONE_OVERRIDES_PATH = previousOverridePath;
+      }
+
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }, 20_000);
+
+  it("matches NPC catalog search against normalized display names", async () => {
+    const results = await searchCatalog("The Avatar of War");
+    const npcs = await listNpcs({ q: "The Avatar of War" });
+
+    expect(results.some((entry) => entry.type === "npc" && entry.id === "113457")).toBe(true);
+    expect(npcs.some((entry) => entry.id === 113457)).toBe(true);
+  });
+
+  it("formats elemental damage with a typed damage label", async () => {
+    const item = await getItemDetail(25210);
+
+    expect(item).toBeTruthy();
+    expect(item?.stats).toContainEqual({
+      label: "Fire Dmg",
+      value: "1",
+      section: "offense"
+    });
   });
 
   it("supports multi-select class and slot filters for item lists", async () => {
@@ -562,6 +807,39 @@ describe("catalog services", () => {
     expect(npcDetail).toBeUndefined();
   }, 60_000);
 
+  it("excludes NPCs named Bazaar from listings, search, detail, and zone bestiary views", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{ id: number; zone: string }>`
+      select nt.id, min(s2.zone) as zone
+      from npc_types nt
+      join spawnentry se on se.npcID = nt.id
+      join spawngroup sg on sg.id = se.spawngroupID
+      join spawn2 s2 on s2.spawngroupID = sg.id
+      where nt.name = 'Bazaar'
+      group by nt.id
+      order by nt.id asc
+      limit 1
+    `.execute(db!);
+
+    if (!rows.rows[0]) {
+      expect(rows.rows).toEqual([]);
+      return;
+    }
+
+    const sample = rows.rows[0];
+    const npcResults = await listNpcs({ q: "Bazaar" });
+    const searchHits = await searchCatalog("Bazaar");
+    const npcDetail = await getNpcDetail(sample.id);
+    const zoneDetail = await getZoneDetail(sample.zone);
+
+    expect(npcResults.some((npc) => npc.name === "Bazaar")).toBe(false);
+    expect(searchHits.some((hit) => hit.type === "npc" && hit.title === "Bazaar")).toBe(false);
+    expect(npcDetail).toBeUndefined();
+    expect(zoneDetail?.bestiary.some((npc) => npc.name === "Bazaar")).toBe(false);
+  }, 20_000);
+
   it("renders readable spell effect translations for trigger focus effects", async () => {
     const spell = await getSpellDetail(38188);
     const effectTexts = spell?.effects.map((entry) => entry.text) ?? [];
@@ -836,6 +1114,166 @@ describe("catalog services", () => {
     expect(zone?.namedNpcs.length).toBeGreaterThan(0);
   });
 
+  it("lists only min_status 0 zones for recipe public station access", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{ recipe_id: number }>`
+      select distinct r.id as recipe_id
+      from tradeskill_recipe r
+      join tradeskill_recipe_entries tre on tre.recipe_id = r.id and tre.iscontainer = 1
+      left join items i on i.id = tre.item_id
+      where coalesce(r.enabled, 1) = 1
+        and (
+          coalesce(i.Name, '') like '%Forge%'
+          or coalesce(i.Name, '') like '%Sewing%'
+          or coalesce(i.Name, '') like '%Loom%'
+          or coalesce(i.Name, '') like '%Oven%'
+          or coalesce(i.Name, '') like '%Spit%'
+          or coalesce(i.Name, '') like '%Mixing Bowl%'
+          or coalesce(i.Name, '') like '%Brew%'
+          or coalesce(i.Name, '') like '%Barrel%'
+          or coalesce(i.Name, '') like '%Fletching%'
+          or coalesce(i.Name, '') like '%Jeweler%'
+          or coalesce(i.Name, '') like '%Kiln%'
+          or coalesce(i.Name, '') like '%Pottery Wheel%'
+        )
+      order by r.id asc
+      limit 1
+    `.execute(db!);
+
+    if (!rows.rows[0]) {
+      expect(rows.rows).toEqual([]);
+      return;
+    }
+
+    const recipe = await getRecipeDetail(rows.rows[0].recipe_id);
+    expect(recipe).toBeTruthy();
+    expect(recipe?.requiredStations.length).toBeGreaterThan(0);
+    expect(recipe?.availableZonesByStation.length).toBeGreaterThan(0);
+
+    const zoneShortNames = recipe?.availableZonesByStation.flatMap((station) => station.zones.map((zone) => zone.shortName)) ?? [];
+
+    if (zoneShortNames.length === 0) {
+      expect(recipe?.availableZonesByStation.every((station) => station.zones.length === 0)).toBe(true);
+      return;
+    }
+
+    const publicZoneRows = await sql<{ short_name: string; min_status: number }>`
+      select short_name, min_status
+      from zone
+      where version = 0
+        and short_name in (${sql.join(zoneShortNames.map((shortName) => sql`${shortName}`), sql`, `)})
+    `.execute(db!);
+
+    expect(publicZoneRows.rows.every((row) => Number(row.min_status ?? 0) === 0)).toBe(true);
+  }, 20_000);
+
+  it("includes normalized crafting services on visible zone detail routes", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const sampleRows = await sql<{ short_name: string; station_count: number }>`
+      select z.short_name, count(*) as station_count
+      from zone z
+      join object o on o.zoneid = z.zoneidnumber
+      where z.version = 0
+        and coalesce(z.min_status, 0) <= ${1}
+        and o.version in (z.version, -1)
+        and (
+          (
+            coalesce(o.content_flags, '') = ''
+            or exists (
+              select 1
+              from content_flags cf
+              where cf.flag_name = o.content_flags
+                and coalesce(cf.enabled, 0) <> 0
+            )
+          )
+          and (
+            coalesce(o.content_flags_disabled, '') = ''
+            or not exists (
+              select 1
+              from content_flags cf
+              where cf.flag_name = o.content_flags_disabled
+                and coalesce(cf.enabled, 0) <> 0
+            )
+          )
+        )
+        and o.type in (9,10,11,12,13,14,15,16,17,18,19,20,21,22,24,30,31,32,33,34,35,36,38,39,40,41,42,43,44,45,46,47,48,49,50)
+      group by z.short_name
+      order by station_count desc, z.short_name asc
+      limit 1
+    `.execute(db!);
+
+    if (!sampleRows.rows[0]) {
+      expect(sampleRows.rows).toEqual([]);
+      return;
+    }
+
+    const sample = sampleRows.rows[0];
+    const zone = await getZoneDetail(sample.short_name);
+
+    expect(zone).toBeTruthy();
+    expect(zone?.craftingStations).toBe(Number(sample.station_count ?? 0));
+    expect(zone?.craftingServices.length).toBeGreaterThan(0);
+    expect(zone?.craftingServices.reduce((sum, service) => sum + service.count, 0)).toBe(Number(sample.station_count ?? 0));
+  }, 20_000);
+
+  it("falls back to alternate object versions for public guild hall crafting stations", async () => {
+    const zone = await getZoneDetail("guildhall");
+
+    expect(zone).toBeTruthy();
+    expect(zone?.craftingStations).toBeGreaterThan(0);
+    expect(zone?.craftingServices.some((service) => service.slug === "blacksmithing")).toBe(true);
+    expect(zone?.craftingServices.some((service) => service.slug === "baking")).toBe(true);
+    expect(zone?.craftingServices.some((service) => service.slug === "pottery-wheel")).toBe(true);
+    expect(zone?.craftingServices.some((service) => service.slug === "pottery-kiln")).toBe(true);
+  }, 20_000);
+
+  it("limits zone notable NPCs to entries with an active public spawn chance", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const zone = await getZoneDetail("mistmoore");
+    expect(zone).toBeTruthy();
+    expect(zone?.namedNpcs.length).toBeGreaterThan(0);
+
+    const namedNpcIds = zone?.namedNpcs.map((entry) => entry.id) ?? [];
+
+    const rows = await sql<{ id: number; active_spawn_count: number }>`
+      select nt.id, count(*) as active_spawn_count
+      from npc_types nt
+      join spawnentry se on se.npcID = nt.id
+      join spawngroup sg on sg.id = se.spawngroupID
+      join spawn2 s2 on s2.spawngroupID = sg.id
+      left join spawn2_disabled s2d on s2d.spawn2_id = s2.id and coalesce(s2d.disabled, 0) <> 0
+      join zone z on z.short_name = s2.zone and z.version = 0
+      where nt.id in (${sql.join(namedNpcIds.map((id) => sql`${id}`), sql`, `)})
+        and s2.version in (z.version, -1)
+        and s2d.spawn2_id is null
+        and coalesce(se.chance, 0) > 0
+        and (
+          (coalesce(s2.content_flags, '') = '' or exists (
+            select 1
+            from content_flags cf
+            where cf.flag_name = s2.content_flags
+              and coalesce(cf.enabled, 0) <> 0
+          ))
+          and (coalesce(s2.content_flags_disabled, '') = '' or not exists (
+            select 1
+            from content_flags cf
+            where cf.flag_name = s2.content_flags_disabled
+              and coalesce(cf.enabled, 0) <> 0
+          ))
+        )
+      group by nt.id
+    `.execute(db!);
+
+    expect(rows.rows.length).toBe(namedNpcIds.length);
+    expect(rows.rows.every((row) => Number(row.active_spawn_count ?? 0) > 0)).toBe(true);
+  }, 20_000);
+
   it("reports catalog stats from the same visible NPC and recipe populations used by the app", async () => {
     const db = getDb();
     expect(db).toBeTruthy();
@@ -857,6 +1295,7 @@ describe("catalog services", () => {
         ) z on z.short_name = s2.zone
         where s2d.spawn2_id is null
           and coalesce(nt.trackable, 0) = 1
+          and lower(trim(coalesce(nt.name, ''))) <> 'bazaar'
           and (
             (coalesce(s2.content_flags, '') = '' or exists (
               select 1

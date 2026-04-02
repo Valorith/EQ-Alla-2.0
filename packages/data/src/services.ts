@@ -2,6 +2,7 @@ import { cacheGet, cacheGetOrResolve } from "./cache";
 import { getDb } from "./db";
 import { itemClassNames, itemSlotFlags } from "./item-search-filters";
 import { canonicalizeItemTypeName, itemTypeIdFromName, itemTypeNameFromId } from "./item-types";
+import { getManualNpcIdsForZone, getManualNpcZoneLinksByNpcId } from "./manual-npc-zone-overrides";
 import { formatPlayableItemRaceMask, raceNames } from "./race-names";
 import { getSpellEffectName, resolveSpellEffectDirection, summarizeSpellEffects } from "./spell-effects";
 import { formatExpansion, formatZoneEra, getZoneEraLabels, listZoneEraDefinitions, matchesZoneEraFilter } from "./zone-eras";
@@ -11,12 +12,16 @@ import type {
   FactionDetail,
   FactionSummary,
   ItemDetail,
+  ItemDetailStat,
+  ItemDetailStatSection,
   ItemSummary,
   NpcDetail,
   NpcSummary,
   PetDetail,
   PetSummary,
   RecipeDetail,
+  RecipeStationRequirement,
+  RecipeStationZone,
   RecipeSummary,
   SearchHit,
   SpellDetail,
@@ -24,6 +29,7 @@ import type {
   SpawnGroupDetail,
   TaskDetail,
   ZoneByLevelSummary,
+  ZoneCraftingService,
   ZoneDetail,
   ZoneLevelBand,
   ZoneSummary
@@ -122,6 +128,88 @@ const skillNames: Record<number, string> = {
   42: "H2H"
 };
 
+// Canonical EQEmu skill IDs from common/skills.h.
+const eqEmuSkillTypeNames: Record<number, string> = {
+  0: "1H Blunt",
+  1: "1H Slashing",
+  2: "2H Blunt",
+  3: "2H Slashing",
+  4: "Abjuration",
+  5: "Alteration",
+  6: "Apply Poison",
+  7: "Archery",
+  8: "Backstab",
+  9: "Bind Wound",
+  10: "Bash",
+  11: "Block",
+  12: "Brass Instruments",
+  13: "Channeling",
+  14: "Conjuration",
+  15: "Defense",
+  16: "Disarm",
+  17: "Disarm Traps",
+  18: "Divination",
+  19: "Dodge",
+  20: "Double Attack",
+  21: "Dragon Punch",
+  22: "Dual Wield",
+  23: "Eagle Strike",
+  24: "Evocation",
+  25: "Feign Death",
+  26: "Flying Kick",
+  27: "Forage",
+  28: "Hand to Hand",
+  29: "Hide",
+  30: "Kick",
+  31: "Meditate",
+  32: "Mend",
+  33: "Offense",
+  34: "Parry",
+  35: "Pick Lock",
+  36: "1H Piercing",
+  37: "Riposte",
+  38: "Round Kick",
+  39: "Safe Fall",
+  40: "Sense Heading",
+  41: "Singing",
+  42: "Sneak",
+  43: "Specialize Abjuration",
+  44: "Specialize Alteration",
+  45: "Specialize Conjuration",
+  46: "Specialize Divination",
+  47: "Specialize Evocation",
+  48: "Pick Pockets",
+  49: "Stringed Instruments",
+  50: "Swimming",
+  51: "Throwing",
+  52: "Tiger Claw",
+  53: "Tracking",
+  54: "Wind Instruments",
+  55: "Fishing",
+  56: "Make Poison",
+  57: "Tinkering",
+  58: "Research",
+  59: "Alchemy",
+  60: "Baking",
+  61: "Tailoring",
+  62: "Sense Traps",
+  63: "Blacksmithing",
+  64: "Fletching",
+  65: "Brewing",
+  66: "Alcohol Tolerance",
+  67: "Begging",
+  68: "Jewelry Making",
+  69: "Pottery",
+  70: "Percussion Instruments",
+  71: "Intimidation",
+  72: "Berserking",
+  73: "Taunt",
+  74: "Frenzy",
+  75: "Remove Traps",
+  76: "Triple Attack",
+  77: "2H Piercing"
+};
+
 const lightNames: Record<number, string> = {
   9: "Light",
   10: "Greater Light",
@@ -181,6 +269,78 @@ const spellSkillNames: Record<number, string> = {
   98: "Combat Ability"
 };
 
+const itemElementDamageTypeNames: Record<number, string> = {
+  1: "Magic",
+  2: "Fire",
+  3: "Cold",
+  4: "Poison",
+  5: "Disease",
+  6: "Chromatic",
+  7: "Prismatic",
+  9: "Corruption"
+};
+
+function formatSkillModifierType(skillId: number | null | undefined) {
+  const normalized = Number(skillId ?? 0);
+  if (normalized <= 0) {
+    return undefined;
+  }
+
+  return eqEmuSkillTypeNames[normalized] ?? `Skill ${normalized}`;
+}
+
+function formatSkillModifierValue(value: number | null | undefined, skillId: number | null | undefined) {
+  const normalizedValue = Number(value ?? 0);
+  if (normalizedValue === 0) {
+    return undefined;
+  }
+
+  const prefix = normalizedValue > 0 ? "+" : "";
+  const skillName = formatSkillModifierType(skillId);
+  return skillName ? `${skillName}: ${prefix}${normalizedValue}%` : `${prefix}${normalizedValue}%`;
+}
+
+function formatExtraDamageSkillType(skillId: number | null | undefined) {
+  const normalized = Number(skillId ?? 0);
+  if (normalized <= 0) {
+    return undefined;
+  }
+
+  return skillNames[normalized - 1] ?? skillNames[normalized] ?? `Skill ${normalized}`;
+}
+
+function formatItemElementDamageType(typeId: number | null | undefined) {
+  const normalized = Number(typeId ?? 0);
+  if (normalized <= 0) {
+    return undefined;
+  }
+
+  return itemElementDamageTypeNames[normalized] ?? `Type ${normalized}`;
+}
+
+function formatItemElementDamageLabel(typeId: number | null | undefined) {
+  const typeName = formatItemElementDamageType(typeId);
+  return typeName ? `${typeName} Dmg` : "Elemental Dmg";
+}
+
+function formatBaneRace(raceId: number | null | undefined) {
+  const normalized = Number(raceId ?? 0);
+  if (normalized <= 0) {
+    return undefined;
+  }
+
+  return raceNames[normalized] ?? `Race ${normalized}`;
+}
+
+function formatBaneBodyType(bodyType: number | null | undefined) {
+  const normalized = Number(bodyType ?? 0);
+  if (normalized <= 0) {
+    return undefined;
+  }
+
+  return `Body Type ${normalized}`;
+}
+
 function enabledContentFlagsCondition(
   alias: string,
   requiredColumn = "content_flags",
@@ -209,7 +369,10 @@ function enabledContentFlagsCondition(
 }
 
 function trackableNpcCondition(alias: string) {
-  return `coalesce(${alias}.trackable, 0) = ${requiredTrackableNpcValue}`;
+  return `(
+    coalesce(${alias}.trackable, 0) = ${requiredTrackableNpcValue}
+    and lower(trim(coalesce(${alias}.name, ''))) <> 'bazaar'
+  )`;
 }
 
 function enabledRecipeCondition(alias: string) {
@@ -333,8 +496,115 @@ const staticTradeskillContainers: Record<number, { name: string; icon: string }>
   17: { name: "Forge", icon: "" }
 };
 
+const zoneCraftingObjectTypes = [
+  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 24, 30, 31, 32, 33, 34, 35, 36, 38, 39, 40, 41, 42, 43, 44,
+  45, 46, 47, 48, 49, 50
+] as const;
+
+type ZoneCraftingServiceDefinition = Pick<ZoneCraftingService, "slug" | "label">;
+
+const zoneCraftingServiceOrder = [
+  "Alchemy",
+  "Tinkering",
+  "Poisoncrafting",
+  "Research",
+  "Baking / Oven",
+  "Tailoring / Loom",
+  "Blacksmithing / Forge",
+  "Fletching",
+  "Brewing",
+  "Jewelcraft",
+  "Pottery Wheel",
+  "Pottery Kiln",
+  "Fly Making",
+  "Experiment Combine"
+] as const;
+
+const zoneCraftingServiceRank = new Map<string, number>(zoneCraftingServiceOrder.map((label, index) => [label, index]));
+
+const zoneCraftingServicesByType: Record<number, ZoneCraftingServiceDefinition> = {
+  9: { slug: "alchemy", label: "Alchemy" },
+  10: { slug: "tinkering", label: "Tinkering" },
+  11: { slug: "research", label: "Research" },
+  12: { slug: "poisoncrafting", label: "Poisoncrafting" },
+  13: { slug: "experiment", label: "Experiment Combine" },
+  14: { slug: "baking", label: "Baking / Oven" },
+  15: { slug: "baking", label: "Baking / Oven" },
+  16: { slug: "tailoring", label: "Tailoring / Loom" },
+  17: { slug: "blacksmithing", label: "Blacksmithing / Forge" },
+  18: { slug: "fletching", label: "Fletching" },
+  19: { slug: "brewing", label: "Brewing" },
+  20: { slug: "jewelcraft", label: "Jewelcraft" },
+  21: { slug: "pottery-wheel", label: "Pottery Wheel" },
+  22: { slug: "pottery-kiln", label: "Pottery Kiln" },
+  24: { slug: "experiment", label: "Experiment Combine" },
+  30: { slug: "experiment", label: "Experiment Combine" },
+  31: { slug: "blacksmithing", label: "Blacksmithing / Forge" },
+  32: { slug: "blacksmithing", label: "Blacksmithing / Forge" },
+  33: { slug: "blacksmithing", label: "Blacksmithing / Forge" },
+  34: { slug: "blacksmithing", label: "Blacksmithing / Forge" },
+  35: { slug: "blacksmithing", label: "Blacksmithing / Forge" },
+  36: { slug: "blacksmithing", label: "Blacksmithing / Forge" },
+  38: { slug: "blacksmithing", label: "Blacksmithing / Forge" },
+  39: { slug: "blacksmithing", label: "Blacksmithing / Forge" },
+  40: { slug: "blacksmithing", label: "Blacksmithing / Forge" },
+  41: { slug: "tailoring", label: "Tailoring / Loom" },
+  42: { slug: "tailoring", label: "Tailoring / Loom" },
+  43: { slug: "tailoring", label: "Tailoring / Loom" },
+  44: { slug: "fletching", label: "Fletching" },
+  45: { slug: "pottery-wheel", label: "Pottery Wheel" },
+  46: { slug: "fly-making", label: "Fly Making" },
+  47: { slug: "blacksmithing", label: "Blacksmithing / Forge" },
+  48: { slug: "blacksmithing", label: "Blacksmithing / Forge" },
+  49: { slug: "blacksmithing", label: "Blacksmithing / Forge" },
+  50: { slug: "blacksmithing", label: "Blacksmithing / Forge" }
+};
+
+const recipeStationFallbackByTradeskill: Record<number, RecipeStationRequirement> = {
+  56: { slug: "poisoncrafting", label: "Poisoncrafting" },
+  57: { slug: "tinkering", label: "Tinkering" },
+  58: { slug: "research", label: "Research" },
+  59: { slug: "alchemy", label: "Alchemy" },
+  60: { slug: "baking", label: "Baking / Oven" },
+  61: { slug: "tailoring", label: "Tailoring / Loom" },
+  63: { slug: "blacksmithing", label: "Blacksmithing / Forge" },
+  64: { slug: "fletching", label: "Fletching" },
+  65: { slug: "brewing", label: "Brewing" },
+  68: { slug: "jewelcraft", label: "Jewelcraft" },
+  75: { slug: "poisoncrafting", label: "Poisoncrafting" }
+};
+
+const zoneCraftingObjectTypesBySlug = Object.entries(zoneCraftingServicesByType).reduce<Record<string, number[]>>((accumulator, [type, service]) => {
+  if (!accumulator[service.slug]) {
+    accumulator[service.slug] = [];
+  }
+
+  accumulator[service.slug].push(Number(type));
+  return accumulator;
+}, {});
+
 function like(query?: string) {
   return `%${query ?? ""}%`;
+}
+
+function normalizedNpcSearchText(value?: string) {
+  return value
+    ?.toLowerCase()
+    .replace(/[#!~]/g, "")
+    .replace(/_/g, " ")
+    .replace(/\d+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function npcSearchTerms(query?: string) {
+  const normalized = normalizedNpcSearchText(query);
+  if (!normalized) {
+    return [];
+  }
+
+  const withoutLeadingArticle = normalized.replace(/^the\s+/, "").trim();
+  return [...new Set([normalized, withoutLeadingArticle].filter(Boolean))];
 }
 
 function normalizeText(value?: string) {
@@ -651,6 +921,75 @@ function formatNpcName(name: string) {
     .replace(/_/g, " ")
     .replace(/\d+/g, "")
     .trim();
+}
+
+function resolveZoneCraftingService(
+  type: number | null | undefined,
+  displayName: string | null | undefined,
+  objectName: string | null | undefined
+): ZoneCraftingServiceDefinition | undefined {
+  const haystack = `${displayName ?? ""} ${objectName ?? ""}`.toLowerCase();
+
+  if (haystack.includes("poison")) return { slug: "poisoncrafting", label: "Poisoncrafting" };
+  if (haystack.includes("alchemy")) return { slug: "alchemy", label: "Alchemy" };
+  if (haystack.includes("tinkering") || haystack.includes("tool box")) return { slug: "tinkering", label: "Tinkering" };
+  if (haystack.includes("research")) return { slug: "research", label: "Research" };
+  if (haystack.includes("jewelry")) return { slug: "jewelcraft", label: "Jewelcraft" };
+  if (haystack.includes("fletching")) return { slug: "fletching", label: "Fletching" };
+  if (haystack.includes("fly making")) return { slug: "fly-making", label: "Fly Making" };
+  if (haystack.includes("forge")) return { slug: "blacksmithing", label: "Blacksmithing / Forge" };
+  if (haystack.includes("loom") || haystack.includes("tailor")) return { slug: "tailoring", label: "Tailoring / Loom" };
+  if (haystack.includes("oven") || haystack.includes("baking")) return { slug: "baking", label: "Baking / Oven" };
+  if (haystack.includes("brew")) return { slug: "brewing", label: "Brewing" };
+  if (haystack.includes("pottery wheel")) return { slug: "pottery-wheel", label: "Pottery Wheel" };
+  if (haystack.includes("kiln")) return { slug: "pottery-kiln", label: "Pottery Kiln" };
+  if (haystack.includes("mortar") || haystack.includes("experiment")) return { slug: "experiment", label: "Experiment Combine" };
+
+  return type !== null && type !== undefined ? zoneCraftingServicesByType[type] : undefined;
+}
+
+function resolveRecipeStationRequirementFromContainerName(name: string): RecipeStationRequirement | undefined {
+  const lower = name.trim().toLowerCase();
+
+  if (!lower) return undefined;
+  if (lower.includes("forge")) return { slug: "blacksmithing", label: "Blacksmithing / Forge" };
+  if (lower.includes("sewing") || lower.includes("loom")) return { slug: "tailoring", label: "Tailoring / Loom" };
+  if (lower.includes("spit") || lower.includes("oven") || lower.includes("mixing bowl")) return { slug: "baking", label: "Baking / Oven" };
+  if (lower.includes("brew") || lower.includes("barrel")) return { slug: "brewing", label: "Brewing" };
+  if (lower.includes("fletching")) return { slug: "fletching", label: "Fletching" };
+  if (lower.includes("jeweler") || lower.includes("jeweller") || lower.includes("jewelry")) return { slug: "jewelcraft", label: "Jewelcraft" };
+  if (lower.includes("pottery wheel")) return { slug: "pottery-wheel", label: "Pottery Wheel" };
+  if (lower.includes("kiln")) return { slug: "pottery-kiln", label: "Pottery Kiln" };
+  if (lower.includes("medicine bag")) return { slug: "alchemy", label: "Alchemy" };
+  if (lower.includes("toolbox") || lower.includes("tool box")) return { slug: "tinkering", label: "Tinkering" };
+  if (lower.includes("mortar") || lower.includes("pestle") || lower.includes("component mortar")) {
+    return { slug: "poisoncrafting", label: "Poisoncrafting" };
+  }
+
+  return undefined;
+}
+
+function resolveRecipeStationRequirements(
+  tradeskill: number | null | undefined,
+  containers: Array<{ name: string }>
+): RecipeStationRequirement[] {
+  const requirements = new Map<string, RecipeStationRequirement>();
+
+  for (const container of containers) {
+    const resolved = resolveRecipeStationRequirementFromContainerName(container.name);
+    if (resolved) {
+      requirements.set(resolved.slug, resolved);
+    }
+  }
+
+  if (requirements.size === 0) {
+    const fallback = tradeskill !== null && tradeskill !== undefined ? recipeStationFallbackByTradeskill[tradeskill] : undefined;
+    if (fallback) {
+      requirements.set(fallback.slug, fallback);
+    }
+  }
+
+  return [...requirements.values()];
 }
 
 function spellClassesFromRow(row: Record<string, unknown>) {
@@ -1006,6 +1345,34 @@ function formatCoinString(price: number | null | undefined) {
   return formatted.join(" ") || "0c";
 }
 
+type ZoneLink = {
+  shortName: string;
+  longName: string;
+  href: string;
+};
+
+function mergeZoneLinks(...zoneGroups: ZoneLink[][]) {
+  const merged = new Map<string, ZoneLink>();
+
+  for (const zoneGroup of zoneGroups) {
+    for (const zone of zoneGroup) {
+      const normalizedShortName = zone.shortName.trim().toLowerCase();
+      if (!normalizedShortName || merged.has(normalizedShortName)) {
+        continue;
+      }
+
+      merged.set(normalizedShortName, zone);
+    }
+  }
+
+  return [...merged.values()].sort((left, right) => left.longName.localeCompare(right.longName));
+}
+
+function summarizeZoneNames(zones: Array<{ longName: string }>) {
+  const names = [...new Set(zones.map((zone) => zone.longName).filter(Boolean))];
+  return names.length > 0 ? names.join(", ") : "Unknown";
+}
+
 function decodeNpcSpecialAttacks(raw: string | null | undefined) {
   const names: Record<string, string> = {
     A: "Immune to melee",
@@ -1240,6 +1607,7 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
   const key = `search:${query.toLowerCase()}`;
   const cached = await cacheGet<SearchHit[]>(key);
   const loweredQuery = query.toLowerCase();
+  const npcSearchPatterns = npcSearchTerms(query).map((term) => like(term));
 
   if (cached) {
     return cached;
@@ -1280,7 +1648,18 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
         left join spawnentry se on se.npcID = nt.id
         left join spawngroup sg on sg.id = se.spawngroupID
         left join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
-        where nt.name like ${like(query)}
+        where (
+          nt.name like ${like(query)}
+          ${npcSearchPatterns.length > 0
+            ? sql`or ${sql.join(
+                npcSearchPatterns.map(
+                  (pattern) =>
+                    sql`lower(trim(replace(replace(replace(replace(nt.name, '_', ' '), '#', ''), '!', ''), '~', ''))) like ${pattern}`
+                ),
+                sql` or `
+              )}`
+            : sql``}
+        )
           and ${sql.raw(trackableNpcCondition("nt"))}
         group by nt.id, nt.name, nt.race, nt.level
         order by nt.name asc
@@ -1312,6 +1691,7 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
       `.execute(db!)
     ]);
 
+    const manualZoneLinksByNpcId = await getManualNpcZoneLinksByNpcId(npcRows.rows.map((row) => row.id));
     const dbHits: SearchHit[] = [];
 
     for (const row of itemRows.rows) {
@@ -1342,13 +1722,15 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
     }
 
     for (const row of npcRows.rows) {
+      const liveZones = row.zone_name ? [{ shortName: row.zone_name, longName: row.zone_name, href: "" }] : [];
+      const zones = mergeZoneLinks(liveZones, manualZoneLinksByNpcId.get(row.id) ?? []);
       dbHits.push({
         id: String(row.id),
         type: "npc",
         title: formatNpcName(row.name),
         href: `/npcs/${row.id}`,
         subtitle: `${formatRace(row.race)} • ${row.level}`,
-        tags: [row.zone_name ?? "Unknown", isNamedNpcName(row.name) ? "Named" : "Common"]
+        tags: [summarizeZoneNames(zones), isNamedNpcName(row.name) ? "Named" : "Common"]
       });
     }
 
@@ -1434,9 +1816,18 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       hp: number;
       mana: number;
       endur: number;
+      damageshield: number;
+      dsmitigation: number;
       regen: number;
       manaregen: number;
       enduranceregen: number;
+      spellshield: number;
+      shielding: number;
+      avoidance: number;
+      accuracy: number;
+      strikethrough: number;
+      stunresist: number;
+      dotshielding: number;
       ac: number;
       astr: number;
       asta: number;
@@ -1450,6 +1841,37 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       cr: number;
       dr: number;
       pr: number;
+      svcorruption: number;
+      heroic_str: number;
+      heroic_sta: number;
+      heroic_agi: number;
+      heroic_dex: number;
+      heroic_int: number;
+      heroic_wis: number;
+      heroic_cha: number;
+      heroic_mr: number;
+      heroic_fr: number;
+      heroic_cr: number;
+      heroic_dr: number;
+      heroic_pr: number;
+      heroic_svcorrup: number;
+      healamt: number;
+      spelldmg: number;
+      clairvoyance: number;
+      backstabdmg: number;
+      elemdmgtype: number;
+      elemdmgamt: number;
+      banedmgamt: number;
+      banedmgbody: number;
+      banedmgraceamt: number;
+      banedmgrace: number;
+      skillmodtype: number;
+      skillmodvalue: number;
+      skillmodmax: number;
+      extradmgskill: number;
+      extradmgamt: number;
+      bardtype: number;
+      bardvalue: number;
       augslot1type: number;
       augslot1visible: number;
       augslot2type: number;
@@ -1480,10 +1902,16 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       light: number;
       price: number;
       icon: number;
-    }>`
+      }>`
       select id, Name as name, itemclass, itemtype, slots, classes, races, nodrop, attuneable, magic, reqlevel, reclevel,
-             damage, delay, ${sql.raw("`range`")} as item_range, attack, haste, hp, mana, endur, regen, manaregen, enduranceregen, ac,
-             astr, asta, aagi, adex, aint, awis, acha, mr, fr, cr, dr, pr,
+             damage, delay, ${sql.raw("`range`")} as item_range, attack, haste, hp, mana, endur, damageshield, dsmitigation, regen, manaregen, enduranceregen,
+             spellshield, shielding, avoidance, accuracy, strikethrough, stunresist, dotshielding, ac,
+             astr, asta, aagi, adex, aint, awis, acha, mr, fr, cr, dr, pr, svcorruption,
+             heroic_str, heroic_sta, heroic_agi, heroic_dex, heroic_int, heroic_wis, heroic_cha,
+             heroic_mr, heroic_fr, heroic_cr, heroic_dr, heroic_pr, heroic_svcorrup,
+             healamt, spelldmg, clairvoyance, backstabdmg,
+             elemdmgtype, elemdmgamt, banedmgamt, banedmgbody, banedmgraceamt, banedmgrace,
+             skillmodtype, skillmodvalue, skillmodmax, extradmgskill, extradmgamt, bardtype, bardvalue,
              augslot1type, augslot1visible, augslot2type, augslot2visible, augslot3type, augslot3visible,
              augslot4type, augslot4visible, augslot5type, augslot5visible, augslot6type, augslot6visible,
              proceffect, proclevel2, procrate, worneffect, wornlevel, focuseffect, focuslevel, clickeffect, clicklevel2, clicktype, scrolleffect,
@@ -1533,6 +1961,23 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       limit 20
     `.execute(db!);
 
+    const droppedByCandidateRowsPromise = sql<{
+      id: number;
+      name: string;
+      multiplier: number;
+      probability: number;
+      chance: number;
+    }>`
+      select distinct nt.id, nt.name, lte.multiplier, lte.probability, lde.chance
+      from lootdrop_entries lde
+      join loottable_entries lte on lte.lootdrop_id = lde.lootdrop_id
+      join npc_types nt on nt.loottable_id = lte.loottable_id
+      where lde.item_id = ${id}
+        and ${sql.raw(trackableNpcCondition("nt"))}
+      order by nt.name asc
+      limit 160
+    `.execute(db!);
+
     const soldByRowsPromise = sql<{
       id: number;
       name: string;
@@ -1571,50 +2016,185 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
 
     const effectNameMapPromise = spellNamesById([row.proceffect, row.worneffect, row.focuseffect, row.clickeffect, row.scrolleffect].map(Number));
 
-    const [droppedByRows, droppedZoneRows, soldByRows, recipeRows, effectNameMap] = await Promise.all([
+    const [droppedByRows, droppedZoneRows, droppedByCandidateRows, soldByRows, recipeRows, effectNameMap] = await Promise.all([
       droppedByRowsPromise,
       droppedZoneRowsPromise,
+      droppedByCandidateRowsPromise,
       soldByRowsPromise,
       recipeRowsPromise,
       effectNameMapPromise
     ]);
 
+    const manualZoneLinksByNpcId = await getManualNpcZoneLinksByNpcId(droppedByCandidateRows.rows.map((entry) => entry.id));
+
     const soldByEntries = Array.from(
       new Map(soldByRows.rows.map((entry) => [`${entry.id}:${entry.short_name}`, entry] as const)).values()
     );
 
-    const statPairs: Array<[string, string | number | null | undefined]> = [
-      ["AC", row.ac],
-      ["HP", row.hp],
-      ["Mana", row.mana],
-      ["End", row.endur],
-      ["Attack", row.attack],
-      ["Haste", row.haste ? `${row.haste}%` : 0],
-      ["Strength", row.astr],
-      ["Stamina", row.asta],
-      ["Agility", row.aagi],
-      ["Dexterity", row.adex],
-      ["Intelligence", row.aint],
-      ["Wisdom", row.awis],
-      ["Charisma", row.acha],
-      ["Magic Resist", row.mr],
-      ["Fire Resist", row.fr],
-      ["Cold Resist", row.cr],
-      ["Disease Resist", row.dr],
-      ["Poison Resist", row.pr],
-      ["HP Regen", row.regen],
-      ["Mana Regen", row.manaregen],
-      ["Damage / Delay", row.damage && row.delay ? `${row.damage} / ${row.delay}` : 0]
+    const droppedByEntries = new Map<
+      string,
+      {
+        id: number;
+        name: string;
+        href: string;
+        dropChance: number;
+        multiplier: number;
+        zone: ZoneLink;
+      }
+    >();
+
+    for (const entry of droppedByRows.rows) {
+      const zone = {
+        shortName: entry.short_name,
+        longName: entry.long_name,
+        href: `/zones/${entry.short_name}`
+      };
+
+      droppedByEntries.set(`${entry.id}:${entry.short_name}`, {
+        id: entry.id,
+        name: entry.name,
+        href: `/npcs/${entry.id}`,
+        dropChance: (Number(entry.chance ?? 0) * Number(entry.probability ?? 0)) / 100,
+        multiplier: Number(entry.multiplier ?? 1),
+        zone
+      });
+    }
+
+    for (const entry of droppedByCandidateRows.rows) {
+      const manualZones = manualZoneLinksByNpcId.get(entry.id) ?? [];
+
+      for (const zone of manualZones) {
+        const key = `${entry.id}:${zone.shortName}`;
+        if (droppedByEntries.has(key)) {
+          continue;
+        }
+
+        droppedByEntries.set(key, {
+          id: entry.id,
+          name: entry.name,
+          href: `/npcs/${entry.id}`,
+          dropChance: (Number(entry.chance ?? 0) * Number(entry.probability ?? 0)) / 100,
+          multiplier: Number(entry.multiplier ?? 1),
+          zone
+        });
+      }
+    }
+
+    const droppedInZones = mergeZoneLinks(
+      droppedZoneRows.rows.map((entry) => ({
+        shortName: entry.short_name,
+        longName: entry.long_name,
+        href: `/zones/${entry.short_name}`
+      })),
+      ...[...manualZoneLinksByNpcId.values()]
+    );
+
+    const statDefinitions: Array<{
+      label: string;
+      section: ItemDetailStatSection;
+      value: string | number | null | undefined;
+      show?: boolean;
+    }> = [
+      { label: "AC", section: "primary", value: row.ac },
+      { label: "HP", section: "primary", value: row.hp },
+      { label: "Mana", section: "primary", value: row.mana },
+      { label: "End", section: "primary", value: row.endur },
+      { label: "Strength", section: "attributes", value: row.astr },
+      { label: "Stamina", section: "attributes", value: row.asta },
+      { label: "Agility", section: "attributes", value: row.aagi },
+      { label: "Dexterity", section: "attributes", value: row.adex },
+      { label: "Intelligence", section: "attributes", value: row.aint },
+      { label: "Wisdom", section: "attributes", value: row.awis },
+      { label: "Charisma", section: "attributes", value: row.acha },
+      { label: "Magic Resist", section: "resists", value: row.mr },
+      { label: "Fire Resist", section: "resists", value: row.fr },
+      { label: "Cold Resist", section: "resists", value: row.cr },
+      { label: "Disease Resist", section: "resists", value: row.dr },
+      { label: "Poison Resist", section: "resists", value: row.pr },
+      { label: "Corruption Resist", section: "resists", value: row.svcorruption },
+      { label: "Heroic Strength", section: "heroics", value: row.heroic_str },
+      { label: "Heroic Stamina", section: "heroics", value: row.heroic_sta },
+      { label: "Heroic Agility", section: "heroics", value: row.heroic_agi },
+      { label: "Heroic Dexterity", section: "heroics", value: row.heroic_dex },
+      { label: "Heroic Intelligence", section: "heroics", value: row.heroic_int },
+      { label: "Heroic Wisdom", section: "heroics", value: row.heroic_wis },
+      { label: "Heroic Charisma", section: "heroics", value: row.heroic_cha },
+      { label: "Heroic Magic Resist", section: "heroics", value: row.heroic_mr },
+      { label: "Heroic Fire Resist", section: "heroics", value: row.heroic_fr },
+      { label: "Heroic Cold Resist", section: "heroics", value: row.heroic_cr },
+      { label: "Heroic Disease Resist", section: "heroics", value: row.heroic_dr },
+      { label: "Heroic Poison Resist", section: "heroics", value: row.heroic_pr },
+      { label: "Heroic Corruption Resist", section: "heroics", value: row.heroic_svcorrup },
+      { label: "Attack", section: "offense", value: row.attack },
+      { label: "Haste", section: "offense", value: row.haste ? `${row.haste}%` : 0 },
+      { label: "Accuracy", section: "offense", value: row.accuracy },
+      { label: "Strike Through", section: "offense", value: row.strikethrough ? `${row.strikethrough}%` : 0 },
+      { label: "Backstab Damage", section: "offense", value: row.backstabdmg },
+      {
+        label: formatItemElementDamageLabel(row.elemdmgtype),
+        section: "offense",
+        value: Number(row.elemdmgamt ?? 0) !== 0 ? `${Number(row.elemdmgamt)}` : 0
+      },
+      {
+        label: "Bane Damage",
+        section: "offense",
+        value:
+          Number(row.banedmgamt ?? 0) !== 0
+            ? `${Number(row.banedmgamt)}${formatBaneBodyType(row.banedmgbody) ? ` (${formatBaneBodyType(row.banedmgbody)})` : ""}`
+            : 0
+      },
+      {
+        label: "Bane Damage (Race)",
+        section: "offense",
+        value:
+          Number(row.banedmgraceamt ?? 0) !== 0
+            ? `${Number(row.banedmgraceamt)}${formatBaneRace(row.banedmgrace) ? ` (${formatBaneRace(row.banedmgrace)})` : ""}`
+            : 0
+      },
+      {
+        label: formatExtraDamageSkillType(row.extradmgskill) ? `${formatExtraDamageSkillType(row.extradmgskill)} Damage` : "Extra Damage",
+        section: "offense",
+        value: Number(row.extradmgamt ?? 0) !== 0 ? `+${Number(row.extradmgamt)}` : 0
+      },
+      { label: "Damage Shield", section: "defense", value: row.damageshield },
+      { label: "Damage Shield Mitigation", section: "defense", value: row.dsmitigation },
+      { label: "Shielding", section: "defense", value: row.shielding ? `${row.shielding}%` : 0 },
+      { label: "Spell Shield", section: "defense", value: row.spellshield ? `${row.spellshield}%` : 0 },
+      { label: "Avoidance", section: "defense", value: row.avoidance ? `${row.avoidance}%` : 0 },
+      { label: "Stun Resist", section: "defense", value: row.stunresist ? `${row.stunresist}%` : 0 },
+      { label: "DoT Shielding", section: "defense", value: row.dotshielding ? `${row.dotshielding}%` : 0 },
+      { label: "HP Regen", section: "utility", value: row.regen },
+      { label: "Mana Regen", section: "utility", value: row.manaregen },
+      { label: "End Regen", section: "utility", value: row.enduranceregen },
+      { label: "Heal Amount", section: "utility", value: row.healamt },
+      { label: "Spell Damage", section: "utility", value: row.spelldmg },
+      { label: "Clairvoyance", section: "utility", value: row.clairvoyance },
+      {
+        label: "Skill Mod",
+        section: "utility",
+        value: formatSkillModifierValue(row.skillmodvalue, row.skillmodtype) ?? 0
+      },
+      {
+        label: "Bard Modifier",
+        section: "utility",
+        value: Number(row.bardvalue ?? 0) !== 0 ? `${Number(row.bardvalue)} (Type ${Number(row.bardtype ?? 0)})` : 0
+      }
     ];
 
-    const stats: Array<{ label: string; value: string }> = statPairs
-      .filter(([, value]) => {
-        if (typeof value === "string" && value.includes("/")) {
-          return true;
+    const stats: ItemDetailStat[] = statDefinitions
+      .filter((definition) => definition.show !== false)
+      .filter((definition) => {
+        if (typeof definition.value === "string") {
+          return definition.value.trim().length > 0 && definition.value !== "0";
         }
-        return Number(value) !== 0;
+
+        return Number(definition.value) !== 0;
       })
-      .map(([label, value]) => ({ label, value: String(value) }));
+      .map((definition) => ({
+        label: definition.label,
+        value: String(definition.value),
+        section: definition.section
+      }));
 
     const flags = [
       Number(row.magic ?? 0) > 0 ? "Magic" : null,
@@ -1688,29 +2268,18 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       delay: Number(row.delay ?? 0),
       lore: row.lore?.trim() || "No lore text available.",
       augmentSlots,
-      droppedInZones: droppedZoneRows.rows.map((entry) => ({
-        shortName: entry.short_name,
-        longName: entry.long_name,
-        href: `/zones/${entry.short_name}`
-      })),
+      droppedInZones,
       combatEffect: buildEffect(row.proceffect, row.proclevel2, { chanceModifier: 100 + Number(row.procrate ?? 0) }),
       wornEffect: buildEffect(row.worneffect, row.wornlevel),
       focusEffect: buildEffect(row.focuseffect, row.focuslevel),
       clickEffect: buildEffect(row.clickeffect, row.clicklevel2, { castType: effectCastTypes[Number(row.clicktype ?? 0)] }),
       spellScrollEffect: buildEffect(row.scrolleffect, null),
       stats,
-      droppedBy: droppedByRows.rows.map((entry) => ({
-        id: entry.id,
-        name: entry.name,
-        href: `/npcs/${entry.id}`,
-        dropChance: (Number(entry.chance ?? 0) * Number(entry.probability ?? 0)) / 100,
-        multiplier: Number(entry.multiplier ?? 1),
-        zone: {
-          shortName: entry.short_name,
-          longName: entry.long_name,
-          href: `/zones/${entry.short_name}`
-        }
-      })),
+      droppedBy: [...droppedByEntries.values()].sort((left, right) => {
+        const zoneSort = left.zone.longName.localeCompare(right.zone.longName);
+        if (zoneSort !== 0) return zoneSort;
+        return left.name.localeCompare(right.name);
+      }),
       soldBy: soldByEntries.map((entry) => ({
         id: entry.id,
         name: entry.name,
@@ -1723,8 +2292,6 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       })),
       usedInRecipes: recipeRows.rows.map((entry) => ({ id: entry.id, name: entry.name, href: `/recipes/${entry.id}` }))
     };
-    detail.stats.push({ label: "Value", value: `${coinValue.pp}pp ${coinValue.gp}gp ${coinValue.sp}sp ${coinValue.cp}cp` });
-
     return detail;
   })();
 }
@@ -1955,29 +2522,50 @@ export async function listNpcs(filters: NpcFilters = {}) {
   requireDatabaseConnection();
 
   return (async () => {
-    const rows = await sql<{ id: number; name: string; race: number; level: number; class: number; zone_name: string | null }>`
-      select nt.id, nt.name, nt.race, nt.level, nt.class, min(ps.long_name) as zone_name
+    const npcSearchPatterns = npcSearchTerms(filters.q).map((term) => like(term));
+    const rows = await sql<{ id: number; name: string; race: number; level: number; class: number; zone_name: string | null; zone_short_name: string | null }>`
+      select nt.id, nt.name, nt.race, nt.level, nt.class, min(ps.long_name) as zone_name, min(ps.zone) as zone_short_name
       from npc_types nt
       left join spawnentry se on se.npcID = nt.id
       left join spawngroup sg on sg.id = se.spawngroupID
       left join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
-      where nt.name like ${like(filters.q)}
+      where (
+        nt.name like ${like(filters.q)}
+        ${npcSearchPatterns.length > 0
+          ? sql`or ${sql.join(
+              npcSearchPatterns.map(
+                (pattern) =>
+                  sql`lower(trim(replace(replace(replace(replace(nt.name, '_', ' '), '#', ''), '!', ''), '~', ''))) like ${pattern}`
+              ),
+              sql` or `
+            )}`
+          : sql``}
+      )
         and ${sql.raw(trackableNpcCondition("nt"))}
       group by nt.id, nt.name, nt.race, nt.level, nt.class
       order by nt.level desc, nt.name asc
       limit 100
     `.execute(db!);
 
+    const manualZoneLinksByNpcId = await getManualNpcZoneLinksByNpcId(rows.rows.map((row) => row.id));
+
     return rows.rows
-      .map((row) => ({
-        id: row.id,
-        name: formatNpcName(row.name),
-        race: formatRace(row.race),
-        klass: formatNpcClass(row.class),
-        level: String(row.level),
-        zone: row.zone_name ?? "Unknown",
-        named: isNamedNpcName(row.name)
-      }))
+      .map((row) => {
+        const liveZones = row.zone_name && row.zone_short_name
+          ? [{ shortName: row.zone_short_name, longName: row.zone_name, href: `/zones/${row.zone_short_name}` }]
+          : [];
+        const zones = mergeZoneLinks(liveZones, manualZoneLinksByNpcId.get(row.id) ?? []);
+
+        return {
+          id: row.id,
+          name: formatNpcName(row.name),
+          race: formatRace(row.race),
+          klass: formatNpcClass(row.class),
+          level: String(row.level),
+          zone: summarizeZoneNames(zones),
+          named: isNamedNpcName(row.name)
+        };
+      })
       .filter((npc) => {
         if (filters.zone && !includesFolded(npc.zone, filters.zone)) return false;
         if (filters.race && !includesFolded(npc.race, filters.race)) return false;
@@ -2038,7 +2626,7 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
 
     if (!row) return undefined;
 
-    const [spellRows, dropRows, sellRows, spawnZoneRows, factionRows] = await Promise.all([
+    const [spellRows, dropRows, sellRows, spawnZoneRows, factionRows, manualZoneLinksByNpcId] = await Promise.all([
       row.npc_spells_id
         ? sql<{ spellid: number; type: number; name: string; new_icon: number }>`
             select nse.spellid, nse.type, s.name, s.new_icon
@@ -2124,7 +2712,17 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
             order by nfe.value desc, fl.name asc
           `.execute(db!)
         : Promise.resolve({ rows: [] as Array<{ id: number; name: string; value: number }> }),
+      getManualNpcZoneLinksByNpcId([id])
     ]);
+
+    const spawnZones = mergeZoneLinks(
+      spawnZoneRows.rows.map((entry) => ({
+        shortName: entry.short_name,
+        longName: entry.long_name ?? entry.short_name,
+        href: `/zones/${entry.short_name}`
+      })),
+      manualZoneLinksByNpcId.get(id) ?? []
+    );
 
     const dropGroups = new Map<
       number,
@@ -2169,7 +2767,7 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
       },
       race: formatRace(row.race),
       level: String(row.level),
-      zone: row.zone_name ?? "Unknown",
+      zone: summarizeZoneNames(spawnZones),
       named: isNamedNpcName(row.name),
       klass: formatNpcClass(row.class),
       hp: Number(row.hp ?? 0),
@@ -2194,14 +2792,11 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
         name: entry.name,
         href: `/items/${entry.id}`,
         icon: String(entry.icon ?? 0),
-        price: row.class === 61 ? `${entry.ldonprice ?? 0} points` : formatCoinString(entry.price)
+        price: row.class === 61 ? `${entry.ldonprice ?? 0} points` : formatCoinString(entry.price),
+        coinValue: row.class === 61 ? null : formatCoinValue(entry.price)
       })),
       spawnGroups: [],
-      spawnZones: spawnZoneRows.rows.map((entry) => ({
-        shortName: entry.short_name,
-        longName: entry.long_name ?? entry.short_name,
-        href: `/zones/${entry.short_name}`
-      })),
+      spawnZones,
       factionHits: {
         lowers: factionRows.rows
           .filter((entry) => Number(entry.value) < 0)
@@ -2391,8 +2986,9 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
     if (!zone) return undefined;
 
     const spawnVersions = [...new Set([Number(zone.version ?? 0), -1])];
+    const manualNpcIdsForZone = getManualNpcIdsForZone(shortName);
 
-    const [bestiaryRows, itemRows, forageRows, spawnLocationRows, spawnEntryRows] = await Promise.all([
+    const [bestiaryRows, itemRows, forageRows, spawnLocationRows, spawnEntryRows, craftingObjectRows, manualBestiaryRows, manualItemRows] = await Promise.all([
       sql<{
         id: number;
         raw_name: string;
@@ -2493,28 +3089,113 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
           and s2.version in (${sql.join(spawnVersions.map((value) => sql`${value}`), sql`, `)})
           and ${sql.raw(trackableNpcCondition("nt"))}
         order by se.spawngroupID asc, nt.name asc
-      `.execute(db!)
+      `.execute(db!),
+      sql<{
+        id: number;
+        type: number;
+        version: number;
+        display_name: string | null;
+        objectname: string | null;
+      }>`
+        select o.id, o.type, o.version, o.display_name, o.objectname
+        from object o
+        where o.zoneid = ${zone.zoneidnumber}
+          and ${sql.raw(enabledContentFlagsCondition("o"))}
+          and o.type in (${sql.join(zoneCraftingObjectTypes.map((value) => sql`${value}`), sql`, `)})
+        order by o.version asc, o.id asc
+      `.execute(db!),
+      manualNpcIdsForZone.length > 0
+        ? sql<{
+            id: number;
+            raw_name: string;
+            min_level: number;
+            max_level: number;
+            race: number;
+            class: number;
+            variants: number;
+          }>`
+            select nt.id,
+                   nt.name as raw_name,
+                   nt.level as min_level,
+                   coalesce(nullif(nt.maxlevel, 0), nt.level) as max_level,
+                   nt.race,
+                   nt.class,
+                   1 as variants
+            from npc_types nt
+            where nt.id in (${sql.join(manualNpcIdsForZone.map((value) => sql`${value}`), sql`, `)})
+              and ${sql.raw(trackableNpcCondition("nt"))}
+              and nt.race not in (127, 240)
+            order by nt.name asc
+          `.execute(db!)
+        : Promise.resolve({
+            rows: [] as Array<{
+              id: number;
+              raw_name: string;
+              min_level: number;
+              max_level: number;
+              race: number;
+              class: number;
+              variants: number;
+            }>
+          }),
+      manualNpcIdsForZone.length > 0
+        ? sql<{
+            id: number;
+            name: string;
+            icon: number;
+            itemclass: number;
+            itemtype: number;
+            damage: number;
+          }>`
+            select distinct i.id, i.Name as name, i.icon, i.itemclass, i.itemtype, i.damage
+            from items i
+            join lootdrop_entries lde on lde.item_id = i.id
+            join loottable_entries lte on lte.lootdrop_id = lde.lootdrop_id
+            join npc_types nt on nt.loottable_id = lte.loottable_id
+            where nt.id in (${sql.join(manualNpcIdsForZone.map((value) => sql`${value}`), sql`, `)})
+              and ${sql.raw(trackableNpcCondition("nt"))}
+              and ${discoveredItemClause("i.id")}
+              and nt.class not in (${sql.join(merchantNpcClasses.map((value) => sql`${value}`), sql`, `)})
+            order by i.Name asc
+          `.execute(db!)
+        : Promise.resolve({
+            rows: [] as Array<{
+              id: number;
+              name: string;
+              icon: number;
+              itemclass: number;
+              itemtype: number;
+              damage: number;
+            }>
+          })
     ]);
 
-    const bestiary = bestiaryRows.rows
-      .map((row) => {
-        const name = formatNpcName(row.raw_name);
+    const bestiary = Array.from(
+      new Map(
+        [...bestiaryRows.rows, ...manualBestiaryRows.rows]
+          .map((row) => {
+            const name = formatNpcName(row.raw_name);
 
-        return {
-          id: row.id,
-          name,
-          href: `/npcs/${row.id}`,
-          levelRange: formatLevelRange(row.min_level, row.max_level),
-          race: formatRace(row.race),
-          klass: formatNpcClass(row.class),
-          classification: formatNpcClassification(row.raw_name),
-          named: isNamedNpcName(name),
-          variants: Number(row.variants ?? 1)
-        };
-      })
-      .filter((entry) => entry.name.length > 0);
+            return [
+              `${row.id}:${name}`,
+              {
+                id: row.id,
+                name,
+                href: `/npcs/${row.id}`,
+                levelRange: formatLevelRange(row.min_level, row.max_level),
+                race: formatRace(row.race),
+                klass: formatNpcClass(row.class),
+                classification: formatNpcClassification(row.raw_name),
+                named: isNamedNpcName(name),
+                variants: Number(row.variants ?? 1)
+              }
+            ] as const;
+          })
+          .filter(([, entry]) => entry.name.length > 0)
+      ).values()
+    );
 
-    const encounterLevels = bestiaryRows.rows.flatMap((row) => {
+    const encounterLevels = [...bestiaryRows.rows, ...manualBestiaryRows.rows].flatMap((row) => {
       const levels = [Number(row.min_level ?? 0), Number(row.max_level ?? 0)].filter((value) => value > 0);
       return levels;
     });
@@ -2526,17 +3207,36 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
     const recommendedRange = formatLevelRange(zone.min_level, zone.max_level);
     const displayRange = recommendedRange === "All levels" ? encounterRange : recommendedRange;
 
+    const activeNamedNpcNames = new Set(
+      [
+        ...spawnEntryRows.rows
+          .filter((row) => Number(row.chance ?? 0) > 0)
+          .map((row) => formatNpcName(row.name))
+          .filter(Boolean),
+        ...manualBestiaryRows.rows
+          .map((row) => formatNpcName(row.raw_name))
+          .filter((name) => Boolean(name) && isNamedNpcName(name))
+      ]
+    );
+
     const namedNpcs = bestiary
-      .filter((entry) => entry.named)
+      .filter((entry) => entry.named && activeNamedNpcNames.has(entry.name))
       .map((entry) => ({ id: entry.id, name: entry.name, href: entry.href }));
 
-    const itemDrops = itemRows.rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      href: `/items/${row.id}`,
-      icon: String(row.icon ?? ""),
-      type: formatDetailedItemType(row.itemtype ?? row.itemclass)
-    }));
+    const itemDrops = Array.from(
+      new Map(
+        [...itemRows.rows, ...manualItemRows.rows].map((row) => [
+          row.id,
+          {
+            id: row.id,
+            name: row.name,
+            href: `/items/${row.id}`,
+            icon: String(row.icon ?? ""),
+            type: formatDetailedItemType(row.itemtype ?? row.itemclass)
+          }
+        ])
+      ).values()
+    );
 
     const forage = forageRows.rows.map((row) => ({
       id: row.id,
@@ -2546,6 +3246,33 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
       chance: Number(row.chance ?? 0),
       skill: Number(row.level ?? 0)
     }));
+
+    const preferredCraftingObjectRows = craftingObjectRows.rows.filter((row) =>
+      spawnVersions.includes(Number(row.version ?? 0))
+    );
+    const effectiveCraftingObjectRows =
+      preferredCraftingObjectRows.length > 0 ? preferredCraftingObjectRows : craftingObjectRows.rows;
+
+    const craftingServiceMap = new Map<string, ZoneCraftingService>();
+
+    for (const row of effectiveCraftingObjectRows) {
+      const service = resolveZoneCraftingService(row.type, row.display_name, row.objectname);
+      if (!service) continue;
+
+      const existing = craftingServiceMap.get(service.slug);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        craftingServiceMap.set(service.slug, { ...service, count: 1 });
+      }
+    }
+
+    const craftingServices = [...craftingServiceMap.values()].sort((left, right) => {
+      const leftRank = zoneCraftingServiceRank.get(left.label) ?? Number.MAX_SAFE_INTEGER;
+      const rightRank = zoneCraftingServiceRank.get(right.label) ?? Number.MAX_SAFE_INTEGER;
+      if (leftRank !== rightRank) return leftRank - rightRank;
+      return left.label.localeCompare(right.label);
+    });
 
     const spawnGroupMap = new Map<number, SpawnGroupDetail>();
 
@@ -2647,6 +3374,8 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
       safePoint: `${Math.floor(zone.safe_x ?? 0)} / ${Math.floor(zone.safe_y ?? 0)} / ${Math.floor(zone.safe_z ?? 0)}`,
       encounterRange,
       spawnPoints: spawnLocationRows.rows.length,
+      craftingStations: effectiveCraftingObjectRows.length,
+      craftingServices,
       rules,
       resources,
       bestiary,
@@ -2944,6 +3673,7 @@ export async function getRecipeDetail(id: number): Promise<RecipeDetail | undefi
       }, []);
     const resolvedContainers = rawContainers.filter((entry) => entry.href || entry.icon);
     const containers = resolvedContainers.length > 0 ? resolvedContainers : rawContainers;
+    const requiredStations = resolveRecipeStationRequirements(row.tradeskill, containers);
 
     const creates = entryRows.rows
       .filter((entry) => Number(entry.successcount ?? 0) > 0 && Boolean(entry.item_name))
@@ -2965,6 +3695,58 @@ export async function getRecipeDetail(id: number): Promise<RecipeDetail | undefi
         icon: String(entry.item_icon ?? "")
       }));
 
+    let availableZonesByStation: Array<RecipeStationRequirement & { zones: RecipeStationZone[] }> = [];
+
+    if (requiredStations.length > 0) {
+      const requiredObjectTypes = [...new Set(requiredStations.flatMap((station) => zoneCraftingObjectTypesBySlug[station.slug] ?? []))];
+
+      if (requiredObjectTypes.length > 0) {
+        const stationZoneRows = await sql<{
+          short_name: string;
+          long_name: string;
+          type: number;
+        }>`
+          select z.short_name, min(z.long_name) as long_name, o.type
+          from zone z
+          join object o on o.zoneid = z.zoneidnumber
+          where z.version = 0
+            and coalesce(z.min_status, 0) = 0
+            and o.version in (z.version, -1)
+            and ${sql.raw(enabledContentFlagsCondition("o"))}
+            and o.type in (${sql.join(requiredObjectTypes.map((value) => sql`${value}`), sql`, `)})
+          group by z.short_name, o.type
+          order by z.short_name asc
+        `.execute(db!);
+
+        const zonesBySlug = new Map<string, RecipeStationZone[]>();
+
+        for (const row of stationZoneRows.rows) {
+          const service = zoneCraftingServicesByType[Number(row.type ?? 0)];
+          if (!service) continue;
+
+          if (!zonesBySlug.has(service.slug)) {
+            zonesBySlug.set(service.slug, []);
+          }
+
+          const zoneList = zonesBySlug.get(service.slug);
+          if (!zoneList?.some((zone) => zone.shortName === row.short_name)) {
+            zoneList?.push({
+              shortName: row.short_name,
+              longName: row.long_name,
+              href: `/zones/${row.short_name}`
+            });
+          }
+        }
+
+        availableZonesByStation = requiredStations.map((station) => ({
+          ...station,
+          zones: zonesBySlug.get(station.slug) ?? []
+        }));
+      } else {
+        availableZonesByStation = requiredStations.map((station) => ({ ...station, zones: [] }));
+      }
+    }
+
     return {
       id: row.id,
       name: row.name,
@@ -2974,6 +3756,8 @@ export async function getRecipeDetail(id: number): Promise<RecipeDetail | undefi
       container: containers.length > 0 ? containers.map((entry) => entry.name).join(", ") : "Unknown",
       notes: row.notes?.trim() || "No notes are recorded for this recipe.",
       containers,
+      requiredStations,
+      availableZonesByStation,
       creates,
       ingredients
     };

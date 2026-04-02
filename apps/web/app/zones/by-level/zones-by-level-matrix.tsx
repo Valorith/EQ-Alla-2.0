@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { memo, startTransition, useEffect, useMemo, useRef, useState } from "react";
 import type { ZoneByLevelSummary, ZoneLevelBand } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 
@@ -40,6 +40,10 @@ function parseLevelInput(value: string, maximumLevel: number) {
   }
 
   return clampLevel(next, maximumLevel);
+}
+
+function levelToBandIndex(level: number) {
+  return Math.max(0, Math.floor((level - 1) / 5));
 }
 
 function isIdealBand(band: ZoneLevelBand | undefined) {
@@ -86,10 +90,15 @@ function buildCellBoxShadow({
   return shadows.length > 0 ? shadows.join(", ") : undefined;
 }
 
-export function ZonesByLevelMatrix({ zones, levelCap }: ZonesByLevelMatrixProps) {
-  const bands = zones[0]?.bands ?? [];
-  const maximumLevel = Math.min(bands[bands.length - 1]?.maxLevel ?? levelCap, levelCap);
-  const [selectedLevel, setSelectedLevel] = useState(() => clampLevel(defaultSelectedLevel, maximumLevel));
+const ZonesLevelTable = memo(function ZonesLevelTable({
+  zones,
+  bands,
+  selectedBandIndex
+}: {
+  zones: ZoneByLevelSummary[];
+  bands: ZoneLevelBand[];
+  selectedBandIndex: number;
+}) {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -97,9 +106,6 @@ export function ZonesByLevelMatrix({ zones, levelCap }: ZonesByLevelMatrixProps)
   const headerRefs = useRef<Array<HTMLTableCellElement | null>>([]);
   const hasMountedRef = useRef(false);
 
-  const selectedBandIndex = Math.max(0, Math.floor((selectedLevel - 1) / 5));
-  const selectedBand = bands[selectedBandIndex];
-  const idealZones = zones.filter((zone) => isIdealBand(zone.bands[selectedBandIndex]));
   const selectedColumnFrame = "bg-[linear-gradient(180deg,rgba(213,165,90,0.12),rgba(213,165,90,0.05))]";
   const selectedColumnHeaderFrame = "bg-[linear-gradient(180deg,rgba(213,165,90,0.16),rgba(213,165,90,0.05))]";
   const stickyHeaderCell =
@@ -181,55 +187,6 @@ export function ZonesByLevelMatrix({ zones, levelCap }: ZonesByLevelMatrixProps)
 
   return (
     <div className="space-y-5">
-      <div className="rounded-[26px] border border-[#7b603b]/22 bg-[linear-gradient(180deg,rgba(31,28,25,0.78),rgba(13,17,23,0.8))] px-5 py-5 shadow-[0_16px_40px_rgba(0,0,0,0.22)]">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-[#d7b472]">Level target</p>
-              <span className="inline-flex rounded-full border border-[#d5a55a]/26 bg-[#d5a55a]/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#f0d4a3]">
-                Level {selectedLevel}
-              </span>
-              {selectedBand ? (
-                <span className="inline-flex rounded-full border border-white/12 bg-white/6 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#ddd1bf]">
-                  Band {selectedBand.label}
-                </span>
-              ) : null}
-            </div>
-            <p className="max-w-2xl text-sm leading-6 text-[#cbbba1]">
-              Pick your current level to spotlight the zones that have meaningful creature coverage in that hunting band.
-            </p>
-            <input
-              type="range"
-              min={1}
-              max={maximumLevel}
-              step={1}
-              value={selectedLevel}
-              onChange={(event) => setSelectedLevel(parseLevelInput(event.target.value, maximumLevel))}
-              className="h-2 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-[#d5a55a]"
-              aria-label="Selected level"
-            />
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-[112px_auto] xl:items-end">
-            <label className="grid gap-2 text-sm">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">Exact level</span>
-              <Input
-                type="number"
-                min={1}
-                max={maximumLevel}
-                value={String(selectedLevel)}
-                onChange={(event) => setSelectedLevel(parseLevelInput(event.target.value, maximumLevel))}
-                className="border-white/12 bg-white/10 text-white placeholder:text-white/45 focus:border-[#f0c36a] focus:bg-white/14"
-              />
-            </label>
-            <div className="rounded-2xl border border-white/10 bg-black/18 px-4 py-3 text-sm text-[#d8ccb8]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9f8f74]">Ideal zones</p>
-              <p className="mt-1 font-[var(--font-display)] text-2xl font-semibold tracking-[-0.03em] text-white">{idealZones.length}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div className="flex flex-col gap-3 rounded-[24px] border border-[#7b603b]/18 bg-[linear-gradient(180deg,rgba(24,21,19,0.78),rgba(13,17,24,0.82))] px-4 py-4 shadow-[0_18px_36px_rgba(0,0,0,0.2)] sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#d7b472]">Matrix navigation</p>
@@ -416,6 +373,84 @@ export function ZonesByLevelMatrix({ zones, levelCap }: ZonesByLevelMatrixProps)
           </tbody>
         </table>
       </div>
+    </div>
+  );
+});
+
+export function ZonesByLevelMatrix({ zones, levelCap }: ZonesByLevelMatrixProps) {
+  const bands = zones[0]?.bands ?? [];
+  const maximumLevel = Math.min(bands[bands.length - 1]?.maxLevel ?? levelCap, levelCap);
+  const initialLevel = clampLevel(defaultSelectedLevel, maximumLevel);
+  const [selectedLevel, setSelectedLevel] = useState(initialLevel);
+  const [selectedBandIndex, setSelectedBandIndex] = useState(() => levelToBandIndex(initialLevel));
+
+  const selectedBand = bands[selectedBandIndex];
+  const idealZoneCount = useMemo(
+    () => zones.reduce((count, zone) => count + (isIdealBand(zone.bands[selectedBandIndex]) ? 1 : 0), 0),
+    [zones, selectedBandIndex]
+  );
+
+  function updateSelectedLevel(nextLevel: number) {
+    setSelectedLevel(nextLevel);
+
+    const nextBandIndex = levelToBandIndex(nextLevel);
+    startTransition(() => {
+      setSelectedBandIndex((currentBandIndex) => (currentBandIndex === nextBandIndex ? currentBandIndex : nextBandIndex));
+    });
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-[26px] border border-[#7b603b]/22 bg-[linear-gradient(180deg,rgba(31,28,25,0.78),rgba(13,17,23,0.8))] px-5 py-5 shadow-[0_16px_40px_rgba(0,0,0,0.22)]">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-[#d7b472]">Level target</p>
+              <span className="inline-flex rounded-full border border-[#d5a55a]/26 bg-[#d5a55a]/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#f0d4a3]">
+                Level {selectedLevel}
+              </span>
+              {selectedBand ? (
+                <span className="inline-flex rounded-full border border-white/12 bg-white/6 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#ddd1bf]">
+                  Band {selectedBand.label}
+                </span>
+              ) : null}
+            </div>
+            <p className="max-w-2xl text-sm leading-6 text-[#cbbba1]">
+              Pick your current level to spotlight the zones that have meaningful creature coverage in that hunting band.
+            </p>
+            <input
+              type="range"
+              min={1}
+              max={maximumLevel}
+              step={1}
+              value={selectedLevel}
+              onChange={(event) => updateSelectedLevel(parseLevelInput(event.target.value, maximumLevel))}
+              className="h-2 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-[#d5a55a]"
+              aria-label="Selected level"
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-[112px_auto] xl:items-end">
+            <label className="grid gap-2 text-sm">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">Exact level</span>
+              <Input
+                type="number"
+                min={1}
+                max={maximumLevel}
+                value={String(selectedLevel)}
+                onChange={(event) => updateSelectedLevel(parseLevelInput(event.target.value, maximumLevel))}
+                className="border-white/12 bg-white/10 text-white placeholder:text-white/45 focus:border-[#f0c36a] focus:bg-white/14"
+              />
+            </label>
+            <div className="rounded-2xl border border-white/10 bg-black/18 px-4 py-3 text-sm text-[#d8ccb8]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9f8f74]">Ideal zones</p>
+              <p className="mt-1 font-[var(--font-display)] text-2xl font-semibold tracking-[-0.03em] text-white">{idealZoneCount}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <ZonesLevelTable zones={zones} bands={bands} selectedBandIndex={selectedBandIndex} />
     </div>
   );
 }

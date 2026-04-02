@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowRight, FlaskConical, Package2, Wrench } from "lucide-react";
 import { getRecipeDetail } from "@eq-alla/data";
 import { ItemIcon } from "../../../components/item-icon";
+import { RecipeStationAccess } from "../../../components/recipe-station-access";
 
 type RecipeDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -231,6 +232,14 @@ export default async function RecipeDetailPage({ params }: RecipeDetailPageProps
               </div>
             </div>
           </div>
+
+          <section className="space-y-4 border-t border-white/12 pt-6">
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b99a67]">Public Station Access</p>
+            </div>
+
+            <RecipeStationAccess stations={recipe.availableZonesByStation} />
+          </section>
         </div>
       </section>
     </div>
