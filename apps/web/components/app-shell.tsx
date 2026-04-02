@@ -22,6 +22,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const isHome = pathname === "/";
   const showSidebarSearch = !routesWithInlineSearch.has(pathname);
+  const mainShellClassName = isHome
+    ? "min-w-0 xl:col-[1/-1] xl:row-start-1"
+    : "min-w-0 rounded-[28px] border border-white/10 bg-black/20 p-3 backdrop-blur-sm xl:max-w-[1320px] xl:p-4";
 
   const navGroups = [
     {
@@ -51,9 +54,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   ];
 
   return (
-    <div className="mx-auto min-h-screen max-w-[1680px] px-3 py-3 md:px-5 lg:px-6">
-      <div className="grid gap-4 xl:grid-cols-[290px_minmax(0,1fr)]">
-        <aside>
+    <div className="min-h-screen px-3 py-3 md:px-5 lg:px-6">
+      <div className="grid gap-4 xl:grid-cols-[290px_minmax(0,1fr)] xl:items-start">
+        <aside className={isHome ? "xl:col-start-1 xl:row-start-1 xl:relative xl:z-10" : undefined}>
           <div className="eq-sidebar-surface eq-shell-glow sticky top-3 overflow-hidden rounded-[26px] border border-[var(--sidebar-border)]">
             <div className="relative z-10 flex min-h-[calc(100vh-1.5rem)] flex-col gap-6 p-5 text-[var(--sidebar-text)]">
               <div className="space-y-4">
@@ -138,13 +141,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </aside>
 
-        <main
-          className={
-            isHome
-              ? "min-w-0"
-              : "min-w-0 rounded-[28px] border border-white/10 bg-black/20 p-3 backdrop-blur-sm xl:p-4"
-          }
-        >
+        <main className={mainShellClassName}>
           <div className={isHome ? "flex min-w-0 flex-col" : "flex min-w-0 flex-col gap-4"}>{children}</div>
         </main>
       </div>
