@@ -1,0 +1,32 @@
+[
+  {
+    "chestNpcId": 92129,
+    "sourceNpcId": 92110,
+    "zoneShortName": "frontiermtns",
+    "note": "Blacksmith Yragbore chest attribution"
+  },
+  {
+    "chestNpcId": 68270,
+    "sourceNpcId": 68267,
+    "zoneShortName": "butcher",
+    "note": "Enraged Corflunk chest attribution"
+  },
+  {
+    "chestNpcId": 68270,
+    "sourceNpcId": 68268,
+    "zoneShortName": "butcher",
+    "note": "Enraged Zarchoomi chest attribution"
+  },
+  {
+    "chestNpcId": 364029,
+    "sourceNpcId": 364025,
+    "zoneShortName": "shadowspine",
+    "note": "Braag the Morphling chest attribution"
+  },
+  {
+    "chestNpcId": 449009,
+    "sourceNpcId": 449004,
+    "zoneShortName": "cryptofshade",
+    "note": "Braag_the_Morphling chest attribution"
+  }
+]

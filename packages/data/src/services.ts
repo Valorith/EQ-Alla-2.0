@@ -2,6 +2,14 @@ import { cacheGet, cacheGetOrResolve } from "./cache";
 import { getDb } from "./db";
 import { itemClassNames, itemSlotFlags } from "./item-search-filters";
 import { canonicalizeItemTypeName, itemTypeIdFromName, itemTypeNameFromId } from "./item-types";
+import {
+  getLootChestNpcIds,
+  getLootChestNpcIdsForSourceNpcId,
+  getLootChestNpcIdsForSourceNpcIds,
+  getLootChestSourceNpcIdsByChestNpcId,
+  getLootChestSourceNpcIdsForZoneShortName,
+  getLootChestZoneShortNamesBySourceNpcId
+} from "./loot-chest-npc-attribution";
 import { getManualNpcIdsForZone, getManualNpcZoneLinksByNpcId } from "./manual-npc-zone-overrides";
 import { formatPlayableItemRaceMask, raceNames } from "./race-names";
 import { getSpellEffectName, resolveSpellEffectDirection, summarizeSpellEffects } from "./spell-effects";
@@ -1373,6 +1381,122 @@ function summarizeZoneNames(zones: Array<{ longName: string }>) {
   return names.length > 0 ? names.join(", ") : "Unknown";
 }
 
+async function getZoneLinksByShortNames(shortNames: string[]) {
+  const normalizedShortNames = [...new Set(shortNames.map((value) => value.trim().toLowerCase()).filter(Boolean))];
+  if (!db || normalizedShortNames.length === 0) {
+    return new Map<string, ZoneLink>();
+  }
+
+  const rows = await sql<{ short_name: string; long_name: string }>`
+    select lower(short_name) as short_name, min(long_name) as long_name
+    from zone
+    where lower(short_name) in (${sql.join(normalizedShortNames.map((value) => sql`${value}`), sql`, `)})
+      and version = 0
+      and coalesce(min_status, 0) <= ${publicZoneStatusCeiling}
+    group by lower(short_name)
+  `.execute(db);
+
+  const zoneLinksByShortName = new Map<string, ZoneLink>();
+
+  for (const row of rows.rows) {
+    zoneLinksByShortName.set(row.short_name, {
+      shortName: row.short_name,
+      longName: row.long_name ?? row.short_name,
+      href: `/zones/${row.short_name}`
+    });
+  }
+
+  for (const shortName of normalizedShortNames) {
+    if (!zoneLinksByShortName.has(shortName)) {
+      zoneLinksByShortName.set(shortName, {
+        shortName,
+        longName: shortName,
+        href: `/zones/${shortName}`
+      });
+    }
+  }
+
+  return zoneLinksByShortName;
+}
+
+async function getLootChestZoneLinksBySourceNpcId(sourceNpcIds: number[]) {
+  const zoneShortNamesBySourceNpcId = getLootChestZoneShortNamesBySourceNpcId(sourceNpcIds);
+  const zoneLinksByShortName = await getZoneLinksByShortNames(
+    [...new Set([...zoneShortNamesBySourceNpcId.values()].flatMap((value) => value))]
+  );
+  const zoneLinksBySourceNpcId = new Map<number, ZoneLink[]>();
+
+  for (const [sourceNpcId, zoneShortNames] of zoneShortNamesBySourceNpcId.entries()) {
+    zoneLinksBySourceNpcId.set(
+      sourceNpcId,
+      zoneShortNames
+        .map((shortName) => zoneLinksByShortName.get(shortName))
+        .filter((zone): zone is ZoneLink => Boolean(zone))
+    );
+  }
+
+  return zoneLinksBySourceNpcId;
+}
+
+async function getNpcDisplayMetadataById(npcIds: number[]) {
+  const normalizedNpcIds = [...new Set(npcIds.map((value) => Number(value)).filter((value) => value > 0))];
+  if (!db || normalizedNpcIds.length === 0) {
+    return new Map<number, { name: string; zones: ZoneLink[] }>();
+  }
+
+  const [nameRows, liveZoneRows, manualZoneLinksByNpcId, lootChestZoneLinksByNpcId] = await Promise.all([
+    sql<{ id: number; name: string }>`
+      select id, name
+      from npc_types
+      where id in (${sql.join(normalizedNpcIds.map((value) => sql`${value}`), sql`, `)})
+    `.execute(db),
+    sql<{ id: number; short_name: string; long_name: string }>`
+      select distinct nt.id, ps.zone as short_name, ps.long_name
+      from npc_types nt
+      left join spawnentry se on se.npcID = nt.id
+      left join spawngroup sg on sg.id = se.spawngroupID
+      left join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
+      where nt.id in (${sql.join(normalizedNpcIds.map((value) => sql`${value}`), sql`, `)})
+      order by ps.long_name asc
+    `.execute(db),
+    getManualNpcZoneLinksByNpcId(normalizedNpcIds),
+    getLootChestZoneLinksBySourceNpcId(normalizedNpcIds)
+  ]);
+
+  const liveZoneLinksByNpcId = new Map<number, ZoneLink[]>();
+
+  for (const row of liveZoneRows.rows) {
+    if (!row.short_name || !row.long_name) {
+      continue;
+    }
+
+    if (!liveZoneLinksByNpcId.has(row.id)) {
+      liveZoneLinksByNpcId.set(row.id, []);
+    }
+
+    liveZoneLinksByNpcId.get(row.id)?.push({
+      shortName: row.short_name,
+      longName: row.long_name,
+      href: `/zones/${row.short_name}`
+    });
+  }
+
+  const metadataByNpcId = new Map<number, { name: string; zones: ZoneLink[] }>();
+
+  for (const row of nameRows.rows) {
+    metadataByNpcId.set(row.id, {
+      name: row.name,
+      zones: mergeZoneLinks(
+        liveZoneLinksByNpcId.get(row.id) ?? [],
+        manualZoneLinksByNpcId.get(row.id) ?? [],
+        lootChestZoneLinksByNpcId.get(row.id) ?? []
+      )
+    });
+  }
+
+  return metadataByNpcId;
+}
+
 function decodeNpcSpecialAttacks(raw: string | null | undefined) {
   const names: Record<string, string> = {
     A: "Immune to melee",
@@ -1642,8 +1766,8 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
         order by name asc
         limit ${catalogSearchTypeLimit}
       `.execute(db!),
-      sql<{ id: number; name: string; race: number; level: number; zone_name: string | null }>`
-        select nt.id, nt.name, nt.race, nt.level, min(ps.long_name) as zone_name
+      sql<{ id: number; name: string; race: number; level: number; zone_name: string | null; zone_short_name: string | null }>`
+        select nt.id, nt.name, nt.race, nt.level, min(ps.long_name) as zone_name, min(ps.zone) as zone_short_name
         from npc_types nt
         left join spawnentry se on se.npcID = nt.id
         left join spawngroup sg on sg.id = se.spawngroupID
@@ -1691,7 +1815,10 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
       `.execute(db!)
     ]);
 
-    const manualZoneLinksByNpcId = await getManualNpcZoneLinksByNpcId(npcRows.rows.map((row) => row.id));
+    const [manualZoneLinksByNpcId, lootChestZoneLinksByNpcId] = await Promise.all([
+      getManualNpcZoneLinksByNpcId(npcRows.rows.map((row) => row.id)),
+      getLootChestZoneLinksBySourceNpcId(npcRows.rows.map((row) => row.id))
+    ]);
     const dbHits: SearchHit[] = [];
 
     for (const row of itemRows.rows) {
@@ -1722,8 +1849,14 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
     }
 
     for (const row of npcRows.rows) {
-      const liveZones = row.zone_name ? [{ shortName: row.zone_name, longName: row.zone_name, href: "" }] : [];
-      const zones = mergeZoneLinks(liveZones, manualZoneLinksByNpcId.get(row.id) ?? []);
+        const liveZones = row.zone_name && row.zone_short_name
+          ? [{ shortName: row.zone_short_name, longName: row.zone_name, href: `/zones/${row.zone_short_name}` }]
+          : [];
+      const zones = mergeZoneLinks(
+        liveZones,
+        manualZoneLinksByNpcId.get(row.id) ?? [],
+        lootChestZoneLinksByNpcId.get(row.id) ?? []
+      );
       dbHits.push({
         id: String(row.id),
         type: "npc",
@@ -1924,42 +2057,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
     const row = result.rows[0];
 
     if (!row) return undefined;
-
-    const droppedByRowsPromise = sql<{
-      id: number;
-      name: string;
-      short_name: string;
-      long_name: string;
-      multiplier: number;
-      probability: number;
-      chance: number;
-    }>`
-      select distinct nt.id, nt.name, ps.zone as short_name, ps.long_name, lte.multiplier, lte.probability, lde.chance
-      from lootdrop_entries lde
-      join loottable_entries lte on lte.lootdrop_id = lde.lootdrop_id
-      join npc_types nt on nt.loottable_id = lte.loottable_id
-      join spawnentry se on se.npcID = nt.id
-      join spawngroup sg on sg.id = se.spawngroupID
-      join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
-      where lde.item_id = ${id}
-        and ${sql.raw(trackableNpcCondition("nt"))}
-      order by ps.long_name asc, nt.name asc
-      limit 160
-    `.execute(db!);
-
-    const droppedZoneRowsPromise = sql<{ short_name: string; long_name: string }>`
-      select distinct ps.zone as short_name, ps.long_name
-      from lootdrop_entries lde
-      join loottable_entries lte on lte.lootdrop_id = lde.lootdrop_id
-      join npc_types nt on nt.loottable_id = lte.loottable_id
-      join spawnentry se on se.npcID = nt.id
-      join spawngroup sg on sg.id = se.spawngroupID
-      join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
-      where lde.item_id = ${id}
-        and ${sql.raw(trackableNpcCondition("nt"))}
-      order by ps.long_name asc
-      limit 20
-    `.execute(db!);
+    const mappedLootChestNpcIds = getLootChestNpcIds();
 
     const droppedByCandidateRowsPromise = sql<{
       id: number;
@@ -1973,7 +2071,12 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       join loottable_entries lte on lte.lootdrop_id = lde.lootdrop_id
       join npc_types nt on nt.loottable_id = lte.loottable_id
       where lde.item_id = ${id}
-        and ${sql.raw(trackableNpcCondition("nt"))}
+        and (
+          ${sql.raw(trackableNpcCondition("nt"))}
+          ${mappedLootChestNpcIds.length > 0
+            ? sql`or nt.id in (${sql.join(mappedLootChestNpcIds.map((value) => sql`${value}`), sql`, `)})`
+            : sql``}
+        )
       order by nt.name asc
       limit 160
     `.execute(db!);
@@ -2016,16 +2119,19 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
 
     const effectNameMapPromise = spellNamesById([row.proceffect, row.worneffect, row.focuseffect, row.clickeffect, row.scrolleffect].map(Number));
 
-    const [droppedByRows, droppedZoneRows, droppedByCandidateRows, soldByRows, recipeRows, effectNameMap] = await Promise.all([
-      droppedByRowsPromise,
-      droppedZoneRowsPromise,
+    const [droppedByCandidateRows, soldByRows, recipeRows, effectNameMap] = await Promise.all([
       droppedByCandidateRowsPromise,
       soldByRowsPromise,
       recipeRowsPromise,
       effectNameMapPromise
     ]);
-
-    const manualZoneLinksByNpcId = await getManualNpcZoneLinksByNpcId(droppedByCandidateRows.rows.map((entry) => entry.id));
+    const lootChestSourceNpcIdsByChestNpcId = getLootChestSourceNpcIdsByChestNpcId(droppedByCandidateRows.rows.map((entry) => entry.id));
+    const effectiveLootOwnerIds = [
+      ...new Set(
+        droppedByCandidateRows.rows.flatMap((entry) => lootChestSourceNpcIdsByChestNpcId.get(entry.id) ?? [entry.id])
+      )
+    ];
+    const npcDisplayMetadataByNpcId = await getNpcDisplayMetadataById(effectiveLootOwnerIds);
 
     const soldByEntries = Array.from(
       new Map(soldByRows.rows.map((entry) => [`${entry.id}:${entry.short_name}`, entry] as const)).values()
@@ -2043,50 +2149,38 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       }
     >();
 
-    for (const entry of droppedByRows.rows) {
-      const zone = {
-        shortName: entry.short_name,
-        longName: entry.long_name,
-        href: `/zones/${entry.short_name}`
-      };
-
-      droppedByEntries.set(`${entry.id}:${entry.short_name}`, {
-        id: entry.id,
-        name: entry.name,
-        href: `/npcs/${entry.id}`,
-        dropChance: (Number(entry.chance ?? 0) * Number(entry.probability ?? 0)) / 100,
-        multiplier: Number(entry.multiplier ?? 1),
-        zone
-      });
-    }
-
     for (const entry of droppedByCandidateRows.rows) {
-      const manualZones = manualZoneLinksByNpcId.get(entry.id) ?? [];
+      const effectiveNpcIds = lootChestSourceNpcIdsByChestNpcId.get(entry.id) ?? [entry.id];
 
-      for (const zone of manualZones) {
-        const key = `${entry.id}:${zone.shortName}`;
-        if (droppedByEntries.has(key)) {
-          continue;
+      for (const effectiveNpcId of effectiveNpcIds) {
+        const metadata = npcDisplayMetadataByNpcId.get(effectiveNpcId);
+        const zones = metadata?.zones?.length
+          ? metadata.zones
+          : effectiveNpcId !== entry.id
+            ? [{ shortName: "unknown", longName: "Unknown", href: "/zones" }]
+            : [];
+
+        for (const zone of zones) {
+          const key = `${effectiveNpcId}:${zone.shortName}`;
+          if (!droppedByEntries.has(key)) {
+            droppedByEntries.set(key, {
+              id: effectiveNpcId,
+              name: formatNpcName(metadata?.name ?? entry.name),
+              href: `/npcs/${effectiveNpcId}`,
+              dropChance: (Number(entry.chance ?? 0) * Number(entry.probability ?? 0)) / 100,
+              multiplier: Number(entry.multiplier ?? 1),
+              zone
+            });
+          }
         }
-
-        droppedByEntries.set(key, {
-          id: entry.id,
-          name: entry.name,
-          href: `/npcs/${entry.id}`,
-          dropChance: (Number(entry.chance ?? 0) * Number(entry.probability ?? 0)) / 100,
-          multiplier: Number(entry.multiplier ?? 1),
-          zone
-        });
       }
     }
 
     const droppedInZones = mergeZoneLinks(
-      droppedZoneRows.rows.map((entry) => ({
-        shortName: entry.short_name,
-        longName: entry.long_name,
-        href: `/zones/${entry.short_name}`
-      })),
-      ...[...manualZoneLinksByNpcId.values()]
+      [...new Set([...droppedByEntries.values()].map((entry) => entry.zone.shortName))].map((shortName) => {
+        const zone = [...droppedByEntries.values()].find((entry) => entry.zone.shortName === shortName)?.zone;
+        return zone ?? { shortName, longName: shortName, href: `/zones/${shortName}` };
+      })
     );
 
     const statDefinitions: Array<{
@@ -2260,7 +2354,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       enduranceRegen: Number(row.enduranceregen ?? 0),
       damageBonus: calculateDamageBonus(row.itemtype, row.damage, row.delay),
       coinValue,
-      zone: droppedZoneRows.rows[0]?.long_name ?? (row.source?.trim() || "Various"),
+      zone: droppedInZones[0]?.longName ?? (row.source?.trim() || "Various"),
       ac: Number(row.ac ?? 0),
       hp: Number(row.hp ?? 0),
       mana: Number(row.mana ?? 0),
@@ -2547,14 +2641,21 @@ export async function listNpcs(filters: NpcFilters = {}) {
       limit 100
     `.execute(db!);
 
-    const manualZoneLinksByNpcId = await getManualNpcZoneLinksByNpcId(rows.rows.map((row) => row.id));
+    const [manualZoneLinksByNpcId, lootChestZoneLinksByNpcId] = await Promise.all([
+      getManualNpcZoneLinksByNpcId(rows.rows.map((row) => row.id)),
+      getLootChestZoneLinksBySourceNpcId(rows.rows.map((row) => row.id))
+    ]);
 
     return rows.rows
       .map((row) => {
         const liveZones = row.zone_name && row.zone_short_name
           ? [{ shortName: row.zone_short_name, longName: row.zone_name, href: `/zones/${row.zone_short_name}` }]
           : [];
-        const zones = mergeZoneLinks(liveZones, manualZoneLinksByNpcId.get(row.id) ?? []);
+        const zones = mergeZoneLinks(
+          liveZones,
+          manualZoneLinksByNpcId.get(row.id) ?? [],
+          lootChestZoneLinksByNpcId.get(row.id) ?? []
+        );
 
         return {
           id: row.id,
@@ -2625,8 +2726,10 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
     const row = result.rows[0];
 
     if (!row) return undefined;
+    const attributedLootChestNpcIds = getLootChestNpcIdsForSourceNpcId(id);
+    const attributedLootOwnerNpcIds = [...new Set([id, ...attributedLootChestNpcIds])];
 
-    const [spellRows, dropRows, sellRows, spawnZoneRows, factionRows, manualZoneLinksByNpcId] = await Promise.all([
+    const [spellRows, attributedLootOwnerRows, sellRows, spawnZoneRows, factionRows, manualZoneLinksByNpcId, lootChestZoneLinksByNpcId] = await Promise.all([
       row.npc_spells_id
         ? sql<{ spellid: number; type: number; name: string; new_icon: number }>`
             select nse.spellid, nse.type, s.name, s.new_icon
@@ -2638,38 +2741,13 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
             order by nse.priority desc, s.name asc
           `.execute(db!)
         : Promise.resolve({ rows: [] as Array<{ spellid: number; type: number; name: string; new_icon: number }> }),
-      row.loottable_id
-        ? sql<{
-            lootdrop_id: number;
-            probability: number;
-            multiplier: number;
-            item_id: number;
-            chance: number;
-            name: string;
-            itemtype: number;
-            icon: number;
-          }>`
-            select lte.lootdrop_id, lte.probability, lte.multiplier, lde.item_id, lde.chance,
-                   i.Name as name, i.itemtype, i.icon
-            from loottable_entries lte
-            join lootdrop_entries lde on lde.lootdrop_id = lte.lootdrop_id
-            join items i on i.id = lde.item_id
-            where lte.loottable_id = ${row.loottable_id}
-              and ${discoveredItemClause("i.id")}
-            order by lte.lootdrop_id asc, i.Name asc
+      attributedLootOwnerNpcIds.length > 0
+        ? sql<{ id: number; loottable_id: number | null }>`
+            select id, loottable_id
+            from npc_types
+            where id in (${sql.join(attributedLootOwnerNpcIds.map((value) => sql`${value}`), sql`, `)})
           `.execute(db!)
-        : Promise.resolve({
-            rows: [] as Array<{
-              lootdrop_id: number;
-              probability: number;
-              multiplier: number;
-              item_id: number;
-              chance: number;
-              name: string;
-              itemtype: number;
-              icon: number;
-            }>
-          }),
+        : Promise.resolve({ rows: [] as Array<{ id: number; loottable_id: number | null }> }),
       row.merchant_id
         ? sql<{
             id: number;
@@ -2712,8 +2790,46 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
             order by nfe.value desc, fl.name asc
           `.execute(db!)
         : Promise.resolve({ rows: [] as Array<{ id: number; name: string; value: number }> }),
-      getManualNpcZoneLinksByNpcId([id])
+      getManualNpcZoneLinksByNpcId([id]),
+      getLootChestZoneLinksBySourceNpcId([id])
     ]);
+
+    const attributedLoottableIds = attributedLootOwnerRows.rows
+      .map((entry) => Number(entry.loottable_id ?? 0))
+      .filter((value) => value > 0);
+
+    const dropRows = attributedLoottableIds.length > 0
+      ? await sql<{
+          lootdrop_id: number;
+          probability: number;
+          multiplier: number;
+          item_id: number;
+          chance: number;
+          name: string;
+          itemtype: number;
+          icon: number;
+        }>`
+          select lte.lootdrop_id, lte.probability, lte.multiplier, lde.item_id, lde.chance,
+                 i.Name as name, i.itemtype, i.icon
+          from loottable_entries lte
+          join lootdrop_entries lde on lde.lootdrop_id = lte.lootdrop_id
+          join items i on i.id = lde.item_id
+          where lte.loottable_id in (${sql.join(attributedLoottableIds.map((value) => sql`${value}`), sql`, `)})
+            and ${discoveredItemClause("i.id")}
+          order by lte.lootdrop_id asc, i.Name asc
+        `.execute(db!)
+      : {
+          rows: [] as Array<{
+            lootdrop_id: number;
+            probability: number;
+            multiplier: number;
+            item_id: number;
+            chance: number;
+            name: string;
+            itemtype: number;
+            icon: number;
+          }>
+        };
 
     const spawnZones = mergeZoneLinks(
       spawnZoneRows.rows.map((entry) => ({
@@ -2721,7 +2837,8 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
         longName: entry.long_name ?? entry.short_name,
         href: `/zones/${entry.short_name}`
       })),
-      manualZoneLinksByNpcId.get(id) ?? []
+      manualZoneLinksByNpcId.get(id) ?? [],
+      lootChestZoneLinksByNpcId.get(id) ?? []
     );
 
     const dropGroups = new Map<
@@ -2987,8 +3104,9 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
 
     const spawnVersions = [...new Set([Number(zone.version ?? 0), -1])];
     const manualNpcIdsForZone = getManualNpcIdsForZone(shortName);
+    const lootChestSourceNpcIdsForZone = getLootChestSourceNpcIdsForZoneShortName(shortName);
 
-    const [bestiaryRows, itemRows, forageRows, spawnLocationRows, spawnEntryRows, craftingObjectRows, manualBestiaryRows, manualItemRows] = await Promise.all([
+    const [bestiaryRows, itemRows, forageRows, spawnLocationRows, spawnEntryRows, craftingObjectRows, manualBestiaryRows, manualItemRows, lootChestZoneBestiaryRows] = await Promise.all([
       sql<{
         id: number;
         raw_name: string;
@@ -3167,12 +3285,46 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
               itemtype: number;
               damage: number;
             }>
+          }),
+      lootChestSourceNpcIdsForZone.length > 0
+        ? sql<{
+            id: number;
+            raw_name: string;
+            min_level: number;
+            max_level: number;
+            race: number;
+            class: number;
+            variants: number;
+          }>`
+            select nt.id,
+                   nt.name as raw_name,
+                   nt.level as min_level,
+                   coalesce(nullif(nt.maxlevel, 0), nt.level) as max_level,
+                   nt.race,
+                   nt.class,
+                   1 as variants
+            from npc_types nt
+            where nt.id in (${sql.join(lootChestSourceNpcIdsForZone.map((value) => sql`${value}`), sql`, `)})
+              and ${sql.raw(trackableNpcCondition("nt"))}
+              and nt.race not in (127, 240)
+            order by nt.name asc
+          `.execute(db!)
+        : Promise.resolve({
+            rows: [] as Array<{
+              id: number;
+              raw_name: string;
+              min_level: number;
+              max_level: number;
+              race: number;
+              class: number;
+              variants: number;
+            }>
           })
     ]);
 
     const bestiary = Array.from(
       new Map(
-        [...bestiaryRows.rows, ...manualBestiaryRows.rows]
+        [...bestiaryRows.rows, ...manualBestiaryRows.rows, ...lootChestZoneBestiaryRows.rows]
           .map((row) => {
             const name = formatNpcName(row.raw_name);
 
@@ -3195,7 +3347,7 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
       ).values()
     );
 
-    const encounterLevels = [...bestiaryRows.rows, ...manualBestiaryRows.rows].flatMap((row) => {
+    const encounterLevels = [...bestiaryRows.rows, ...manualBestiaryRows.rows, ...lootChestZoneBestiaryRows.rows].flatMap((row) => {
       const levels = [Number(row.min_level ?? 0), Number(row.max_level ?? 0)].filter((value) => value > 0);
       return levels;
     });
@@ -3215,6 +3367,9 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
           .filter(Boolean),
         ...manualBestiaryRows.rows
           .map((row) => formatNpcName(row.raw_name))
+          .filter((name) => Boolean(name) && isNamedNpcName(name)),
+        ...lootChestZoneBestiaryRows.rows
+          .map((row) => formatNpcName(row.raw_name))
           .filter((name) => Boolean(name) && isNamedNpcName(name))
       ]
     );
@@ -3223,9 +3378,46 @@ export async function getZoneDetail(shortName: string): Promise<ZoneDetail | und
       .filter((entry) => entry.named && activeNamedNpcNames.has(entry.name))
       .map((entry) => ({ id: entry.id, name: entry.name, href: entry.href }));
 
+    const attributedLootChestNpcIdsForZone = getLootChestNpcIdsForSourceNpcIds([
+        ...new Set([
+          ...spawnEntryRows.rows.map((row) => row.id),
+          ...manualBestiaryRows.rows.map((row) => row.id),
+          ...lootChestZoneBestiaryRows.rows.map((row) => row.id)
+        ])
+      ]);
+    const attributedLootChestItemRows = attributedLootChestNpcIdsForZone.length > 0
+      ? await sql<{
+          id: number;
+          name: string;
+          icon: number;
+          itemclass: number;
+          itemtype: number;
+          damage: number;
+        }>`
+          select distinct i.id, i.Name as name, i.icon, i.itemclass, i.itemtype, i.damage
+          from items i
+          join lootdrop_entries lde on lde.item_id = i.id
+          join loottable_entries lte on lte.lootdrop_id = lde.lootdrop_id
+          join npc_types nt on nt.loottable_id = lte.loottable_id
+          where nt.id in (${sql.join(attributedLootChestNpcIdsForZone.map((value) => sql`${value}`), sql`, `)})
+            and ${discoveredItemClause("i.id")}
+            and nt.class not in (${sql.join(merchantNpcClasses.map((value) => sql`${value}`), sql`, `)})
+          order by i.Name asc
+        `.execute(db!)
+      : {
+          rows: [] as Array<{
+            id: number;
+            name: string;
+            icon: number;
+            itemclass: number;
+            itemtype: number;
+            damage: number;
+          }>
+        };
+
     const itemDrops = Array.from(
       new Map(
-        [...itemRows.rows, ...manualItemRows.rows].map((row) => [
+        [...itemRows.rows, ...manualItemRows.rows, ...attributedLootChestItemRows.rows].map((row) => [
           row.id,
           {
             id: row.id,

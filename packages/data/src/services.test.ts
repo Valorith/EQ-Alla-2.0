@@ -287,6 +287,161 @@ describe("catalog services", () => {
     expect(npcs.some((entry) => entry.id === 113457)).toBe(true);
   });
 
+  it("attributes mapped loot chest drops to the source NPC outside the content database", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const chestRows = await sql<{ npc_id: number; item_id: number }>`
+      select nt.id as npc_id, lde.item_id
+      from npc_types nt
+      join loottable_entries lte on lte.loottable_id = nt.loottable_id
+      join lootdrop_entries lde on lde.lootdrop_id = lte.lootdrop_id
+      where exists (
+        select 1
+        from discovered_items di
+        where di.item_id = lde.item_id
+      )
+      order by nt.id asc, lde.item_id asc
+      limit 25
+    `.execute(db!);
+
+    const sourceRows = await sql<{ npc_id: number; short_name: string; long_name: string }>`
+      select nt.id as npc_id, min(z.short_name) as short_name, min(z.long_name) as long_name
+      from npc_types nt
+      join spawnentry se on se.npcID = nt.id
+      join spawngroup sg on sg.id = se.spawngroupID
+      join spawn2 s2 on s2.spawngroupID = sg.id
+      left join spawn2_disabled s2d
+        on s2d.spawn2_id = s2.id
+       and coalesce(s2d.disabled, 0) <> 0
+      join zone z
+        on z.short_name = s2.zone
+       and coalesce(z.version, 0) = 0
+       and coalesce(z.min_status, 0) <= 1
+      where ${sql.raw("coalesce(nt.trackable, 0) = 1")}
+        and lower(trim(coalesce(nt.name, ''))) <> 'bazaar'
+        and s2d.spawn2_id is null
+      group by nt.id
+      order by nt.level desc, nt.name asc
+      limit 25
+    `.execute(db!);
+
+    let sample:
+      | {
+          chestNpcId: number;
+          sourceNpcId: number;
+          itemId: number;
+          sourceZoneShortName: string;
+          sourceZoneLongName: string;
+        }
+      | undefined;
+
+    for (const source of sourceRows.rows) {
+      const sourceDetail = await getNpcDetail(source.npc_id);
+      const existingItemIds = new Set(
+        sourceDetail?.drops.flatMap((group) => group.items.map((item) => item.id)) ?? []
+      );
+
+      for (const chest of chestRows.rows) {
+        if (chest.npc_id === source.npc_id || existingItemIds.has(chest.item_id)) {
+          continue;
+        }
+
+        const itemDetail = await getItemDetail(chest.item_id);
+        if (!itemDetail?.droppedBy.some((entry) => entry.id === chest.npc_id)) {
+          continue;
+        }
+
+        if (itemDetail.droppedBy.some((entry) => entry.id === source.npc_id)) {
+          continue;
+        }
+
+        sample = {
+          chestNpcId: chest.npc_id,
+          sourceNpcId: source.npc_id,
+          itemId: chest.item_id,
+          sourceZoneShortName: source.short_name,
+          sourceZoneLongName: source.long_name
+        };
+        break;
+      }
+
+      if (sample) {
+        break;
+      }
+    }
+
+    expect(sample).toBeTruthy();
+    if (!sample) {
+      return;
+    }
+
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "eq-alla-loot-chest-attribution-"));
+    const attributionPath = path.join(tempDir, "loot-chest-npc-attribution.json");
+    const previousAttributionPath = process.env.EQ_LOOT_CHEST_NPC_ATTRIBUTION_PATH;
+
+    fs.writeFileSync(
+      attributionPath,
+      JSON.stringify([{ chestNpcId: sample.chestNpcId, sourceNpcId: sample.sourceNpcId }], null, 2),
+      "utf8"
+    );
+
+    process.env.EQ_LOOT_CHEST_NPC_ATTRIBUTION_PATH = attributionPath;
+
+    try {
+      const item = await getItemDetail(sample.itemId);
+      const sourceNpc = await getNpcDetail(sample.sourceNpcId);
+      const zone = await getZoneDetail(sample.sourceZoneShortName);
+
+      expect(item?.droppedBy.some((entry) => entry.id === sample.sourceNpcId)).toBe(true);
+      expect(item?.droppedBy.some((entry) => entry.id === sample.chestNpcId)).toBe(false);
+      expect(item?.droppedInZones.some((entry) => entry.shortName === sample.sourceZoneShortName)).toBe(true);
+      expect(sourceNpc?.drops.some((group) => group.items.some((entry) => entry.id === sample.itemId))).toBe(true);
+      expect(zone?.itemDrops.some((entry) => entry.id === sample.itemId)).toBe(true);
+      expect(sourceNpc?.zone.includes(sample.sourceZoneLongName)).toBe(true);
+    } finally {
+      if (previousAttributionPath === undefined) {
+        delete process.env.EQ_LOOT_CHEST_NPC_ATTRIBUTION_PATH;
+      } else {
+        process.env.EQ_LOOT_CHEST_NPC_ATTRIBUTION_PATH = previousAttributionPath;
+      }
+
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }, 20_000);
+
+  it("keeps undiscovered chest-attributed items hidden across user-facing surfaces", async () => {
+    const npc = await getNpcDetail(92110);
+    const item = await getItemDetail(150873);
+    const searchResults = await searchCatalog("Essence of Yragbor");
+    const items = await listItems({ q: "Essence of Yragbor" });
+    const zone = await getZoneDetail("eastwastes");
+
+    expect(npc).toBeTruthy();
+    expect(npc?.drops.some((group) => group.items.some((entry) => entry.id === 150873))).toBe(false);
+
+    expect(item).toBeUndefined();
+    expect(searchResults.some((entry) => entry.type === "item" && entry.id === "150873")).toBe(false);
+    expect(items.some((entry) => entry.id === 150873)).toBe(false);
+    expect(zone?.itemDrops.some((entry) => entry.id === 150873)).toBe(false);
+  });
+
+  it("uses mapped chest-attribution zones on item and NPC pages", async () => {
+    const item = await getItemDetail(150359);
+    const npc = await getNpcDetail(364025);
+    const npcList = await listNpcs({ q: "Braag the Morphling" });
+    const zone = await getZoneDetail("shadowspine");
+
+    expect(item).toBeTruthy();
+    expect(item?.droppedBy.some((entry) => entry.id === 364025)).toBe(true);
+    expect(item?.droppedBy.find((entry) => entry.id === 364025)?.zone.shortName).toBe("shadowspine");
+    expect(item?.droppedBy.find((entry) => entry.id === 364025)?.zone.longName).toBe("Shadow Spine");
+    expect(npc?.zone.includes("Shadow Spine")).toBe(true);
+    expect(npc?.spawnZones.some((entry) => entry.shortName === "shadowspine")).toBe(true);
+    expect(npcList.some((entry) => entry.id === 364025 && entry.zone.includes("Shadow Spine"))).toBe(true);
+    expect(zone?.bestiary.some((entry) => entry.id === 364025)).toBe(true);
+  });
+
   it("formats elemental damage with a typed damage label", async () => {
     const item = await getItemDetail(25210);
 
