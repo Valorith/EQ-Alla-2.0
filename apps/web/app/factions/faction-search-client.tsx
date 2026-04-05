@@ -7,6 +7,7 @@ import type { FactionSummary } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../components/catalog-shell";
+import { waitForLoadingIndicator } from "../../components/loading-state";
 
 type FactionSearchClientProps = {
   initialQuery: string;
@@ -332,20 +333,24 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
     }
 
     const startedAt = performance.now();
+    setIsFetching(true);
+    setError(null);
+
     const cached = getCachedFactions(nextKey);
     if (cached) {
-      setResults(cached);
-      setDisplayKey(nextKey);
-      setError(null);
-      setIsFetching(false);
-      setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "cache" });
+      void (async () => {
+        await waitForLoadingIndicator(startedAt);
+        setResults(cached);
+        setDisplayKey(nextKey);
+        setError(null);
+        setIsFetching(false);
+        setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "cache" });
+      })();
       return;
     }
 
     const controller = new AbortController();
     abortRef.current = controller;
-    setIsFetching(true);
-    setError(null);
 
     void (async () => {
       try {
@@ -364,6 +369,7 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
       } finally {
         if (abortRef.current === controller) {
           abortRef.current = null;
+          await waitForLoadingIndicator(startedAt);
           setIsFetching(false);
         }
       }
@@ -449,38 +455,44 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
         </div>
       </SectionCard>
       <SectionCard title={resultTitle}>
-        {showResults && results.length > 0 ? (
-          <>
-            <SimpleTable
-              columns={["Name", "Aligned Zone", "NPC Relationship", "Faction ID"]}
-              rows={pagedResults.map((faction) => [
-                <Link key={faction.id} href={`/factions/${faction.id}`} className="font-medium hover:underline">
-                  {faction.name}
-                </Link>,
-                faction.alignedZone,
-                describeRelationships(faction),
-                faction.id
-              ])}
-            />
-            <PaginationControls
-              currentPage={visiblePage}
-              totalPages={totalPages}
-              totalItems={results.length}
-              pageSize={factionResultsPerPage}
-              onPageChange={setPage}
-            />
-          </>
-        ) : showResults ? (
-          isFetching ? (
-            <ClassLoadingIndicator message="Loading factions" detail="Resolving alliances and rivalries." />
-          ) : activeQuery !== displayKey ? (
-            <SearchPrompt message="Press Search or View all to apply these filters." />
+        <div className="relative">
+          {showResults && results.length > 0 ? (
+            <div className={isFetching ? "transition duration-200 opacity-40 blur-[2px]" : undefined}>
+              <SimpleTable
+                columns={["Name", "Aligned Zone", "NPC Relationship", "Faction ID"]}
+                rows={pagedResults.map((faction) => [
+                  <Link key={faction.id} href={`/factions/${faction.id}`} className="font-medium hover:underline">
+                    {faction.name}
+                  </Link>,
+                  faction.alignedZone,
+                  describeRelationships(faction),
+                  faction.id
+                ])}
+              />
+              <PaginationControls
+                currentPage={visiblePage}
+                totalPages={totalPages}
+                totalItems={results.length}
+                pageSize={factionResultsPerPage}
+                onPageChange={setPage}
+              />
+            </div>
+          ) : showResults ? (
+            isFetching ? (
+              <ClassLoadingIndicator message="Loading factions" detail="Resolving alliances and rivalries." />
+            ) : activeQuery !== displayKey ? (
+              <SearchPrompt message="Press Search or View all to apply these filters." />
+            ) : (
+              <SearchPrompt message="No factions matched this search." />
+            )
           ) : (
-            <SearchPrompt message="No factions matched this search." />
-          )
-        ) : (
-          <SearchPrompt message="Enter a faction name or zone, choose an NPC relationship filter, or use View all factions." />
-        )}
+            <SearchPrompt message="Enter a faction name or zone, choose an NPC relationship filter, or use View all factions." />
+          )}
+
+          {isFetching && results.length > 0 ? (
+            <ClassLoadingIndicator overlay message="Loading factions" detail="Resolving alliances and rivalries." />
+          ) : null}
+        </div>
         {resolvedTiming ? <p className="pt-1 text-right text-[11px] uppercase tracking-[0.16em] text-[#9f8e79]">{resolvedTiming}</p> : null}
       </SectionCard>
     </>

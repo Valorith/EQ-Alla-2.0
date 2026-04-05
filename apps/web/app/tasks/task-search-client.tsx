@@ -7,6 +7,7 @@ import type { TaskDetail } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { PaginationControls, SearchPrompt, SectionCard, SimpleTable } from "../../components/catalog-shell";
+import { waitForLoadingIndicator } from "../../components/loading-state";
 
 type TaskSearchClientProps = {
   initialQuery: string;
@@ -184,20 +185,24 @@ export function TaskSearchClient({ initialQuery }: TaskSearchClientProps) {
     }
 
     const startedAt = performance.now();
+    setIsFetching(true);
+    setError(null);
+
     const cached = getCachedTasks(nextKey);
     if (cached) {
-      setResults(cached);
-      setDisplayKey(nextKey);
-      setError(null);
-      setIsFetching(false);
-      setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "cache" });
+      void (async () => {
+        await waitForLoadingIndicator(startedAt);
+        setResults(cached);
+        setDisplayKey(nextKey);
+        setError(null);
+        setIsFetching(false);
+        setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "cache" });
+      })();
       return;
     }
 
     const controller = new AbortController();
     abortRef.current = controller;
-    setIsFetching(true);
-    setError(null);
 
     void (async () => {
       try {
@@ -216,6 +221,7 @@ export function TaskSearchClient({ initialQuery }: TaskSearchClientProps) {
       } finally {
         if (abortRef.current === controller) {
           abortRef.current = null;
+          await waitForLoadingIndicator(startedAt);
           setIsFetching(false);
         }
       }
@@ -267,38 +273,44 @@ export function TaskSearchClient({ initialQuery }: TaskSearchClientProps) {
         </div>
       </SectionCard>
       <SectionCard title={resultTitle}>
-        {showResults && results.length > 0 ? (
-          <>
-            <SimpleTable
-              columns={["Task", "Zone", "Levels", "Reward"]}
-              rows={pagedResults.map((task) => [
-                <Link key={task.id} href={`/tasks/${task.id}`} className="font-medium hover:underline">
-                  {task.title}
-                </Link>,
-                task.zone.longName,
-                task.levelRange,
-                task.reward
-              ])}
-            />
-            <PaginationControls
-              currentPage={visiblePage}
-              totalPages={totalPages}
-              totalItems={results.length}
-              pageSize={taskResultsPerPage}
-              onPageChange={setPage}
-            />
-          </>
-        ) : showResults ? (
-          isFetching ? (
-            <ClassLoadingIndicator message="Loading tasks" detail="Reviewing quests, zones, and rewards." />
-          ) : activeQuery !== displayKey ? (
-            <SearchPrompt message="Press Search to apply this query." />
+        <div className="relative">
+          {showResults && results.length > 0 ? (
+            <div className={isFetching ? "transition duration-200 opacity-40 blur-[2px]" : undefined}>
+              <SimpleTable
+                columns={["Task", "Zone", "Levels", "Reward"]}
+                rows={pagedResults.map((task) => [
+                  <Link key={task.id} href={`/tasks/${task.id}`} className="font-medium hover:underline">
+                    {task.title}
+                  </Link>,
+                  task.zone.longName,
+                  task.levelRange,
+                  task.reward
+                ])}
+              />
+              <PaginationControls
+                currentPage={visiblePage}
+                totalPages={totalPages}
+                totalItems={results.length}
+                pageSize={taskResultsPerPage}
+                onPageChange={setPage}
+              />
+            </div>
+          ) : showResults ? (
+            isFetching ? (
+              <ClassLoadingIndicator message="Loading tasks" detail="Reviewing quests, zones, and rewards." />
+            ) : activeQuery !== displayKey ? (
+              <SearchPrompt message="Press Search to apply this query." />
+            ) : (
+              <SearchPrompt message="No tasks matched this search." />
+            )
           ) : (
-            <SearchPrompt message="No tasks matched this search." />
-          )
-        ) : (
-          <SearchPrompt message="Enter a task name to load results." />
-        )}
+            <SearchPrompt message="Enter a task name to load results." />
+          )}
+
+          {isFetching && results.length > 0 ? (
+            <ClassLoadingIndicator overlay message="Loading tasks" detail="Reviewing quests, zones, and rewards." />
+          ) : null}
+        </div>
         {resolvedTiming ? <p className="pt-1 text-right text-[11px] uppercase tracking-[0.16em] text-[#9f8e79]">{resolvedTiming}</p> : null}
       </SectionCard>
     </>

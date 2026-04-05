@@ -7,6 +7,7 @@ import type { RecipeSummary } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../components/catalog-shell";
+import { waitForLoadingIndicator } from "../../components/loading-state";
 
 type RecipeSearchClientProps = {
   initialQuery: string;
@@ -240,20 +241,24 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
     }
 
     const startedAt = performance.now();
+    setIsFetching(true);
+    setError(null);
+
     const cached = getCachedRecipes(nextKey);
     if (cached) {
-      setResults(cached);
-      setDisplayKey(nextKey);
-      setError(null);
-      setIsFetching(false);
-      setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "cache" });
+      void (async () => {
+        await waitForLoadingIndicator(startedAt);
+        setResults(cached);
+        setDisplayKey(nextKey);
+        setError(null);
+        setIsFetching(false);
+        setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "cache" });
+      })();
       return;
     }
 
     const controller = new AbortController();
     abortRef.current = controller;
-    setIsFetching(true);
-    setError(null);
 
     void (async () => {
       try {
@@ -272,6 +277,7 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
       } finally {
         if (abortRef.current === controller) {
           abortRef.current = null;
+          await waitForLoadingIndicator(startedAt);
           setIsFetching(false);
         }
       }
@@ -345,38 +351,44 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
         </div>
       </SectionCard>
       <SectionCard title={resultTitle}>
-        {showResults && results.length > 0 ? (
-          <>
-            <SimpleTable
-              columns={["Recipe", "Recipe ID", "Tradeskill", "Trivial at skill level"]}
-              rows={pagedResults.map((recipe) => [
-                <Link key={recipe.id} href={`/recipes/${recipe.id}`} className="font-medium hover:underline">
-                  {recipe.name}
-                </Link>,
-                recipe.id,
-                recipe.tradeskill,
-                recipe.trivial
-              ])}
-            />
-            <PaginationControls
-              currentPage={visiblePage}
-              totalPages={totalPages}
-              totalItems={results.length}
-              pageSize={recipeResultsPerPage}
-              onPageChange={setPage}
-            />
-          </>
-        ) : showResults ? (
-          isFetching ? (
-            <ClassLoadingIndicator message="Loading recipes" detail="Sifting ingredients, trivials, and results." />
-          ) : buildSearchParams(filters).toString() !== displayKey ? (
-            <SearchPrompt message="Press Search to apply these filters." />
+        <div className="relative">
+          {showResults && results.length > 0 ? (
+            <div className={isFetching ? "transition duration-200 opacity-40 blur-[2px]" : undefined}>
+              <SimpleTable
+                columns={["Recipe", "Recipe ID", "Tradeskill", "Trivial at skill level"]}
+                rows={pagedResults.map((recipe) => [
+                  <Link key={recipe.id} href={`/recipes/${recipe.id}`} className="font-medium hover:underline">
+                    {recipe.name}
+                  </Link>,
+                  recipe.id,
+                  recipe.tradeskill,
+                  recipe.trivial
+                ])}
+              />
+              <PaginationControls
+                currentPage={visiblePage}
+                totalPages={totalPages}
+                totalItems={results.length}
+                pageSize={recipeResultsPerPage}
+                onPageChange={setPage}
+              />
+            </div>
+          ) : showResults ? (
+            isFetching ? (
+              <ClassLoadingIndicator message="Loading recipes" detail="Sifting ingredients, trivials, and results." />
+            ) : buildSearchParams(filters).toString() !== displayKey ? (
+              <SearchPrompt message="Press Search to apply these filters." />
+            ) : (
+              <SearchPrompt message="No recipes matched this search." />
+            )
           ) : (
-            <SearchPrompt message="No recipes matched this search." />
-          )
-        ) : (
-          <SearchPrompt message="Enter a recipe name to load results." />
-        )}
+            <SearchPrompt message="Enter a recipe name to load results." />
+          )}
+
+          {isFetching && results.length > 0 ? (
+            <ClassLoadingIndicator overlay message="Loading recipes" detail="Sifting ingredients, trivials, and results." />
+          ) : null}
+        </div>
         {resolvedTiming ? <p className="pt-1 text-right text-[11px] uppercase tracking-[0.16em] text-[#9f8e79]">{resolvedTiming}</p> : null}
       </SectionCard>
     </>

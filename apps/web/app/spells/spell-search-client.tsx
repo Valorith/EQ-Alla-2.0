@@ -7,6 +7,7 @@ import type { SpellSummary } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { PaginationControls, SearchPrompt, SectionCard, SelectField } from "../../components/catalog-shell";
+import { waitForLoadingIndicator } from "../../components/loading-state";
 import { SpellIcon } from "../../components/spell-icon";
 
 type LevelMode = "exact" | "min" | "max";
@@ -298,21 +299,25 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
     }
 
     const startedAt = performance.now();
+    setIsFetching(true);
+    setError(null);
+
     const cached = getCachedSpells(nextKey);
     if (cached) {
-      setResults(cached);
-      setDisplayKey(nextKey);
-      setError(null);
-      setIsFetching(false);
-      setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "cache" });
-      setPage(1);
+      void (async () => {
+        await waitForLoadingIndicator(startedAt);
+        setResults(cached);
+        setDisplayKey(nextKey);
+        setError(null);
+        setIsFetching(false);
+        setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "cache" });
+        setPage(1);
+      })();
       return;
     }
 
     const controller = new AbortController();
     abortRef.current = controller;
-    setIsFetching(true);
-    setError(null);
 
     void (async () => {
       try {
@@ -333,6 +338,7 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
       } finally {
         if (abortRef.current === controller) {
           abortRef.current = null;
+          await waitForLoadingIndicator(startedAt);
           setIsFetching(false);
         }
       }
@@ -416,67 +422,73 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
       </SectionCard>
 
       <SectionCard title={resultTitle}>
-        {showResults && results.length > 0 ? (
-          <>
-            <div className="overflow-x-auto rounded-2xl border border-[#7b603b]/20 bg-[linear-gradient(180deg,rgba(35,30,27,0.86),rgba(18,20,24,0.84))] shadow-[0_18px_44px_rgba(0,0,0,0.24)] backdrop-blur-md">
-              <table className="min-w-full border-collapse text-left text-sm">
-                <thead className="bg-[linear-gradient(180deg,rgba(215,164,95,0.08),rgba(255,255,255,0.02))] text-[#ccb594]">
-                  <SpellTableHeaderRow />
-                </thead>
-                <tbody>
-                  {(filters.className ? groupedResults.flatMap((group) => [{ isLevelHeader: true as const, level: group.level }, ...group.spells]) : pagedResults).map(
-                    (entry, index) =>
-                      "isLevelHeader" in entry ? (
-                        <Fragment key={`level-${entry.level}-${index}`}>
-                          <tr className="border-t border-white/10 bg-[#d7a45f]/10">
-                            <td colSpan={7} className="px-4 py-3 text-center text-sm font-semibold uppercase tracking-[0.2em] text-[#f5dfb8]">
-                              Level {entry.level}
+        <div className="relative">
+          {showResults && results.length > 0 ? (
+            <div className={isFetching ? "transition duration-200 opacity-40 blur-[2px]" : undefined}>
+              <div className="overflow-x-auto rounded-2xl border border-[#7b603b]/20 bg-[linear-gradient(180deg,rgba(35,30,27,0.86),rgba(18,20,24,0.84))] shadow-[0_18px_44px_rgba(0,0,0,0.24)] backdrop-blur-md">
+                <table className="min-w-full border-collapse text-left text-sm">
+                  <thead className="bg-[linear-gradient(180deg,rgba(215,164,95,0.08),rgba(255,255,255,0.02))] text-[#ccb594]">
+                    <SpellTableHeaderRow />
+                  </thead>
+                  <tbody>
+                    {(filters.className ? groupedResults.flatMap((group) => [{ isLevelHeader: true as const, level: group.level }, ...group.spells]) : pagedResults).map(
+                      (entry, index) =>
+                        "isLevelHeader" in entry ? (
+                          <Fragment key={`level-${entry.level}-${index}`}>
+                            <tr className="border-t border-white/10 bg-[#d7a45f]/10">
+                              <td colSpan={7} className="px-4 py-3 text-center text-sm font-semibold uppercase tracking-[0.2em] text-[#f5dfb8]">
+                                Level {entry.level}
+                              </td>
+                            </tr>
+                            <SpellTableHeaderRow repeated />
+                          </Fragment>
+                        ) : (
+                          <tr
+                            key={entry.id}
+                            className="border-t border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.018),rgba(255,255,255,0.008))] transition hover:bg-[linear-gradient(180deg,rgba(215,164,95,0.075),rgba(255,255,255,0.02))]"
+                          >
+                            <td className="px-4 py-3.5 align-top text-[#e8dfcf]">
+                              <div className="flex items-start gap-4">
+                                <SpellIcon icon={entry.icon} name={entry.name} size="md" />
+                                <Link href={`/spells/${entry.id}`} className="font-medium hover:underline">
+                                  {entry.name}
+                                </Link>
+                              </div>
                             </td>
+                            <td className="px-4 py-3.5 align-top text-[#e8dfcf]">{filters.className || entry.className || "—"}</td>
+                            <td className="px-4 py-3.5 align-top text-[#e8dfcf]">{normalizeDisplayEffect(entry.effect)}</td>
+                            <td className="px-4 py-3.5 align-top text-[#e8dfcf]">{entry.mana || 0}</td>
+                            <td className="px-4 py-3.5 align-top text-[#e8dfcf]">{normalizeDisplaySkill(entry.skill)}</td>
+                            <td className="px-4 py-3.5 align-top text-[#e8dfcf]">{entry.target}</td>
+                            <td className="px-4 py-3.5 align-top text-[#e8dfcf]">{entry.id}</td>
                           </tr>
-                          <SpellTableHeaderRow repeated />
-                        </Fragment>
-                      ) : (
-                        <tr
-                          key={entry.id}
-                          className="border-t border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.018),rgba(255,255,255,0.008))] transition hover:bg-[linear-gradient(180deg,rgba(215,164,95,0.075),rgba(255,255,255,0.02))]"
-                        >
-                          <td className="px-4 py-3.5 align-top text-[#e8dfcf]">
-                            <div className="flex items-start gap-4">
-                              <SpellIcon icon={entry.icon} name={entry.name} size="md" />
-                              <Link href={`/spells/${entry.id}`} className="font-medium hover:underline">
-                                {entry.name}
-                              </Link>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3.5 align-top text-[#e8dfcf]">{filters.className || entry.className || "—"}</td>
-                          <td className="px-4 py-3.5 align-top text-[#e8dfcf]">{normalizeDisplayEffect(entry.effect)}</td>
-                          <td className="px-4 py-3.5 align-top text-[#e8dfcf]">{entry.mana || 0}</td>
-                          <td className="px-4 py-3.5 align-top text-[#e8dfcf]">{normalizeDisplaySkill(entry.skill)}</td>
-                          <td className="px-4 py-3.5 align-top text-[#e8dfcf]">{entry.target}</td>
-                          <td className="px-4 py-3.5 align-top text-[#e8dfcf]">{entry.id}</td>
-                        </tr>
-                      )
-                  )}
-                </tbody>
-              </table>
+                        )
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <PaginationControls
+                currentPage={visiblePage}
+                totalPages={totalPages}
+                totalItems={results.length}
+                pageSize={spellResultsPerPage}
+                onPageChange={setPage}
+              />
             </div>
-            <PaginationControls
-              currentPage={visiblePage}
-              totalPages={totalPages}
-              totalItems={results.length}
-              pageSize={spellResultsPerPage}
-              onPageChange={setPage}
-            />
-          </>
-        ) : showResults ? (
-          isFetching ? (
-            <ClassLoadingIndicator message="Loading spells" detail="Paging through the spell archive." />
+          ) : showResults ? (
+            isFetching ? (
+              <ClassLoadingIndicator message="Loading spells" detail="Paging through the spell archive." />
+            ) : (
+              <SearchPrompt message="No spells matched this search." />
+            )
           ) : (
-            <SearchPrompt message="No spells matched this search." />
-          )
-        ) : (
-          <SearchPrompt message="Enter a spell name or browse by class and level." />
-        )}
+            <SearchPrompt message="Enter a spell name or browse by class and level." />
+          )}
+
+          {isFetching && results.length > 0 ? (
+            <ClassLoadingIndicator overlay message="Loading spells" detail="Paging through the spell archive." />
+          ) : null}
+        </div>
         {resolvedTiming ? <p className="pt-1 text-right text-[11px] uppercase tracking-[0.16em] text-[#9f8e79]">{resolvedTiming}</p> : null}
       </SectionCard>
     </>

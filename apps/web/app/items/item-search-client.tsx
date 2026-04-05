@@ -9,6 +9,7 @@ import { itemTypeFilterOptions } from "@eq-alla/data/item-types";
 import { Button, Input } from "@eq-alla/ui";
 import { PaginationControls, SearchPrompt, SectionCard, SimpleTable } from "../../components/catalog-shell";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
+import { waitForLoadingIndicator } from "../../components/loading-state";
 import { ItemIcon } from "../../components/item-icon";
 
 type ItemSearchFilters = {
@@ -466,24 +467,28 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
     }
 
     const startedAt = performance.now();
+    setIsFetching(true);
+    setError(null);
+
     const cachedItems = getClientCachedItems(nextKey);
     if (cachedItems) {
-      setItems(cachedItems);
-      setDisplayKey(nextKey);
-      setError(null);
-      setIsFetching(false);
-      setResolutionMeta({
-        key: nextKey,
-        durationMs: performance.now() - startedAt,
-        source: "cache"
-      });
+      void (async () => {
+        await waitForLoadingIndicator(startedAt);
+        setItems(cachedItems);
+        setDisplayKey(nextKey);
+        setError(null);
+        setIsFetching(false);
+        setResolutionMeta({
+          key: nextKey,
+          durationMs: performance.now() - startedAt,
+          source: "cache"
+        });
+      })();
       return;
     }
 
     const controller = new AbortController();
     abortRef.current = controller;
-    setIsFetching(true);
-    setError(null);
 
     void (async () => {
       try {
@@ -519,6 +524,7 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
       } finally {
         if (abortRef.current === controller) {
           abortRef.current = null;
+          await waitForLoadingIndicator(startedAt);
           setIsFetching(false);
         }
       }
@@ -619,47 +625,53 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
       </SectionCard>
 
       <SectionCard title={resultTitle} className={`relative z-0 ${frameClassName}`.trim()}>
-        {showResults && items.length > 0 ? (
-          <>
-            <SimpleTable
-              columns={["Icon", "Item", "Type", "AC", "HP", "Mana", "Damage", "Delay", "Item ID"]}
-              rows={pagedItems.map((item) => [
-                <ItemIcon key={`${item.id}-icon`} icon={item.icon} name={item.name} size="sm" tooltipItemId={item.id} />,
-                <Link
-                  key={item.id}
-                  href={`/items/${item.id}`}
-                  className="font-medium text-[#f1e8d6] underline decoration-[#c9a772]/0 underline-offset-2 transition hover:text-[#fff5e2] hover:decoration-[#c9a772]/70"
-                >
-                  {item.name}
-                </Link>,
-                item.type,
-                item.ac || "—",
-                item.hp || "—",
-                item.mana || "—",
-                item.damage || "—",
-                item.delay || "—",
-                item.id
-              ])}
-            />
-            <PaginationControls
-              currentPage={visiblePage}
-              totalPages={totalPages}
-              totalItems={items.length}
-              pageSize={itemResultsPerPage}
-              onPageChange={setPage}
-            />
-          </>
-        ) : showResults ? (
-          isFetching ? (
-            <ClassLoadingIndicator detail="Summoning item records from the archive." message="Loading matching items..." />
-          ) : draftKey !== displayKey ? (
-            <SearchPrompt message="Press Search to apply these filters." />
+        <div className="relative">
+          {showResults && items.length > 0 ? (
+            <div className={isFetching ? "transition duration-200 opacity-40 blur-[2px]" : undefined}>
+              <SimpleTable
+                columns={["Icon", "Item", "Type", "AC", "HP", "Mana", "Damage", "Delay", "Item ID"]}
+                rows={pagedItems.map((item) => [
+                  <ItemIcon key={`${item.id}-icon`} icon={item.icon} name={item.name} size="sm" tooltipItemId={item.id} />,
+                  <Link
+                    key={item.id}
+                    href={`/items/${item.id}`}
+                    className="font-medium text-[#f1e8d6] underline decoration-[#c9a772]/0 underline-offset-2 transition hover:text-[#fff5e2] hover:decoration-[#c9a772]/70"
+                  >
+                    {item.name}
+                  </Link>,
+                  item.type,
+                  item.ac || "—",
+                  item.hp || "—",
+                  item.mana || "—",
+                  item.damage || "—",
+                  item.delay || "—",
+                  item.id
+                ])}
+              />
+              <PaginationControls
+                currentPage={visiblePage}
+                totalPages={totalPages}
+                totalItems={items.length}
+                pageSize={itemResultsPerPage}
+                onPageChange={setPage}
+              />
+            </div>
+          ) : showResults ? (
+            isFetching ? (
+              <ClassLoadingIndicator detail="Summoning item records from the archive." message="Loading matching items..." />
+            ) : draftKey !== displayKey ? (
+              <SearchPrompt message="Press Search to apply these filters." />
+            ) : (
+              <SearchPrompt message="No items matched this search." />
+            )
           ) : (
-            <SearchPrompt message="No items matched this search." />
-          )
-        ) : (
-          <SearchPrompt message="Enter an item name to load results." />
-        )}
+            <SearchPrompt message="Enter an item name to load results." />
+          )}
+
+          {isFetching && items.length > 0 ? (
+            <ClassLoadingIndicator overlay detail="Summoning item records from the archive." message="Loading matching items..." />
+          ) : null}
+        </div>
 
         {resolvedTiming ? <p className="pt-1 text-right text-[11px] uppercase tracking-[0.16em] text-[#9f8e79]">{resolvedTiming}</p> : null}
       </SectionCard>

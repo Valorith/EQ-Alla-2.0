@@ -7,6 +7,7 @@ import type { PetSummary } from "@eq-alla/data";
 import { Button } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { PaginationControls, SearchPrompt, SectionCard, SimpleTable } from "../../components/catalog-shell";
+import { waitForLoadingIndicator } from "../../components/loading-state";
 import { SpellIcon } from "../../components/spell-icon";
 
 type PetSearchClientProps = {
@@ -284,20 +285,24 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
     }
 
     const startedAt = performance.now();
+    setIsFetching(true);
+    setError(null);
+
     const cached = getCachedPets(nextKey);
     if (cached) {
-      setResults(cached);
-      setDisplayKey(nextKey);
-      setError(null);
-      setIsFetching(false);
-      setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "cache" });
+      void (async () => {
+        await waitForLoadingIndicator(startedAt);
+        setResults(cached);
+        setDisplayKey(nextKey);
+        setError(null);
+        setIsFetching(false);
+        setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "cache" });
+      })();
       return;
     }
 
     const controller = new AbortController();
     abortRef.current = controller;
-    setIsFetching(true);
-    setError(null);
 
     void (async () => {
       try {
@@ -316,6 +321,7 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
       } finally {
         if (abortRef.current === controller) {
           abortRef.current = null;
+          await waitForLoadingIndicator(startedAt);
           setIsFetching(false);
         }
       }
@@ -378,49 +384,55 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
       </SectionCard>
 
       <SectionCard title={resultTitle}>
-        {showResults && results.length > 0 ? (
-          <>
-            <SimpleTable
-              columns={["Class", "Level", "Icon", "Spell name", "Details", "Race", "Pet level", "Pet class", "HP", "Mana", "AC", "Min damage", "Max damage"]}
-              rows={pagedResults.map((pet) => [
-                pet.ownerClass,
-                pet.spellLevel,
-                <SpellIcon key={`${pet.id}-${pet.ownerClassId}-icon`} icon={pet.spellIcon} name={pet.spellName} />,
-                <Link key={`${pet.id}-${pet.ownerClassId}-spell`} href={`/spells/${pet.spellId}`} className="font-medium hover:underline">
-                  {pet.spellName}
-                </Link>,
-                <Link key={`${pet.id}-${pet.ownerClassId}-detail`} href={`/pets/${pet.id}`} className="font-medium hover:underline">
-                  View
-                </Link>,
-                pet.race,
-                pet.petLevel,
-                pet.petClass,
-                pet.hp,
-                pet.mana,
-                pet.ac,
-                pet.minDamage,
-                pet.maxDamage
-              ])}
-            />
-            <PaginationControls
-              currentPage={visiblePage}
-              totalPages={totalPages}
-              totalItems={results.length}
-              pageSize={petResultsPerPage}
-              onPageChange={setPage}
-            />
-          </>
-        ) : showResults ? (
-          isFetching ? (
-            <ClassLoadingIndicator message="Loading pets" detail="Calling companions and familiars to the roster." />
-          ) : buildSearchKey(selectedClasses) !== displayKey ? (
-            <SearchPrompt message="Press Search to apply these class filters." />
+        <div className="relative">
+          {showResults && results.length > 0 ? (
+            <div className={isFetching ? "transition duration-200 opacity-40 blur-[2px]" : undefined}>
+              <SimpleTable
+                columns={["Class", "Level", "Icon", "Spell name", "Details", "Race", "Pet level", "Pet class", "HP", "Mana", "AC", "Min damage", "Max damage"]}
+                rows={pagedResults.map((pet) => [
+                  pet.ownerClass,
+                  pet.spellLevel,
+                  <SpellIcon key={`${pet.id}-${pet.ownerClassId}-icon`} icon={pet.spellIcon} name={pet.spellName} />,
+                  <Link key={`${pet.id}-${pet.ownerClassId}-spell`} href={`/spells/${pet.spellId}`} className="font-medium hover:underline">
+                    {pet.spellName}
+                  </Link>,
+                  <Link key={`${pet.id}-${pet.ownerClassId}-detail`} href={`/pets/${pet.id}`} className="font-medium hover:underline">
+                    View
+                  </Link>,
+                  pet.race,
+                  pet.petLevel,
+                  pet.petClass,
+                  pet.hp,
+                  pet.mana,
+                  pet.ac,
+                  pet.minDamage,
+                  pet.maxDamage
+                ])}
+              />
+              <PaginationControls
+                currentPage={visiblePage}
+                totalPages={totalPages}
+                totalItems={results.length}
+                pageSize={petResultsPerPage}
+                onPageChange={setPage}
+              />
+            </div>
+          ) : showResults ? (
+            isFetching ? (
+              <ClassLoadingIndicator message="Loading pets" detail="Calling companions and familiars to the roster." />
+            ) : buildSearchKey(selectedClasses) !== displayKey ? (
+              <SearchPrompt message="Press Search to apply these class filters." />
+            ) : (
+              <SearchPrompt message="No pets matched the selected classes." />
+            )
           ) : (
-            <SearchPrompt message="No pets matched the selected classes." />
-          )
-        ) : (
-          <SearchPrompt message="Choose one or more class icons to browse pet statistics." />
-        )}
+            <SearchPrompt message="Choose one or more class icons to browse pet statistics." />
+          )}
+
+          {isFetching && results.length > 0 ? (
+            <ClassLoadingIndicator overlay message="Loading pets" detail="Calling companions and familiars to the roster." />
+          ) : null}
+        </div>
         {resolvedTiming ? <p className="pt-1 text-right text-[11px] uppercase tracking-[0.16em] text-[#9f8e79]">{resolvedTiming}</p> : null}
       </SectionCard>
     </>

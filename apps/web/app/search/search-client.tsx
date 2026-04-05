@@ -7,6 +7,7 @@ import type { SearchHit } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { PaginationControls, SearchPrompt, SectionCard } from "../../components/catalog-shell";
+import { waitForLoadingIndicator } from "../../components/loading-state";
 import { ItemIcon } from "../../components/item-icon";
 import { SpellIcon } from "../../components/spell-icon";
 
@@ -247,24 +248,28 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
     }
 
     const startedAt = performance.now();
+    setIsFetching(true);
+    setError(null);
+
     const cachedHits = getClientCachedHits(nextKey);
     if (cachedHits) {
-      setHits(cachedHits);
-      setDisplayKey(nextKey);
-      setError(null);
-      setIsFetching(false);
-      setResolutionMeta({
-        key: nextKey,
-        durationMs: performance.now() - startedAt,
-        source: "cache"
-      });
+      void (async () => {
+        await waitForLoadingIndicator(startedAt);
+        setHits(cachedHits);
+        setDisplayKey(nextKey);
+        setError(null);
+        setIsFetching(false);
+        setResolutionMeta({
+          key: nextKey,
+          durationMs: performance.now() - startedAt,
+          source: "cache"
+        });
+      })();
       return;
     }
 
     const controller = new AbortController();
     abortRef.current = controller;
-    setIsFetching(true);
-    setError(null);
 
     void (async () => {
       try {
@@ -300,6 +305,7 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
       } finally {
         if (abortRef.current === controller) {
           abortRef.current = null;
+          await waitForLoadingIndicator(startedAt);
           setIsFetching(false);
         }
       }
@@ -367,63 +373,69 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
       </SectionCard>
 
       <SectionCard title={resultTitle}>
-        {showResults && hits.length > 0 ? (
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              {groupedHits.map((entry) => (
-                <button
-                  key={entry.type}
-                  type="button"
-                  onClick={() => setActiveType(entry.type)}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] transition ${
-                    visibleType === entry.type
-                      ? "border-[#d7a45f] bg-[#d7a45f]/14 text-[#f5dfb8]"
-                      : "border-white/12 bg-white/5 text-white/68 hover:border-white/25 hover:text-white"
-                  }`}
-                >
-                  {globalSearchLabels[entry.type]} ({entry.hits.length})
-                </button>
-              ))}
-            </div>
-
-            <div className="rounded-2xl border border-[#7b603b]/20 bg-[linear-gradient(180deg,rgba(35,30,27,0.86),rgba(18,20,24,0.84))] px-4 py-4 shadow-[0_18px_44px_rgba(0,0,0,0.24)] backdrop-blur-md">
-              <ul className="space-y-2">
-                {pagedVisibleHits.map((hit) => (
-                  <li key={hit.href} className="grid grid-cols-[2rem_minmax(0,1fr)] items-start gap-x-3 text-left text-sm text-[#e8dfcf]">
-                    <div className="pt-0.5">{renderSearchHitIcon(hit)}</div>
-                    <div className="min-w-0">
-                      <Link href={hit.href} className="block truncate font-medium hover:underline">
-                        {hit.title}
-                      </Link>
-                      {hit.subtitle || hit.tags.length > 0 ? (
-                        <p className="mt-0.5 text-xs leading-5 text-[#aa9d89]">
-                          {[hit.subtitle, hit.tags.join(" • ")].filter(Boolean).join(" • ")}
-                        </p>
-                      ) : null}
-                    </div>
-                  </li>
+        <div className="relative">
+          {showResults && hits.length > 0 ? (
+            <div className={`space-y-4 ${isFetching ? "transition duration-200 opacity-40 blur-[2px]" : ""}`.trim()}>
+              <div className="flex flex-wrap gap-2">
+                {groupedHits.map((entry) => (
+                  <button
+                    key={entry.type}
+                    type="button"
+                    onClick={() => setActiveType(entry.type)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] transition ${
+                      visibleType === entry.type
+                        ? "border-[#d7a45f] bg-[#d7a45f]/14 text-[#f5dfb8]"
+                        : "border-white/12 bg-white/5 text-white/68 hover:border-white/25 hover:text-white"
+                    }`}
+                  >
+                    {globalSearchLabels[entry.type]} ({entry.hits.length})
+                  </button>
                 ))}
-              </ul>
+              </div>
+
+              <div className="rounded-2xl border border-[#7b603b]/20 bg-[linear-gradient(180deg,rgba(35,30,27,0.86),rgba(18,20,24,0.84))] px-4 py-4 shadow-[0_18px_44px_rgba(0,0,0,0.24)] backdrop-blur-md">
+                <ul className="space-y-2">
+                  {pagedVisibleHits.map((hit) => (
+                    <li key={hit.href} className="grid grid-cols-[2rem_minmax(0,1fr)] items-start gap-x-3 text-left text-sm text-[#e8dfcf]">
+                      <div className="pt-0.5">{renderSearchHitIcon(hit)}</div>
+                      <div className="min-w-0">
+                        <Link href={hit.href} className="block truncate font-medium hover:underline">
+                          {hit.title}
+                        </Link>
+                        {hit.subtitle || hit.tags.length > 0 ? (
+                          <p className="mt-0.5 text-xs leading-5 text-[#aa9d89]">
+                            {[hit.subtitle, hit.tags.join(" • ")].filter(Boolean).join(" • ")}
+                          </p>
+                        ) : null}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <PaginationControls
+                currentPage={visiblePage}
+                totalPages={totalPages}
+                totalItems={visibleHits.length}
+                pageSize={globalSearchResultsPerPage}
+                onPageChange={setPage}
+              />
             </div>
-            <PaginationControls
-              currentPage={visiblePage}
-              totalPages={totalPages}
-              totalItems={visibleHits.length}
-              pageSize={globalSearchResultsPerPage}
-              onPageChange={setPage}
-            />
-          </div>
-        ) : showResults ? (
-          isFetching ? (
-            <ClassLoadingIndicator message="Loading global search" detail="Sweeping items, spells, NPCs, and zones." />
-          ) : activeQuery !== displayKey ? (
-            <SearchPrompt message="Press Search to apply this query." />
+          ) : showResults ? (
+            isFetching ? (
+              <ClassLoadingIndicator message="Loading global search" detail="Sweeping items, spells, NPCs, and zones." />
+            ) : activeQuery !== displayKey ? (
+              <SearchPrompt message="Press Search to apply this query." />
+            ) : (
+              <SearchPrompt message="No archive entries matched this search." />
+            )
           ) : (
-            <SearchPrompt message="No archive entries matched this search." />
-          )
-        ) : (
-          <SearchPrompt message="Enter a search term to search across items, spells, NPCs, zones, and more." />
-        )}
+            <SearchPrompt message="Enter a search term to search across items, spells, NPCs, zones, and more." />
+          )}
+
+          {isFetching && hits.length > 0 ? (
+            <ClassLoadingIndicator overlay message="Loading global search" detail="Sweeping items, spells, NPCs, and zones." />
+          ) : null}
+        </div>
 
         {resolvedTiming ? <p className="pt-1 text-right text-[11px] uppercase tracking-[0.16em] text-[#9f8e79]">{resolvedTiming}</p> : null}
       </SectionCard>

@@ -7,6 +7,7 @@ import type { ZoneSummary } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../components/catalog-shell";
+import { waitForLoadingIndicator } from "../../components/loading-state";
 
 type ZoneSearchClientProps = {
   initialQuery: string;
@@ -217,20 +218,24 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
     }
 
     const startedAt = performance.now();
+    setIsFetching(true);
+    setError(null);
+
     const cached = getCachedZones(nextKey);
     if (cached) {
-      setResults(cached);
-      setDisplayKey(nextKey);
-      setError(null);
-      setIsFetching(false);
-      setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "cache" });
+      void (async () => {
+        await waitForLoadingIndicator(startedAt);
+        setResults(cached);
+        setDisplayKey(nextKey);
+        setError(null);
+        setIsFetching(false);
+        setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "cache" });
+      })();
       return;
     }
 
     const controller = new AbortController();
     abortRef.current = controller;
-    setIsFetching(true);
-    setError(null);
 
     void (async () => {
       try {
@@ -249,6 +254,7 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
       } finally {
         if (abortRef.current === controller) {
           abortRef.current = null;
+          await waitForLoadingIndicator(startedAt);
           setIsFetching(false);
         }
       }
@@ -319,38 +325,44 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
         </div>
       </SectionCard>
       <SectionCard title={resultTitle}>
-        {showResults && results.length > 0 ? (
-          <>
-            <SimpleTable
-              columns={["Name", "Short name", "ID", "Spawn points"]}
-              rows={pagedResults.map((zone) => [
-                <Link key={zone.shortName} href={`/zones/${zone.shortName}`} className="font-medium hover:underline">
-                  {zone.longName}
-                </Link>,
-                zone.shortName,
-                zone.id,
-                zone.spawns
-              ])}
-            />
-            <PaginationControls
-              currentPage={visiblePage}
-              totalPages={totalPages}
-              totalItems={results.length}
-              pageSize={zoneResultsPerPage}
-              onPageChange={setPage}
-            />
-          </>
-        ) : showResults ? (
-          isFetching ? (
-            <ClassLoadingIndicator message="Loading zones" detail="Surveying eras, levels, and populations." />
-          ) : draftKey !== displayKey ? (
-            <SearchPrompt message="Press Search to apply these filters." />
+        <div className="relative">
+          {showResults && results.length > 0 ? (
+            <div className={isFetching ? "transition duration-200 opacity-40 blur-[2px]" : undefined}>
+              <SimpleTable
+                columns={["Name", "Short name", "ID", "Spawn points"]}
+                rows={pagedResults.map((zone) => [
+                  <Link key={zone.shortName} href={`/zones/${zone.shortName}`} className="font-medium hover:underline">
+                    {zone.longName}
+                  </Link>,
+                  zone.shortName,
+                  zone.id,
+                  zone.spawns
+                ])}
+              />
+              <PaginationControls
+                currentPage={visiblePage}
+                totalPages={totalPages}
+                totalItems={results.length}
+                pageSize={zoneResultsPerPage}
+                onPageChange={setPage}
+              />
+            </div>
+          ) : showResults ? (
+            isFetching ? (
+              <ClassLoadingIndicator message="Loading zones" detail="Surveying eras, levels, and populations." />
+            ) : draftKey !== displayKey ? (
+              <SearchPrompt message="Press Search to apply these filters." />
+            ) : (
+              <SearchPrompt message="No zones matched this search." />
+            )
           ) : (
-            <SearchPrompt message="No zones matched this search." />
-          )
-        ) : (
-          <SearchPrompt message="Enter a zone name to load results." />
-        )}
+            <SearchPrompt message="Enter a zone name to load results." />
+          )}
+
+          {isFetching && results.length > 0 ? (
+            <ClassLoadingIndicator overlay message="Loading zones" detail="Surveying eras, levels, and populations." />
+          ) : null}
+        </div>
         {resolvedTiming ? <p className="pt-1 text-right text-[11px] uppercase tracking-[0.16em] text-[#9f8e79]">{resolvedTiming}</p> : null}
       </SectionCard>
     </>
