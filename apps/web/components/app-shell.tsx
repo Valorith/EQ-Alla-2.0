@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { Input } from "@eq-alla/ui";
 import { ArrowRight, Database, Search, ShieldCheck } from "lucide-react";
 import { ItemHoverTooltip } from "./item-hover-tooltip";
+import { RouteLoadingOverlay } from "./route-loading-overlay";
 
 const routesWithInlineSearch = new Set([
   "/",
@@ -146,6 +147,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </main>
       </div>
       <ItemHoverTooltip />
+      <RouteLoadingOverlay />
     </div>
   );
 }

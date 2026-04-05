@@ -1,6 +1,6 @@
 "use client";
 
-const minimumLoadingIndicatorMs = 350;
+export const minimumLoadingIndicatorMs = 350;
 
 export async function waitForLoadingIndicator(startedAt: number, minimumMs = minimumLoadingIndicatorMs) {
   const elapsed = performance.now() - startedAt;
