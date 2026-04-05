@@ -11,11 +11,13 @@ type ItemDetailPageProps = {
 function RelatedSection({
   title,
   items,
-  emptyText
+  emptyText,
+  fallbackLabel
 }: {
   title: string;
-  items: Array<{ href: string; label: string; suffix?: string }>;
+  items: Array<{ href?: string; label: string; suffix?: string }>;
   emptyText: string;
+  fallbackLabel?: string;
 }) {
   return (
     <section className="space-y-3">
@@ -26,15 +28,27 @@ function RelatedSection({
         <div className="rounded-[10px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,23,31,0.94),rgba(11,15,22,0.92))] px-4 py-3 shadow-[0_14px_30px_rgba(0,0,0,0.28)]">
           <ul className="list-disc space-y-2 pl-7 text-[15px] text-[#dfe4ee] marker:text-[#c5a869]">
             {items.map((entry) => (
-              <li key={`${title}-${entry.href}`}>
-                <Link
-                  href={entry.href}
-                  className="font-medium text-[#7ab8ff] underline decoration-[1.5px] underline-offset-2 transition hover:text-[#a7d2ff] hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7ab8ff]/35"
-                >
-                  {entry.label}
-                </Link>
+              <li key={`${title}-${entry.href ?? entry.label}`}>
+                {entry.href ? (
+                  <Link
+                    href={entry.href}
+                    className="font-medium text-[#7ab8ff] underline decoration-[1.5px] underline-offset-2 transition hover:text-[#a7d2ff] hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7ab8ff]/35"
+                  >
+                    {entry.label}
+                  </Link>
+                ) : (
+                  <span className="font-medium text-[#dfe4ee]">{entry.label}</span>
+                )}
               </li>
             ))}
+          </ul>
+        </div>
+      ) : fallbackLabel ? (
+        <div className="rounded-[10px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,23,31,0.94),rgba(11,15,22,0.92))] px-4 py-3 shadow-[0_14px_30px_rgba(0,0,0,0.28)]">
+          <ul className="list-disc space-y-2 pl-7 text-[15px] text-[#dfe4ee] marker:text-[#c5a869]">
+            <li>
+              <span className="font-medium text-[#dfe4ee]">{fallbackLabel}</span>
+            </li>
           </ul>
         </div>
       ) : (
@@ -49,7 +63,8 @@ function RelatedSection({
 function GroupedNpcSection({
   title,
   entries,
-  emptyText
+  emptyText,
+  fallbackLabel
 }: {
   title: string;
   entries: Array<{
@@ -59,6 +74,7 @@ function GroupedNpcSection({
     zone: { href: string; label: string };
   }>;
   emptyText: string;
+  fallbackLabel?: string;
 }) {
   const groups = entries.reduce<Array<{ zone: { href: string; label: string }; items: Array<{ href: string; label: string; suffix?: string }> }>>(
     (accumulator, entry) => {
@@ -110,6 +126,14 @@ function GroupedNpcSection({
             ))}
           </div>
         </div>
+      ) : fallbackLabel ? (
+        <div className="rounded-[10px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,23,31,0.94),rgba(11,15,22,0.92))] px-4 py-3 shadow-[0_14px_30px_rgba(0,0,0,0.28)]">
+          <ul className="list-disc space-y-2 pl-7 text-[15px] text-[#dfe4ee] marker:text-[#c5a869]">
+            <li>
+              <span className="font-medium text-[#dfe4ee]">{fallbackLabel}</span>
+            </li>
+          </ul>
+        </div>
       ) : (
         <div className="rounded-[10px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,23,31,0.94),rgba(11,15,22,0.92))] px-4 py-3 shadow-[0_14px_30px_rgba(0,0,0,0.28)]">
           <p className="text-[15px] text-[#aeb8ca]">{emptyText}</p>
@@ -146,6 +170,7 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
         <RelatedSection
           title="Dropped in Zones"
           items={item.droppedInZones.map((entry) => ({ href: entry.href, label: entry.longName }))}
+          fallbackLabel={item.globalDrop && item.droppedInZones.length === 0 ? "Global Drop" : undefined}
           emptyText="No zone drop data recorded."
         />
 
@@ -157,6 +182,7 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
             suffix: `(${formatDropChance(entry.dropChance)} x ${entry.multiplier})`,
             zone: { href: entry.zone.href, label: entry.zone.longName }
           }))}
+          fallbackLabel={item.globalDrop && item.droppedBy.length === 0 ? "Global Drop" : undefined}
           emptyText="No NPC drop data recorded."
         />
 

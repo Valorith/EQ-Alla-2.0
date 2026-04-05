@@ -442,6 +442,70 @@ describe("catalog services", () => {
     expect(zone?.bestiary.some((entry) => entry.id === 364025)).toBe(true);
   });
 
+  it("marks items sourced from the global loot table as global drops", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{ item_id: number }>`
+      select distinct lde.item_id as item_id
+      from global_loot gl
+      join loottable_entries lte on lte.loottable_id = gl.loottable_id
+      join lootdrop_entries lde on lde.lootdrop_id = lte.lootdrop_id
+      where coalesce(gl.enabled, 1) = 1
+        and exists (
+          select 1
+          from discovered_items di
+          where di.item_id = lde.item_id
+        )
+      order by lde.item_id asc
+      limit 50
+    `.execute(db!);
+
+    expect(rows.rows.length).toBeGreaterThan(0);
+
+    let sample:
+      | {
+          itemId: number;
+          hasOnlyGlobalSources: boolean;
+        }
+      | undefined;
+
+    for (const row of rows.rows) {
+      const item = await getItemDetail(row.item_id);
+      if (!item?.globalDrop) {
+        continue;
+      }
+
+      if (item.droppedBy.length === 0 && item.droppedInZones.length === 0) {
+        sample = {
+          itemId: row.item_id,
+          hasOnlyGlobalSources: true
+        };
+        break;
+      }
+
+      if (!sample) {
+        sample = {
+          itemId: row.item_id,
+          hasOnlyGlobalSources: false
+        };
+      }
+    }
+
+    expect(sample).toBeTruthy();
+    if (!sample) {
+      return;
+    }
+
+    const item = await getItemDetail(sample.itemId);
+    expect(item?.globalDrop).toBe(true);
+
+    if (sample.hasOnlyGlobalSources) {
+      expect(item?.droppedBy).toEqual([]);
+      expect(item?.droppedInZones).toEqual([]);
+    }
+  }, 20_000);
+
   it("formats elemental damage with a typed damage label", async () => {
     const item = await getItemDetail(25210);
 

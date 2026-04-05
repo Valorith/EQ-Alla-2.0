@@ -2118,12 +2118,23 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
     `.execute(db!);
 
     const effectNameMapPromise = spellNamesById([row.proceffect, row.worneffect, row.focuseffect, row.clickeffect, row.scrolleffect].map(Number));
+    const globalLootRowsPromise = sql<{ id: number }>`
+      select distinct gl.id
+      from global_loot gl
+      join loottable_entries lte on lte.loottable_id = gl.loottable_id
+      join lootdrop_entries lde on lde.lootdrop_id = lte.lootdrop_id
+      where lde.item_id = ${id}
+        and coalesce(gl.enabled, 1) = 1
+        and ${sql.raw(enabledContentFlagsCondition("gl"))}
+      limit 1
+    `.execute(db!);
 
-    const [droppedByCandidateRows, soldByRows, recipeRows, effectNameMap] = await Promise.all([
+    const [droppedByCandidateRows, soldByRows, recipeRows, effectNameMap, globalLootRows] = await Promise.all([
       droppedByCandidateRowsPromise,
       soldByRowsPromise,
       recipeRowsPromise,
-      effectNameMapPromise
+      effectNameMapPromise,
+      globalLootRowsPromise
     ]);
     const lootChestSourceNpcIdsByChestNpcId = getLootChestSourceNpcIdsByChestNpcId(droppedByCandidateRows.rows.map((entry) => entry.id));
     const effectiveLootOwnerIds = [
@@ -2335,6 +2346,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       slot: formatSlotMask(row.slots, row.itemclass),
       classes: decodeClassMask(row.classes),
       flags,
+      globalDrop: globalLootRows.rows.length > 0,
       classDisplay: formatClassMask(row.classes),
       raceDisplay: formatRaceMask(row.races),
       slotDisplay: formatSlotList(row.slots, row.itemclass),

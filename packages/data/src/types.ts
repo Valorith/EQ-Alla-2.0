@@ -55,6 +55,7 @@ export type ItemDetail = ItemSummary & {
   icon: string;
   lore: string;
   flags: string[];
+  globalDrop: boolean;
   classDisplay: string;
   raceDisplay: string;
   slotDisplay: string;
