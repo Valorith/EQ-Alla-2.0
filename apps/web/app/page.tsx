@@ -45,7 +45,7 @@ function HomePageBody({ query }: { query: string }) {
         className={
           hasResults
             ? "eq-home-stage flex justify-center"
-            : "eq-home-stage flex min-h-[calc(100vh-7rem)] justify-center px-4 pt-10 sm:px-8 sm:pt-14 xl:pt-18"
+            : "eq-home-stage flex min-h-[calc(100dvh-7rem)] justify-center px-4 pt-10 sm:px-8 sm:pt-14 xl:pt-18"
         }
       >
         <form action="/" className="w-full max-w-3xl space-y-5">

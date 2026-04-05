@@ -20,7 +20,10 @@ function DetailRows({
       {rows
         .filter((row) => row.show !== false)
         .map((row) => (
-          <div key={row.label} className="grid grid-cols-[150px_minmax(0,1fr)] gap-3 py-2 text-[15px] leading-6">
+          <div
+            key={row.label}
+            className="grid grid-cols-1 gap-1 py-2 text-[15px] leading-6 sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-3"
+          >
             <div className="font-semibold text-[#d8ceb4]">{row.label}</div>
             <div className="min-w-0 text-[#e6e0d2]">{row.value}</div>
           </div>
