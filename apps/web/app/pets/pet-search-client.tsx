@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { PetSummary } from "@eq-alla/data";
 import { Button } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
@@ -185,6 +185,7 @@ function ClassSelector({
 
 export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [selectedClasses, setSelectedClasses] = useState(() => normalizeSelectedClasses(initialClasses));
   const [results, setResults] = useState<PetSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -237,6 +238,16 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
 
   const submitSearch = () => {
     if (!hasQuery(selectedClasses)) return;
+
+    const nextQueryValue = buildQueryValue(selectedClasses);
+    const nextHref = nextQueryValue ? `${pathname}?classes=${encodeURIComponent(nextQueryValue)}` : pathname;
+
+    if (nextQueryValue !== currentUrlValueRef.current) {
+      currentUrlValueRef.current = nextQueryValue;
+      router.replace(nextHref, { scroll: false });
+      return;
+    }
+
     setSubmitCount((current) => current + 1);
   };
 
@@ -250,9 +261,7 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
     setResolutionMeta(null);
     setPage(1);
     currentUrlValueRef.current = "";
-    if (typeof window !== "undefined") {
-      window.history.replaceState(null, "", pathname);
-    }
+    router.replace(pathname, { scroll: false });
   };
 
   useEffect(() => {
@@ -267,9 +276,6 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
 
     if (nextQueryValue !== currentUrlValueRef.current) {
       currentUrlValueRef.current = nextQueryValue;
-      if (typeof window !== "undefined") {
-        window.history.replaceState(null, "", nextHref);
-      }
     }
 
     abortRef.current?.abort();

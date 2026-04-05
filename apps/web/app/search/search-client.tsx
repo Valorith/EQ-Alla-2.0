@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { SearchHit } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
@@ -175,6 +175,7 @@ function setClientCachedHits(key: string, hits: SearchHit[]) {
 
 export function SearchClient({ initialQuery }: SearchClientProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [query, setQuery] = useState(initialQuery);
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -217,6 +218,15 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
       return;
     }
 
+    const nextKey = buildSearchKey(query);
+    const nextHref = nextKey ? `${pathname}?q=${encodeURIComponent(nextKey)}` : pathname;
+
+    if (nextKey !== currentUrlKeyRef.current) {
+      currentUrlKeyRef.current = nextKey;
+      router.replace(nextHref, { scroll: false });
+      return;
+    }
+
     setSubmitCount((current) => current + 1);
   };
 
@@ -231,9 +241,6 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
 
     if (nextKey !== currentUrlKeyRef.current) {
       currentUrlKeyRef.current = nextKey;
-      if (typeof window !== "undefined") {
-        window.history.replaceState(null, "", nextHref);
-      }
     }
 
     abortRef.current?.abort();

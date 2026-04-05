@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { ItemSummary } from "@eq-alla/data";
 import { itemClassFilterOptions, itemSlotFilterOptions } from "@eq-alla/data/item-search-filters";
 import { itemTypeFilterOptions } from "@eq-alla/data/item-types";
@@ -335,6 +335,7 @@ function MultiSelectDropdown({
 
 export function ItemSearchClient({ initialFilters, initialItems, initialResultsResolved, frameClassName }: ItemSearchClientProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [filters, setFilters] = useState(initialFilters);
   const [items, setItems] = useState(initialItems);
   const [error, setError] = useState<string | null>(null);
@@ -410,6 +411,15 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
       return;
     }
 
+    const nextKey = buildSearchParams(filters).toString();
+    const nextHref = nextKey ? `${pathname}?${nextKey}` : pathname;
+
+    if (nextKey !== currentUrlKeyRef.current) {
+      currentUrlKeyRef.current = nextKey;
+      router.replace(nextHref, { scroll: false });
+      return;
+    }
+
     setSubmitCount((current) => current + 1);
   };
 
@@ -430,9 +440,7 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
     setResolutionMeta(null);
     setPage(1);
     currentUrlKeyRef.current = "";
-    if (typeof window !== "undefined") {
-      window.history.replaceState(null, "", pathname);
-    }
+    router.replace(pathname, { scroll: false });
   };
 
   useEffect(() => {
@@ -450,9 +458,6 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
 
     if (nextKey !== currentUrlKeyRef.current) {
       currentUrlKeyRef.current = nextKey;
-      if (typeof window !== "undefined") {
-        window.history.replaceState(null, "", nextHref);
-      }
     }
 
     abortRef.current?.abort();

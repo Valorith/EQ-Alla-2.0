@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { NpcSummary } from "@eq-alla/data";
 import { Input, Button } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
@@ -152,6 +152,7 @@ function setCachedNpcs(key: string, results: NpcSummary[]) {
 
 export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [filters, setFilters] = useState<NpcFilters>(initialFilters);
   const [results, setResults] = useState<NpcSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -198,6 +199,16 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
 
   const submitSearch = () => {
     if (!hasActiveFilters(filters)) return;
+
+    const nextKey = buildSearchParams(filters, mode).toString();
+    const nextHref = nextKey ? `${pathname}?${nextKey}` : pathname;
+
+    if (nextKey !== currentUrlKeyRef.current) {
+      currentUrlKeyRef.current = nextKey;
+      router.replace(nextHref, { scroll: false });
+      return;
+    }
+
     setSubmitCount((current) => current + 1);
   };
 
@@ -219,9 +230,7 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
     setResolutionMeta(null);
     setPage(1);
     currentUrlKeyRef.current = "";
-    if (typeof window !== "undefined") {
-      window.history.replaceState(null, "", pathname);
-    }
+    router.replace(pathname, { scroll: false });
   };
 
   useEffect(() => {
@@ -234,9 +243,6 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
     const nextHref = nextKey ? `${pathname}?${nextKey}` : pathname;
     if (nextKey !== currentUrlKeyRef.current) {
       currentUrlKeyRef.current = nextKey;
-      if (typeof window !== "undefined") {
-        window.history.replaceState(null, "", nextHref);
-      }
     }
 
     abortRef.current?.abort();

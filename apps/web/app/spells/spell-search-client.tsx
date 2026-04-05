@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Fragment, useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { SpellSummary } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
@@ -189,6 +189,7 @@ function SpellTableHeaderRow({ repeated = false }: { repeated?: boolean }) {
 
 export function SpellSearchClient({ initialQuery, initialClassName, initialLevel, initialLevelMode, levelCap }: SpellSearchClientProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const initialFilters: SpellSearchFilters = {
     q: initialQuery,
     className: initialClassName,
@@ -251,6 +252,15 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
   };
 
   const submitSearch = () => {
+    const nextKey = buildSearchParams(filters).toString();
+    const nextHref = nextKey ? `${pathname}?${nextKey}` : pathname;
+
+    if (nextKey !== currentUrlKeyRef.current) {
+      currentUrlKeyRef.current = nextKey;
+      router.replace(nextHref, { scroll: false });
+      return;
+    }
+
     setSubmitCount((current) => current + 1);
   };
 
@@ -265,9 +275,7 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
     setResolutionMeta(null);
     setPage(1);
     currentUrlKeyRef.current = "";
-    if (typeof window !== "undefined") {
-      window.history.replaceState(null, "", pathname);
-    }
+    router.replace(pathname, { scroll: false });
   };
 
   useEffect(() => {
@@ -281,9 +289,6 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
 
     if (nextKey !== currentUrlKeyRef.current) {
       currentUrlKeyRef.current = nextKey;
-      if (typeof window !== "undefined") {
-        window.history.replaceState(null, "", nextHref);
-      }
     }
 
     abortRef.current?.abort();

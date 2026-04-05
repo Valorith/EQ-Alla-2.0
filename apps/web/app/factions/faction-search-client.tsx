@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { FactionSummary } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
@@ -217,6 +217,7 @@ function TextFilterField({
 
 export function FactionSearchClient({ initialQuery, initialZone, initialRelationship, initialViewAll }: FactionSearchClientProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const initialFilters: FactionFilters = {
     q: initialQuery,
     zone: initialZone,
@@ -273,6 +274,15 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
 
   const submitSearch = () => {
     if (!hasQuery(filters)) return;
+    const nextKey = buildSearchKey(filters);
+    const nextHref = nextKey ? `${pathname}?${nextKey}` : pathname;
+
+    if (nextKey !== currentUrlKeyRef.current) {
+      currentUrlKeyRef.current = nextKey;
+      router.replace(nextHref, { scroll: false });
+      return;
+    }
+
     setSubmitCount((current) => current + 1);
   };
 
@@ -291,16 +301,25 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
     setResolutionMeta(null);
     setPage(1);
     currentUrlKeyRef.current = "";
-    if (typeof window !== "undefined") {
-      window.history.replaceState(null, "", pathname);
-    }
+    router.replace(pathname, { scroll: false });
   };
 
   const viewAllFactions = () => {
-    setFilters((current) => ({
-      ...current,
+    const nextFilters = {
+      ...filters,
       viewAll: true
-    }));
+    };
+    const nextKey = buildSearchKey(nextFilters);
+    const nextHref = nextKey ? `${pathname}?${nextKey}` : pathname;
+
+    setFilters(nextFilters);
+
+    if (nextKey !== currentUrlKeyRef.current) {
+      currentUrlKeyRef.current = nextKey;
+      router.replace(nextHref, { scroll: false });
+      return;
+    }
+
     setSubmitCount((current) => current + 1);
   };
 
@@ -315,9 +334,6 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
 
     if (nextKey !== currentUrlKeyRef.current) {
       currentUrlKeyRef.current = nextKey;
-      if (typeof window !== "undefined") {
-        window.history.replaceState(null, "", nextHref);
-      }
     }
 
     abortRef.current?.abort();

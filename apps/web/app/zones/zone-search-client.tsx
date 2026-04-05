@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { ZoneSummary } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
@@ -125,6 +125,7 @@ function setCachedZones(key: string, results: ZoneSummary[]) {
 
 export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneSearchClientProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [filters, setFilters] = useState<ZoneFilters>({ q: initialQuery, era: initialEra });
   const [results, setResults] = useState<ZoneSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -172,6 +173,16 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
 
   const submitSearch = () => {
     if (!hasActiveFilters(filters)) return;
+
+    const nextKey = buildSearchParams(filters).toString();
+    const nextHref = nextKey ? `${pathname}?${nextKey}` : pathname;
+
+    if (nextKey !== currentUrlKeyRef.current) {
+      currentUrlKeyRef.current = nextKey;
+      router.replace(nextHref, { scroll: false });
+      return;
+    }
+
     setSubmitCount((current) => current + 1);
   };
 
@@ -185,9 +196,7 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
     setResolutionMeta(null);
     setPage(1);
     currentUrlKeyRef.current = "";
-    if (typeof window !== "undefined") {
-      window.history.replaceState(null, "", pathname);
-    }
+    router.replace(pathname, { scroll: false });
   };
 
   useEffect(() => {
@@ -200,9 +209,6 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
     const nextHref = nextKey ? `${pathname}?${nextKey}` : pathname;
     if (nextKey !== currentUrlKeyRef.current) {
       currentUrlKeyRef.current = nextKey;
-      if (typeof window !== "undefined") {
-        window.history.replaceState(null, "", nextHref);
-      }
     }
 
     abortRef.current?.abort();

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { RecipeSummary } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
@@ -131,6 +131,7 @@ function setCachedRecipes(key: string, results: RecipeSummary[]) {
 
 export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMinTrivial, initialMaxTrivial }: RecipeSearchClientProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [filters, setFilters] = useState<RecipeFilters>({
     q: initialQuery,
     tradeskill: initialTradeskill,
@@ -190,6 +191,16 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
 
   const submitSearch = () => {
     if (!hasQuery(filters)) return;
+
+    const nextKey = buildSearchParams(filters).toString();
+    const nextHref = nextKey ? `${pathname}?${nextKey}` : pathname;
+
+    if (nextKey !== currentUrlKeyRef.current) {
+      currentUrlKeyRef.current = nextKey;
+      router.replace(nextHref, { scroll: false });
+      return;
+    }
+
     setSubmitCount((current) => current + 1);
   };
 
@@ -208,9 +219,7 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
     setResolutionMeta(null);
     setPage(1);
     currentUrlKeyRef.current = "";
-    if (typeof window !== "undefined") {
-      window.history.replaceState(null, "", pathname);
-    }
+    router.replace(pathname, { scroll: false });
   };
 
   useEffect(() => {
@@ -223,9 +232,6 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
     const nextHref = nextKey ? `${pathname}?${nextKey}` : pathname;
     if (nextKey !== currentUrlKeyRef.current) {
       currentUrlKeyRef.current = nextKey;
-      if (typeof window !== "undefined") {
-        window.history.replaceState(null, "", nextHref);
-      }
     }
 
     abortRef.current?.abort();
