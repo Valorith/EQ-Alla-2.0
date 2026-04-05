@@ -46,6 +46,7 @@ const clientResultCache = new Map<string, ClientCacheEntry>();
 const clientCacheTtlMs = 180_000;
 const clientCacheMaxEntries = 8;
 const clientSessionStorageKey = "eq-item-search-cache";
+const itemSearchRequestTimeoutMs = 20_000;
 let clientCacheHydrated = false;
 
 function buildSearchParams(filters: ItemSearchFilters) {
@@ -489,6 +490,14 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
 
     const controller = new AbortController();
     abortRef.current = controller;
+    let timedOut = false;
+    const requestTimeoutId =
+      typeof window === "undefined"
+        ? null
+        : window.setTimeout(() => {
+            timedOut = true;
+            controller.abort();
+          }, itemSearchRequestTimeoutMs);
 
     void (async () => {
       try {
@@ -515,13 +524,21 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
           source: "network"
         });
       } catch (searchError) {
-        if (controller.signal.aborted) {
+        if (controller.signal.aborted && !timedOut) {
           return;
         }
 
         console.error(searchError);
-        setError("Could not refresh item results. Showing the last successful search.");
+        setError(
+          timedOut
+            ? "Item search timed out on the deployment. Showing the last successful search."
+            : "Could not refresh item results. Showing the last successful search."
+        );
       } finally {
+        if (requestTimeoutId !== null) {
+          window.clearTimeout(requestTimeoutId);
+        }
+
         if (abortRef.current === controller) {
           abortRef.current = null;
           await waitForLoadingIndicator(startedAt);
