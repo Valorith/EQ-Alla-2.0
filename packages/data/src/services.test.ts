@@ -128,7 +128,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = i.id
-            and coalesce(di.account_status, 0) <= 1
+            and coalesce(di.account_status, 0) <= 0
         )
           and coalesce(${sql.raw(statColumn.column)}, 0) <> 0
         order by i.id asc
@@ -167,7 +167,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = i.id
-            and coalesce(di.account_status, 0) <= 1
+            and coalesce(di.account_status, 0) <= 0
         )
       group by i.skillmodtype
       order by i.skillmodtype asc
@@ -221,7 +221,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = lde.item_id
-            and coalesce(di.account_status, 0) <= 1
+            and coalesce(di.account_status, 0) <= 0
         )
       order by nt.level desc, nt.name asc, lde.item_id asc
       limit 25
@@ -331,7 +331,7 @@ describe("catalog services", () => {
         select 1
         from discovered_items di
         where di.item_id = lde.item_id
-          and coalesce(di.account_status, 0) <= 1
+          and coalesce(di.account_status, 0) <= 0
       )
       order by nt.id asc, lde.item_id asc
       limit 25
@@ -488,7 +488,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = lde.item_id
-            and coalesce(di.account_status, 0) <= 1
+            and coalesce(di.account_status, 0) <= 0
         )
       order by lde.item_id asc
       limit 50
@@ -596,7 +596,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = lde.item_id
-            and coalesce(di.account_status, 0) <= 1
+            and coalesce(di.account_status, 0) <= 0
         )
       order by lde.item_id asc
       limit 1
@@ -649,7 +649,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = lde.item_id
-            and coalesce(di.account_status, 0) <= 1
+            and coalesce(di.account_status, 0) <= 0
         )
       order by lde.item_id asc, z.long_name asc, nt.name asc
       limit 1
@@ -688,7 +688,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = ml.item
-            and coalesce(di.account_status, 0) <= 1
+            and coalesce(di.account_status, 0) <= 0
         )
       order by ml.item asc
       limit 1
@@ -726,7 +726,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = ml.item
-            and coalesce(di.account_status, 0) <= 1
+            and coalesce(di.account_status, 0) <= 0
         )
       order by ml.item asc
       limit 1
@@ -760,7 +760,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = ml.item
-            and coalesce(di.account_status, 0) <= 1
+            and coalesce(di.account_status, 0) <= 0
         )
       order by ml.item asc
       limit 1
@@ -794,7 +794,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = ml.item
-            and coalesce(di.account_status, 0) <= 1
+            and coalesce(di.account_status, 0) <= 0
         )
         and not exists (
           select 1
@@ -840,7 +840,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = lde.item_id
-            and coalesce(di.account_status, 0) <= 1
+            and coalesce(di.account_status, 0) <= 0
         )
         and not exists (
           select 1
@@ -899,7 +899,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = ml.item
-            and coalesce(di.account_status, 0) <= 1
+            and coalesce(di.account_status, 0) <= 0
         )
         and not exists (
           select 1
@@ -939,7 +939,7 @@ describe("catalog services", () => {
         select 1
         from discovered_items di
         where di.item_id = tre.item_id
-          and coalesce(di.account_status, 0) <= 1
+          and coalesce(di.account_status, 0) <= 0
       )
         and coalesce(tr.enabled, 1) = 1
         and coalesce(tre.iscontainer, 0) = 0

@@ -1011,7 +1011,7 @@ function discoveredItemClause(columnRef: string) {
     select 1
     from discovered_items di
     where di.item_id = ${sql.ref(columnRef)}
-      and coalesce(di.account_status, 0) <= 1
+      and coalesce(di.account_status, 0) <= 0
   )`;
 }
 
