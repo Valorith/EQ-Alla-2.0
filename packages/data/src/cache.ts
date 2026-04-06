@@ -5,6 +5,9 @@ const memory = new Map<string, { expiresAt: number; value: unknown }>();
 const inFlight = new Map<string, Promise<unknown>>();
 
 let redis: Redis | null = null;
+let redisDisabledUntil = 0;
+const redisOperationTimeoutMs = 250;
+const redisDisableDurationMs = 30_000;
 
 function createRedisOptions(connectionUrl: string): RedisOptions {
   const parsed = new URL(connectionUrl);
@@ -37,6 +40,10 @@ function getRedis() {
     return null;
   }
 
+  if (redisDisabledUntil > Date.now()) {
+    return null;
+  }
+
   if (!redis) {
     redis = new Redis(createRedisOptions(env.EQ_REDIS_URL));
     redis.on("error", () => {});
@@ -45,18 +52,45 @@ function getRedis() {
   return redis;
 }
 
+function disableRedisTemporarily() {
+  redisDisabledUntil = Date.now() + redisDisableDurationMs;
+
+  if (redis) {
+    redis.disconnect(false);
+    redis = null;
+  }
+}
+
+async function withRedisTimeout<T>(operation: Promise<T>) {
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => reject(new Error("Redis operation timed out")), redisOperationTimeoutMs);
+      })
+    ]);
+  } finally {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
+  }
+}
+
 export async function cacheGet<T>(key: string): Promise<T | null> {
   const client = getRedis();
 
   if (client) {
     try {
       if (client.status === "wait") {
-        await client.connect();
+        await withRedisTimeout(client.connect());
       }
 
-      const payload = await client.get(key);
+      const payload = await withRedisTimeout(client.get(key));
       return payload ? (JSON.parse(payload) as T) : null;
     } catch {
+      disableRedisTemporarily();
       return null;
     }
   }
@@ -76,12 +110,13 @@ export async function cacheSet<T>(key: string, value: T, ttlSeconds: number) {
   if (client) {
     try {
       if (client.status === "wait") {
-        await client.connect();
+        await withRedisTimeout(client.connect());
       }
 
-      await client.set(key, JSON.stringify(value), "EX", ttlSeconds);
+      await withRedisTimeout(client.set(key, JSON.stringify(value), "EX", ttlSeconds));
       return;
     } catch {
+      disableRedisTemporarily();
       // fall through
     }
   }

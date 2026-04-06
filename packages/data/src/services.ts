@@ -1,4 +1,4 @@
-import { cacheGet, cacheGetOrResolve } from "./cache";
+import { cacheGetOrResolve } from "./cache";
 import { getDb } from "./db";
 import { itemClassNames, itemSlotFlags } from "./item-search-filters";
 import { canonicalizeItemTypeName, itemTypeIdFromName, itemTypeNameFromId } from "./item-types";
@@ -1730,13 +1730,8 @@ export async function getCatalogStats(): Promise<CatalogStats> {
 export async function searchCatalog(query: string): Promise<SearchHit[]> {
   requireDatabaseConnection();
   const key = `search:${query.toLowerCase()}`;
-  const cached = await cacheGet<SearchHit[]>(key);
   const loweredQuery = query.toLowerCase();
   const npcSearchPatterns = npcSearchTerms(query).map((term) => like(term));
-
-  if (cached) {
-    return cached;
-  }
 
   return cacheGetOrResolve(key, 60, async () => {
     const spellSearchClassClauses = classNames.map((_, index) => {
@@ -1909,11 +1904,6 @@ export async function listItems(filters: ItemFilters = {}) {
   requireDatabaseConnection();
   const normalizedFilters = normalizeItemFilters(filters);
   const key = createItemSearchCacheKey(normalizedFilters);
-  const cached = await cacheGet<ItemSummary[]>(key);
-
-  if (cached) {
-    return cached;
-  }
 
   return cacheGetOrResolve(key, itemSearchCacheTtlSeconds, async () => {
     const candidateIds = await fetchItemCandidateIds(normalizedFilters, itemSearchLimit);
