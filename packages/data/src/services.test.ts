@@ -56,6 +56,34 @@ describe("catalog services", () => {
     expect(noDropShawls.some((item) => item.id === 1175)).toBe(true);
   });
 
+  it("treats items discovered only by elevated-status accounts as undiscovered", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{ item_id: number; name: string }>`
+      select di.item_id, i.Name as name
+      from discovered_items di
+      join items i on i.id = di.item_id
+      group by di.item_id, i.Name
+      having min(coalesce(di.account_status, 0)) > 1
+      order by di.item_id asc
+      limit 1
+    `.execute(db!);
+
+    if (!rows.rows[0]) {
+      expect(rows.rows).toEqual([]);
+      return;
+    }
+
+    const itemId = rows.rows[0].item_id;
+    const itemName = rows.rows[0].name;
+    const detail = await getItemDetail(itemId);
+    const results = await listItems({ q: itemName });
+
+    expect(detail).toBeUndefined();
+    expect(results.some((item) => item.id === itemId)).toBe(false);
+  });
+
   it("includes damage shield stats shown in-game for cloak of death", async () => {
     const item = await getItemDetail(80056);
 
@@ -100,6 +128,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = i.id
+            and coalesce(di.account_status, 0) <= 1
         )
           and coalesce(${sql.raw(statColumn.column)}, 0) <> 0
         order by i.id asc
@@ -138,6 +167,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = i.id
+            and coalesce(di.account_status, 0) <= 1
         )
       group by i.skillmodtype
       order by i.skillmodtype asc
@@ -191,6 +221,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = lde.item_id
+            and coalesce(di.account_status, 0) <= 1
         )
       order by nt.level desc, nt.name asc, lde.item_id asc
       limit 25
@@ -300,6 +331,7 @@ describe("catalog services", () => {
         select 1
         from discovered_items di
         where di.item_id = lde.item_id
+          and coalesce(di.account_status, 0) <= 1
       )
       order by nt.id asc, lde.item_id asc
       limit 25
@@ -456,6 +488,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = lde.item_id
+            and coalesce(di.account_status, 0) <= 1
         )
       order by lde.item_id asc
       limit 50
@@ -563,6 +596,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = lde.item_id
+            and coalesce(di.account_status, 0) <= 1
         )
       order by lde.item_id asc
       limit 1
@@ -615,6 +649,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = lde.item_id
+            and coalesce(di.account_status, 0) <= 1
         )
       order by lde.item_id asc, z.long_name asc, nt.name asc
       limit 1
@@ -653,6 +688,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = ml.item
+            and coalesce(di.account_status, 0) <= 1
         )
       order by ml.item asc
       limit 1
@@ -690,6 +726,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = ml.item
+            and coalesce(di.account_status, 0) <= 1
         )
       order by ml.item asc
       limit 1
@@ -723,6 +760,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = ml.item
+            and coalesce(di.account_status, 0) <= 1
         )
       order by ml.item asc
       limit 1
@@ -756,6 +794,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = ml.item
+            and coalesce(di.account_status, 0) <= 1
         )
         and not exists (
           select 1
@@ -801,6 +840,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = lde.item_id
+            and coalesce(di.account_status, 0) <= 1
         )
         and not exists (
           select 1
@@ -859,6 +899,7 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = ml.item
+            and coalesce(di.account_status, 0) <= 1
         )
         and not exists (
           select 1
@@ -898,6 +939,7 @@ describe("catalog services", () => {
         select 1
         from discovered_items di
         where di.item_id = tre.item_id
+          and coalesce(di.account_status, 0) <= 1
       )
         and coalesce(tr.enabled, 1) = 1
         and coalesce(tre.iscontainer, 0) = 0
