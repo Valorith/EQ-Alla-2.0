@@ -132,7 +132,11 @@ export default async function SpellDetailPage({ params }: SpellDetailPageProps) 
 
       <SectionCard title="Spell Effects">
         {spell.effects.length > 0 ? (
-          <BulletList items={spell.effects.map((entry) => <span key={entry.slot}>{entry.slot}: {entry.text}</span>)} />
+          <BulletList
+            items={spell.effects.map((entry) => (
+              <span key={`${entry.text}:${entry.slots.join(",")}`}>{entry.text}</span>
+            ))}
+          />
         ) : (
           <p className="text-[15px] leading-6 text-[#aeb8ca]">No effect slots are available for this spell.</p>
         )}

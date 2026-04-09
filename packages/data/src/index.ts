@@ -1,5 +1,6 @@
 export * from "./db";
 export * from "./env";
+export * from "./crafted-spells";
 export * from "./item-search-filters";
 export * from "./item-types";
 export * from "./legacy-routes";

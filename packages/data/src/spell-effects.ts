@@ -1,3 +1,7 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 const ignoredSpellEffectIds = new Set([10, 254]);
 const negativeValuesThatStillRepresentIncreases = new Set([59]);
 
@@ -203,12 +207,53 @@ const spellEffectNames: Record<number, string> = {
   330: "Critical Damage Mob"
 };
 
+let cachedSpireSpellEffectNames: Record<number, string> | undefined;
+
 function normalizeSpellEffectName(name: string) {
   return name.replace(/:\s*$/, "").replace(/\s+/g, " ").trim();
 }
 
+function loadSpireSpellEffectNames() {
+  if (cachedSpireSpellEffectNames) {
+    return cachedSpireSpellEffectNames;
+  }
+
+  const constantsPath = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "../../../.spire-reference/frontend/src/app/constants/eq-spell-constants.ts"
+  );
+
+  try {
+    const source = fs.readFileSync(constantsPath, "utf8");
+    const match = source.match(/export const DB_SPA\s*=\s*{([\s\S]*?)^\s*}/m);
+
+    if (!match) {
+      cachedSpireSpellEffectNames = {};
+      return cachedSpireSpellEffectNames;
+    }
+
+    const names: Record<number, string> = {};
+
+    for (const entry of match[1].matchAll(/"(-?\d+)":\s*"([^"]*)"/g)) {
+      const effectId = Number(entry[1]);
+      if (!Number.isFinite(effectId)) {
+        continue;
+      }
+
+      names[effectId] = entry[2].replaceAll("\\/", "/").replaceAll('\\"', '"');
+    }
+
+    cachedSpireSpellEffectNames = names;
+    return cachedSpireSpellEffectNames;
+  } catch {
+    cachedSpireSpellEffectNames = {};
+    return cachedSpireSpellEffectNames;
+  }
+}
+
 export function getSpellEffectName(effectId: number) {
-  return normalizeSpellEffectName(spellEffectNames[effectId] ?? `Effect ${effectId}`);
+  const fallbackName = loadSpireSpellEffectNames()[effectId];
+  return normalizeSpellEffectName(spellEffectNames[effectId] ?? fallbackName ?? `Effect ${effectId}`);
 }
 
 export function resolveSpellEffectDirection(label: string, value: number, effectId?: number) {
@@ -240,7 +285,7 @@ export function summarizeSpellEffects(row: Record<string, unknown>) {
   for (let slot = 1; slot <= 12; slot += 1) {
     const effectId = Number(row[`effectid${slot}`] ?? 254);
 
-    if (!Number.isFinite(effectId) || ignoredSpellEffectIds.has(effectId)) {
+    if (!Number.isFinite(effectId) || effectId < 0 || ignoredSpellEffectIds.has(effectId)) {
       continue;
     }
 

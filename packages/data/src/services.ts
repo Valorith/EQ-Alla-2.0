@@ -1,4 +1,5 @@
 import { cacheGetOrResolve } from "./cache";
+import { getCraftedSpellRecipeRefsForItem } from "./crafted-spells";
 import { getDb } from "./db";
 import { itemClassNames, itemSlotFlags } from "./item-search-filters";
 import { canonicalizeItemTypeName, itemTypeIdFromName, itemTypeNameFromId } from "./item-types";
@@ -892,7 +893,17 @@ function formatNpcClass(klass: number | null | undefined) {
 }
 
 function formatSpellSkill(skill: number | null | undefined) {
-  return spellSkillNames[skill ?? -1] ?? `Skill ${skill ?? 0}`;
+  const normalized = Number(skill ?? 0);
+  return spellSkillNames[normalized] ?? eqEmuSkillTypeNames[normalized] ?? `Skill ${normalized}`;
+}
+
+function formatEffectSkillName(skill: number | null | undefined) {
+  const normalized = Number(skill ?? 0);
+  if (!Number.isFinite(normalized) || normalized === 0) {
+    return undefined;
+  }
+
+  return eqEmuSkillTypeNames[normalized] ?? skillNames[normalized - 1] ?? skillNames[normalized] ?? `Skill ${normalized}`;
 }
 
 function formatResist(resist: number | null | undefined) {
@@ -1229,6 +1240,11 @@ function formatLegacyPercentDeltaEffect(label: string, storedValue: number, effe
   return amount > 0 ? `${nextLabel} by ${amount}%` : nextLabel;
 }
 
+function normalizeStoredPercentModifier(value: number) {
+  const normalized = Math.abs(value);
+  return normalized >= 1000 && normalized % 100 === 0 ? normalized / 100 : normalized;
+}
+
 function effectSpellIdFromValues(effectId: number, base: number, limit: number) {
   switch (effectId) {
     case 85:
@@ -1264,7 +1280,7 @@ function formatReferencedSpell(spellId: number, spellNames: Map<number, string>)
 
 function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, spellNames: Map<number, string> = new Map()) {
   const effectId = Number(row[`effectid${slot}`] ?? 254);
-  if (!Number.isFinite(effectId) || effectId === 10 || effectId === 254) {
+  if (!Number.isFinite(effectId) || effectId < 0 || effectId === 10 || effectId === 254) {
     return undefined;
   }
 
@@ -1275,6 +1291,8 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, spe
   const teleportZone = normalizeText(String(row.teleport_zone ?? "")) ?? "";
   const spellId = effectSpellIdFromValues(effectId, base, limit);
   const referencedSpell = formatReferencedSpell(spellId, spellNames);
+  const slotSkillName = formatEffectSkillName(limit);
+  const spellSkillName = formatEffectSkillName(Number(row.skill ?? 0));
 
   switch (effectId) {
     case 11:
@@ -1337,6 +1355,33 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, spe
       return spellId > 0 ? `${label} ${referencedSpell}` : label;
     case 140:
       return Math.abs(base) > 0 ? `${label} (${Math.abs(base) * 6} sec)` : label;
+    case 169:
+    case 184:
+    case 216:
+      return slotSkillName ? `${formatNumericEffectLabel(label, base, effectId)} with ${slotSkillName}` : formatNumericEffectLabel(label, base, effectId);
+    case 185:
+    case 197:
+    case 220:
+      return slotSkillName ? `${formatNumericEffectLabel(label, base, effectId)} for ${slotSkillName}` : formatNumericEffectLabel(label, base, effectId);
+    case 186:
+      return slotSkillName ? `${formatNumericEffectLabel(label, base, effectId)} for ${slotSkillName}` : formatNumericEffectLabel(label, base, effectId);
+    case 193:
+      if (spellSkillName && base !== 0 && limit !== 0) {
+        return `${spellSkillName} Attack for ${Math.abs(base)} with ${normalizeStoredPercentModifier(limit)}% Accuracy Mod`;
+      }
+      if (spellSkillName && base !== 0) {
+        return `${spellSkillName} Attack for ${Math.abs(base)}`;
+      }
+      if (spellSkillName && limit !== 0) {
+        return `${spellSkillName} Attack with ${normalizeStoredPercentModifier(limit)}% Accuracy Mod`;
+      }
+      return spellSkillName ? `${spellSkillName} Attack` : label;
+    case 227:
+      return slotSkillName ? `${label} for ${slotSkillName} by ${formatMilliseconds(Math.abs(base))}` : `${label} by ${formatMilliseconds(Math.abs(base))}`;
+    case 247:
+      return slotSkillName ? `${label} for ${slotSkillName} by ${Math.abs(base)}` : formatNumericEffectLabel(label, base, effectId);
+    case 268:
+      return slotSkillName ? `${formatNumericEffectLabel(label, base, effectId)} for ${slotSkillName}` : formatNumericEffectLabel(label, base, effectId);
     case 211:
       return base !== 0 ? `${label} for ${formatSeconds(Math.abs(base) * 12)}` : label;
     default:
@@ -1354,12 +1399,20 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, spe
 }
 
 function describeSpellEffects(row: Record<string, unknown>, spellNames: Map<number, string> = new Map()) {
-  const effects: Array<{ slot: number; text: string }> = [];
+  const effects: Array<{ slots: number[]; text: string }> = [];
+  const dedupedByText = new Map<string, { slots: number[]; text: string }>();
 
   for (let slot = 1; slot <= 12; slot += 1) {
     const text = describeSpellEffectSlot(row, slot, spellNames);
     if (text) {
-      effects.push({ slot, text });
+      const existing = dedupedByText.get(text);
+      if (existing) {
+        existing.slots.push(slot);
+      } else {
+        const effect = { slots: [slot], text };
+        dedupedByText.set(text, effect);
+        effects.push(effect);
+      }
     }
   }
 
@@ -2269,6 +2322,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
     `.execute(db!);
 
     const effectNameMapPromise = spellNamesById([row.proceffect, row.worneffect, row.focuseffect, row.clickeffect, row.scrolleffect].map(Number));
+    const craftedSpellRecipeRefsPromise = getCraftedSpellRecipeRefsForItem(id);
     const globalLootRowsPromise = sql<{ id: number }>`
       select distinct gl.id
       from global_loot gl
@@ -2280,11 +2334,12 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       limit 1
     `.execute(db!);
 
-    const [droppedByCandidateRows, soldByRows, recipeRows, effectNameMap, globalLootRows] = await Promise.all([
+    const [droppedByCandidateRows, soldByRows, recipeRows, effectNameMap, craftedSpellRecipeRefs, globalLootRows] = await Promise.all([
       droppedByCandidateRowsPromise,
       soldByRowsPromise,
       recipeRowsPromise,
       effectNameMapPromise,
+      craftedSpellRecipeRefsPromise,
       globalLootRowsPromise
     ]);
     const lootChestSourceNpcIdsByChestNpcId = getLootChestSourceNpcIdsByChestNpcId(droppedByCandidateRows.rows.map((entry) => entry.id));
@@ -2492,6 +2547,14 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
 
     const coinValue = formatCoinValue(row.price);
 
+    const usedInRecipes = [
+      ...recipeRows.rows.map((entry) => ({ id: entry.id, name: entry.name, href: `/recipes/${entry.id}` })),
+      ...craftedSpellRecipeRefs
+    ].filter(
+      (entry, index, entries) => entries.findIndex((candidate) => candidate.href === entry.href && candidate.name === entry.name) === index
+    )
+      .sort((left, right) => left.name.localeCompare(right.name) || left.href.localeCompare(right.href));
+
     const detail: ItemDetail = {
       id: row.id,
       name: row.name,
@@ -2550,7 +2613,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
           href: `/zones/${entry.short_name}`
         }
       })),
-      usedInRecipes: recipeRows.rows.map((entry) => ({ id: entry.id, name: entry.name, href: `/recipes/${entry.id}` }))
+      usedInRecipes
     };
     return detail;
   })();

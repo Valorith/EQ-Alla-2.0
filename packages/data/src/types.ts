@@ -129,7 +129,7 @@ export type SpellDetail = SpellSummary & {
   aoeMaxTargets: number;
   aoeDuration: string;
   reagents: Array<{ id: number; name: string; count: number; href: string }>;
-  effects: Array<{ slot: number; text: string }>;
+  effects: Array<{ slots: number[]; text: string }>;
   itemSources: Array<{ id: number; name: string; href: string; icon: string }>;
 };
 
@@ -310,6 +310,71 @@ export type RecipeStationZone = {
   shortName: string;
   longName: string;
   href: string;
+};
+
+export type CraftedSpellRecipeKind = "stabilizer" | "amplifier" | "ancient-text" | "special";
+
+export type CraftedSpellComponentCatalogEntry = {
+  id: number;
+  name: string;
+  section: string;
+  levelRange?: string;
+  price?: string;
+  note?: string;
+};
+
+export type CraftedSpellItem = {
+  id: number;
+  name: string;
+  icon: string;
+  href?: string;
+};
+
+export type CraftedSpellRecipeComponent = CraftedSpellItem & {
+  slot: "scribestone" | "focus" | "catalyst" | "required-spell";
+  label: string;
+  levelRange?: string;
+  price?: string;
+  note?: string;
+};
+
+export type CraftedSpellRecipe = {
+  key: number;
+  className: string;
+  classSlug: string;
+  levelCode: number;
+  levelLabel: string;
+  levelMin: number;
+  levelMax: number;
+  recipeKind: CraftedSpellRecipeKind;
+  recipeKindLabel: string;
+  requiredSpell: CraftedSpellItem;
+  reward: CraftedSpellItem;
+  components: CraftedSpellRecipeComponent[];
+  searchText: string;
+};
+
+export type CraftedSpellCatalog = {
+  source: {
+    repositoryUrl: string;
+    repositoryRef: string;
+    scriptPath: string;
+    fetchedAt: string;
+    cacheTtlSeconds: number;
+    fetchStrategy: string;
+  };
+  glossary: CraftedSpellComponentCatalogEntry[];
+  recipes: CraftedSpellRecipe[];
+  classes: string[];
+  levelBands: string[];
+  summary: {
+    totalRecipes: number;
+    totalClasses: number;
+    totalLevelBands: number;
+    ancientCount: number;
+    amplifierCount: number;
+    stabilizerCount: number;
+  };
 };
 
 export type PetSummary = {

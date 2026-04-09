@@ -246,6 +246,17 @@ body.eq-home-page.eq-home-search-focused::before {
   --ring: rgba(215, 164, 95, 0.28);
 }
 
+.eq-crafted-spells-scope {
+  --foreground: #f3ecde;
+  --muted: #b8b9ab;
+  --muted-strong: #eff8f4;
+  --card: rgba(16, 23, 28, 0.92);
+  --panel: rgba(19, 26, 33, 0.88);
+  --border: rgba(122, 168, 165, 0.14);
+  --border-strong: rgba(122, 168, 165, 0.24);
+  --ring: rgba(122, 168, 165, 0.28);
+}
+
 .eq-item-search-scope input,
 .eq-item-search-scope select {
   background: rgba(27, 24, 24, 0.9);
@@ -253,14 +264,235 @@ body.eq-home-page.eq-home-search-focused::before {
   border-color: rgba(201, 167, 114, 0.18);
 }
 
+.eq-crafted-spells-scope input,
+.eq-crafted-spells-scope select {
+  background: rgba(14, 20, 24, 0.9);
+  color: #f3ece0;
+  border-color: rgba(122, 168, 165, 0.2);
+}
+
 .eq-item-search-scope input::placeholder {
   color: #a79983;
+}
+
+.eq-crafted-spells-scope input::placeholder {
+  color: #a9b6b4;
 }
 
 .eq-item-search-scope input:focus,
 .eq-item-search-scope select:focus {
   background: rgba(31, 27, 26, 0.94);
   border-color: rgba(215, 164, 95, 0.62);
+}
+
+.eq-crafted-spells-scope input:focus,
+.eq-crafted-spells-scope select:focus {
+  background: rgba(16, 22, 28, 0.94);
+  border-color: rgba(122, 168, 165, 0.58);
+}
+
+.eq-crafted-chip {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #ded4bf;
+}
+
+.eq-crafted-chip:hover {
+  border-color: rgba(122, 168, 165, 0.26);
+  background: rgba(122, 168, 165, 0.1);
+  color: #f5efe2;
+}
+
+.eq-crafted-chip[data-active="true"] {
+  border-color: rgba(122, 168, 165, 0.32);
+  background: linear-gradient(180deg, rgba(104, 166, 161, 0.24), rgba(44, 95, 92, 0.28));
+  color: #f4faf8;
+  box-shadow: 0 10px 24px rgba(20, 42, 44, 0.18);
+}
+
+.eq-crafted-filter-panel {
+  position: relative;
+}
+
+.eq-crafted-filter-group-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: rgba(243, 236, 222, 0.78);
+}
+
+.eq-crafted-filter-group-label::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  order: 1;
+  background: linear-gradient(90deg, rgba(122, 168, 165, 0.3), rgba(122, 168, 165, 0));
+}
+
+.eq-crafted-filter-group-hint {
+  order: 2;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(159, 211, 208, 0.78);
+  padding: 3px 10px;
+  border-radius: 9999px;
+  border: 1px solid rgba(122, 168, 165, 0.22);
+  background: rgba(122, 168, 165, 0.1);
+}
+
+.eq-crafted-search-wrapper > svg {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(159, 211, 208, 0.72);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.eq-crafted-spells-scope .eq-crafted-search-input {
+  background: linear-gradient(180deg, rgba(14, 22, 28, 0.94), rgba(10, 16, 22, 0.94));
+  border-color: rgba(122, 168, 165, 0.22);
+  color: #f3ece0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 30px rgba(6, 10, 14, 0.32);
+}
+
+.eq-crafted-spells-scope .eq-crafted-search-input::placeholder {
+  color: rgba(169, 182, 180, 0.78);
+}
+
+.eq-crafted-spells-scope .eq-crafted-search-input:focus {
+  border-color: rgba(122, 168, 165, 0.6);
+  background: linear-gradient(180deg, rgba(18, 28, 36, 0.96), rgba(12, 20, 26, 0.96));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 4px rgba(122, 168, 165, 0.14), 0 16px 36px rgba(6, 10, 14, 0.4);
+}
+
+.eq-crafted-search-clear {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(243, 236, 222, 0.72);
+  transition: all 160ms ease;
+  cursor: pointer;
+}
+
+.eq-crafted-search-clear:hover {
+  border-color: rgba(215, 164, 95, 0.5);
+  background: rgba(215, 164, 95, 0.16);
+  color: #ffedc0;
+}
+
+.eq-crafted-class-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  width: 84px;
+  padding: 12px 8px 10px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(19, 28, 34, 0.92), rgba(10, 16, 22, 0.92));
+  color: #c7bfa8;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 220ms ease, color 180ms ease;
+  cursor: pointer;
+}
+
+.eq-crafted-class-button img {
+  filter: grayscale(50%) brightness(0.82) contrast(0.95);
+  transition: filter 200ms ease, transform 200ms ease;
+}
+
+.eq-crafted-class-button:hover {
+  border-color: rgba(122, 168, 165, 0.42);
+  background: linear-gradient(180deg, rgba(32, 46, 52, 0.95), rgba(14, 22, 30, 0.94));
+  color: #f2ebd7;
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(6, 12, 18, 0.38);
+}
+
+.eq-crafted-class-button:hover img {
+  filter: grayscale(0%) brightness(1) contrast(1);
+  transform: scale(1.04);
+}
+
+.eq-crafted-class-button[data-active="true"] {
+  border-color: rgba(215, 164, 95, 0.55);
+  background:
+    radial-gradient(circle at top, rgba(240, 195, 106, 0.22), transparent 62%),
+    linear-gradient(180deg, rgba(64, 52, 34, 0.95), rgba(22, 28, 34, 0.95));
+  color: #ffedc0;
+  box-shadow:
+    0 0 0 1px rgba(215, 164, 95, 0.28),
+    0 18px 34px rgba(32, 20, 6, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+.eq-crafted-class-button[data-active="true"] img {
+  filter: grayscale(0%) brightness(1.08) drop-shadow(0 0 10px rgba(240, 195, 106, 0.45));
+  transform: scale(1.06);
+}
+
+.eq-crafted-class-button:focus-visible {
+  outline: none;
+  border-color: rgba(215, 164, 95, 0.6);
+  box-shadow: 0 0 0 4px rgba(215, 164, 95, 0.18);
+}
+
+.eq-crafted-class-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.eq-crafted-recipe-card {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top right, rgba(240, 195, 106, 0.14), transparent 28%),
+    radial-gradient(circle at left center, rgba(122, 168, 165, 0.16), transparent 32%),
+    linear-gradient(180deg, rgba(16, 24, 31, 0.98), rgba(21, 30, 37, 0.96));
+}
+
+.eq-crafted-recipe-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.1;
+  pointer-events: none;
+}
+
+.eq-crafted-component-tile {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.12));
+}
+
+.eq-crafted-resource-card {
+  background:
+    radial-gradient(circle at top right, rgba(122, 168, 165, 0.12), transparent 30%),
+    linear-gradient(180deg, rgba(14, 18, 23, 0.9), rgba(21, 27, 34, 0.94));
 }
 
 ::-webkit-scrollbar {
@@ -280,6 +512,34 @@ body.eq-home-page.eq-home-search-focused::before {
 
 ::-webkit-scrollbar-thumb:hover {
   background-color: rgba(255, 255, 255, 0.45);
+}
+
+.eq-scroll-pane {
+  scrollbar-gutter: stable;
+  scrollbar-width: auto;
+  scrollbar-color: rgba(240, 195, 106, 0.92) rgba(255, 255, 255, 0.12);
+}
+
+.eq-scroll-pane::-webkit-scrollbar {
+  width: 24px;
+  height: 24px;
+}
+
+.eq-scroll-pane::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+}
+
+.eq-scroll-pane::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(249, 214, 140, 0.98), rgba(213, 165, 90, 0.98));
+  border-radius: 9999px;
+  border: 3px solid rgba(13, 16, 22, 0.55);
+  background-clip: padding-box;
+  min-height: 56px;
+}
+
+.eq-scroll-pane::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(255, 229, 176, 1), rgba(230, 182, 102, 1));
 }
 
 .eq-zones-level-scroll {

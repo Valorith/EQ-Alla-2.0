@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -13,6 +13,7 @@ import { usePageLoadingPreference } from "./use-page-loading-preference";
 
 const routesWithInlineSearch = new Set([
   "/",
+  "/crafted-spells",
   "/items",
   "/spells",
   "/npcs",
@@ -234,6 +235,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const showSidebarSearch = !routesWithInlineSearch.has(pathname);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const mainScrollRef = useRef<HTMLElement | null>(null);
 
   const mainShellClassName = isHome
     ? "min-w-0 xl:col-[1/-1] xl:row-start-1 xl:self-start"
@@ -252,6 +254,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     {
       label: "Reference",
       items: [
+        { href: "/crafted-spells", label: "Crafted Spells" },
         { href: "/factions", label: "Factions" },
         { href: "/recipes", label: "Recipes" },
         { href: "/pets", label: "Pets" }
@@ -304,8 +307,53 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [mobileNavOpen, settingsOpen]);
 
+  const routeWheelToMainScroll = (event: React.WheelEvent<HTMLDivElement>) => {
+    if (typeof window === "undefined" || !window.matchMedia("(min-width: 1280px)").matches) {
+      return;
+    }
+
+    const mainScrollElement = mainScrollRef.current;
+    const target = event.target;
+
+    if (!mainScrollElement || !(target instanceof HTMLElement) || mainScrollElement.contains(target)) {
+      return;
+    }
+
+    let current: HTMLElement | null = target;
+    while (current && current !== event.currentTarget) {
+      const style = window.getComputedStyle(current);
+      const overflowY = style.overflowY;
+      const isScrollableY =
+        (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") && current.scrollHeight > current.clientHeight + 1;
+
+      if (isScrollableY) {
+        const canScrollUp = current.scrollTop > 0;
+        const canScrollDown = current.scrollTop + current.clientHeight < current.scrollHeight - 1;
+
+        if ((event.deltaY < 0 && canScrollUp) || (event.deltaY > 0 && canScrollDown)) {
+          return;
+        }
+      }
+
+      current = current.parentElement;
+    }
+
+    const canScrollMainUp = mainScrollElement.scrollTop > 0;
+    const canScrollMainDown = mainScrollElement.scrollTop + mainScrollElement.clientHeight < mainScrollElement.scrollHeight - 1;
+
+    if ((event.deltaY < 0 && !canScrollMainUp) || (event.deltaY > 0 && !canScrollMainDown)) {
+      return;
+    }
+
+    event.preventDefault();
+    mainScrollElement.scrollBy({
+      top: event.deltaY,
+      left: event.deltaX
+    });
+  };
+
   return (
-    <div className="eq-app-shell-padding min-h-screen">
+    <div className="eq-app-shell-padding min-h-screen xl:h-dvh xl:overflow-hidden">
       {mobileNavOpen ? (
         <button
           type="button"
@@ -315,7 +363,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         />
       ) : null}
 
-      <div className="relative z-50 grid gap-4 xl:grid-cols-[290px_minmax(0,1fr)] xl:items-start">
+      <div
+        className="relative z-50 grid gap-4 xl:h-full xl:grid-cols-[290px_minmax(0,1fr)] xl:items-start xl:overflow-hidden"
+        onWheelCapture={routeWheelToMainScroll}
+      >
         <header className="xl:hidden">
           <div className="eq-sidebar-surface eq-shell-glow sticky top-0 overflow-hidden rounded-[22px] border border-[var(--sidebar-border)] shadow-[0_12px_40px_rgba(0,0,0,0.35)]">
             <div className="relative z-10 flex items-center justify-between gap-3 px-4 py-3 text-[var(--sidebar-text)]">
@@ -358,9 +409,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <aside className={isHome ? "hidden xl:block xl:col-start-1 xl:row-start-1 xl:relative xl:z-10" : "hidden xl:block"}>
-          <div className="eq-sidebar-surface eq-shell-glow sticky top-3 overflow-hidden rounded-[26px] border border-[var(--sidebar-border)]">
-            <div className="relative z-10 flex min-h-[calc(100dvh-1.5rem)] flex-col gap-6 p-5 text-[var(--sidebar-text)]">
+        <aside className={isHome ? "hidden xl:block xl:h-full xl:col-start-1 xl:row-start-1 xl:relative xl:z-10" : "hidden xl:block xl:h-full"}>
+          <div className="eq-sidebar-surface eq-shell-glow overflow-hidden rounded-[26px] border border-[var(--sidebar-border)] xl:h-full">
+            <div className="eq-scroll-pane relative z-10 flex min-h-0 flex-col gap-6 p-5 text-[var(--sidebar-text)] xl:h-full xl:overflow-y-auto">
               <div className="space-y-4">
                 <Link href="/" className="block">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[var(--sidebar-muted)]">
@@ -383,7 +434,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </aside>
 
-        <main className={mainShellClassName}>
+        <main ref={mainScrollRef} className={`eq-scroll-pane ${mainShellClassName} xl:h-full xl:overflow-y-auto xl:overscroll-contain`}>
           <div className={isHome ? "flex min-w-0 flex-col" : "flex min-w-0 flex-col gap-4"}>{children}</div>
         </main>
       </div>

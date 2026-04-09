@@ -34,7 +34,7 @@ import {
   zoneByLevelCap
 } from "./index";
 import { getDb } from "./db";
-import { resolveSpellEffectDirection, summarizeSpellEffects } from "./spell-effects";
+import { getSpellEffectName, resolveSpellEffectDirection, summarizeSpellEffects } from "./spell-effects";
 
 describe("catalog services", () => {
   it("filters items by tradeable flag", async () => {
@@ -1161,7 +1161,39 @@ describe("catalog services", () => {
 
     const item = await getItemDetail(itemId);
 
-    expect(item?.usedInRecipes.map((entry) => entry.id)).toEqual(expectedRows.rows.map((row) => row.id));
+    expect(item?.usedInRecipes.filter((entry) => entry.href.startsWith("/recipes/")).map((entry) => entry.id)).toEqual(
+      expectedRows.rows.map((row) => row.id)
+    );
+  }, 20_000);
+
+  it("includes Victoria crafted spell outputs in used in recipes for spell items", async () => {
+    const item = await getItemDetail(150456);
+
+    expect(item).toBeTruthy();
+    expect(item?.usedInRecipes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: expect.stringContaining("Victoria:"),
+          href: expect.stringContaining("/crafted-spells?q=")
+        })
+      ])
+    );
+    expect(item?.usedInRecipes.some((entry) => entry.href.includes("&recipe="))).toBe(true);
+  }, 20_000);
+
+  it("includes Victoria crafted spell inputs in used in recipes for component ledger items", async () => {
+    const item = await getItemDetail(150248);
+
+    expect(item).toBeTruthy();
+    expect(item?.usedInRecipes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: expect.stringContaining("Victoria:"),
+          href: expect.stringContaining("/crafted-spells?q=")
+        })
+      ])
+    );
+    expect(item?.usedInRecipes.some((entry) => entry.href.includes("&recipe="))).toBe(true);
   }, 20_000);
 
   it("hides disabled recipes across recipe list, search, and detail surfaces", async () => {
@@ -1387,6 +1419,24 @@ describe("catalog services", () => {
 
     expect(effects).toContain("AE Melee for 1 min");
     expect(effects.some((entry) => entry.includes("Effect 211"))).toBe(false);
+  });
+
+  it("uses the Spire SPA fallback names for unmapped spell effects", () => {
+    expect(getSpellEffectName(193)).toBe("Skill Attack");
+    expect(getSpellEffectName(220)).toBe("Skill Damage Bonus");
+    expect(getSpellEffectName(262)).toBe("Raise Stat Cap");
+  });
+
+  it("deduplicates repeated spell effect slots and renders skill attacks with translated skill names", async () => {
+    const spell = await getSpellDetail(42606);
+    const skillAttack = spell?.effects.find((entry) => entry.text.includes("Attack")) ?? null;
+
+    expect(spell?.skill).toBe("Throwing");
+    expect(skillAttack).toEqual({
+      slots: [1, 2, 3, 4],
+      text: "Throwing Attack for 26 with 100% Accuracy Mod"
+    });
+    expect(spell?.effects.some((entry) => entry.text.includes("Effect 193"))).toBe(false);
   });
 
   it("caps spell search results at level 60", async () => {
