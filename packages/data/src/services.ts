@@ -82,6 +82,8 @@ const databaseEnabled = Boolean(db);
 const itemSearchLimit = 100;
 const itemSearchCacheTtlSeconds = 60;
 const catalogSearchTypeLimit = 24;
+const npcSummaryLimit = 100;
+const npcCandidateBatchMultiplier = 4;
 const zoneLevelBandSize = 5;
 export const zoneByLevelCap = 60;
 const zoneLevelBandMaximum = zoneByLevelCap;
@@ -420,6 +422,7 @@ function publicEnabledSpawnSubquery(alias: string) {
       group by short_name
     ) z on z.short_name = s2.zone
     where s2d.spawn2_id is null
+      and coalesce(s2.version, 0) in (0, -1)
       and ${enabledContentFlagsCondition("s2")}
   ) ${alias}`);
 }
@@ -1382,6 +1385,182 @@ function summarizeZoneNames(zones: Array<{ longName: string }>) {
   return names.length > 0 ? names.join(", ") : "Unknown";
 }
 
+function npcLiveZoneLinks(row: { zone_name: string | null; zone_short_name: string | null }): ZoneLink[] {
+  return row.zone_name && row.zone_short_name
+    ? [{ shortName: row.zone_short_name, longName: row.zone_name, href: `/zones/${row.zone_short_name}` }]
+    : [];
+}
+
+function npcSummaryMatchesFilters(npc: NpcSummary, filters: NpcFilters) {
+  if (filters.zone && !includesFolded(npc.zone, filters.zone)) return false;
+  if (filters.race && !includesFolded(npc.race, filters.race)) return false;
+  if (typeof filters.named === "boolean" && npc.named !== filters.named) return false;
+  const min = numberFromLevelRange(npc.level);
+  if (filters.minLevel && min < filters.minLevel) return false;
+  if (filters.maxLevel && min > filters.maxLevel) return false;
+  return true;
+}
+
+async function fetchCatalogNpcCandidateRows(query: string, npcSearchPatterns: string[], limit: number, offset: number) {
+  return sql<{ id: number; name: string; race: number; level: number; zone_name: string | null; zone_short_name: string | null }>`
+    select nt.id, nt.name, nt.race, nt.level, min(ps.long_name) as zone_name, min(ps.zone) as zone_short_name
+    from npc_types nt
+    left join spawnentry se on se.npcID = nt.id
+    left join spawngroup sg on sg.id = se.spawngroupID
+    left join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
+    where (
+      nt.name like ${like(query)}
+      ${npcSearchPatterns.length > 0
+        ? sql`or ${sql.join(
+            npcSearchPatterns.map(
+              (pattern) =>
+                sql`lower(trim(replace(replace(replace(replace(nt.name, '_', ' '), '#', ''), '!', ''), '~', ''))) like ${pattern}`
+            ),
+            sql` or `
+          )}`
+        : sql``}
+    )
+      and ${sql.raw(trackableNpcCondition("nt"))}
+    group by nt.id, nt.name, nt.race, nt.level
+    order by nt.name asc
+    limit ${limit}
+    offset ${offset}
+  `.execute(db!);
+}
+
+async function collectCatalogNpcHits(query: string, npcSearchPatterns: string[]) {
+  const hits: SearchHit[] = [];
+  const batchSize = catalogSearchTypeLimit * npcCandidateBatchMultiplier;
+  let offset = 0;
+
+  while (hits.length < catalogSearchTypeLimit) {
+    const rowResult = await fetchCatalogNpcCandidateRows(query, npcSearchPatterns, batchSize, offset);
+    if (rowResult.rows.length === 0) {
+      break;
+    }
+
+    const [manualZoneLinksByNpcId, lootChestZoneLinksByNpcId] = await Promise.all([
+      getManualNpcZoneLinksByNpcId(rowResult.rows.map((row) => row.id)),
+      getLootChestZoneLinksBySourceNpcId(rowResult.rows.map((row) => row.id))
+    ]);
+
+    for (const row of rowResult.rows) {
+      const zones = mergeZoneLinks(
+        npcLiveZoneLinks(row),
+        manualZoneLinksByNpcId.get(row.id) ?? [],
+        lootChestZoneLinksByNpcId.get(row.id) ?? []
+      );
+      if (zones.length === 0) {
+        continue;
+      }
+
+      hits.push({
+        id: String(row.id),
+        type: "npc",
+        title: formatNpcName(row.name),
+        href: `/npcs/${row.id}`,
+        subtitle: `${formatRace(row.race)} • ${row.level}`,
+        tags: [summarizeZoneNames(zones), isNamedNpcName(row.name) ? "Named" : "Common"]
+      });
+
+      if (hits.length >= catalogSearchTypeLimit) {
+        break;
+      }
+    }
+
+    if (rowResult.rows.length < batchSize) {
+      break;
+    }
+
+    offset += rowResult.rows.length;
+  }
+
+  return hits;
+}
+
+async function fetchNpcListCandidateRows(filters: NpcFilters, npcSearchPatterns: string[], limit: number, offset: number) {
+  return sql<{ id: number; name: string; race: number; level: number; class: number; zone_name: string | null; zone_short_name: string | null }>`
+    select nt.id, nt.name, nt.race, nt.level, nt.class, min(ps.long_name) as zone_name, min(ps.zone) as zone_short_name
+    from npc_types nt
+    left join spawnentry se on se.npcID = nt.id
+    left join spawngroup sg on sg.id = se.spawngroupID
+    left join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
+    where (
+      nt.name like ${like(filters.q)}
+      ${npcSearchPatterns.length > 0
+        ? sql`or ${sql.join(
+            npcSearchPatterns.map(
+              (pattern) =>
+                sql`lower(trim(replace(replace(replace(replace(nt.name, '_', ' '), '#', ''), '!', ''), '~', ''))) like ${pattern}`
+            ),
+            sql` or `
+          )}`
+        : sql``}
+    )
+      and ${sql.raw(trackableNpcCondition("nt"))}
+    group by nt.id, nt.name, nt.race, nt.level, nt.class
+    order by nt.level desc, nt.name asc
+    limit ${limit}
+    offset ${offset}
+  `.execute(db!);
+}
+
+async function collectNpcSummaries(filters: NpcFilters, npcSearchPatterns: string[]) {
+  const summaries: NpcSummary[] = [];
+  const batchSize = npcSummaryLimit * npcCandidateBatchMultiplier;
+  let offset = 0;
+
+  while (summaries.length < npcSummaryLimit) {
+    const rowResult = await fetchNpcListCandidateRows(filters, npcSearchPatterns, batchSize, offset);
+    if (rowResult.rows.length === 0) {
+      break;
+    }
+
+    const [manualZoneLinksByNpcId, lootChestZoneLinksByNpcId] = await Promise.all([
+      getManualNpcZoneLinksByNpcId(rowResult.rows.map((row) => row.id)),
+      getLootChestZoneLinksBySourceNpcId(rowResult.rows.map((row) => row.id))
+    ]);
+
+    for (const row of rowResult.rows) {
+      const zones = mergeZoneLinks(
+        npcLiveZoneLinks(row),
+        manualZoneLinksByNpcId.get(row.id) ?? [],
+        lootChestZoneLinksByNpcId.get(row.id) ?? []
+      );
+      if (zones.length === 0) {
+        continue;
+      }
+
+      const npc = {
+        id: row.id,
+        name: formatNpcName(row.name),
+        race: formatRace(row.race),
+        klass: formatNpcClass(row.class),
+        level: String(row.level),
+        zone: summarizeZoneNames(zones),
+        named: isNamedNpcName(row.name)
+      };
+
+      if (!npcSummaryMatchesFilters(npc, filters)) {
+        continue;
+      }
+
+      summaries.push(npc);
+      if (summaries.length >= npcSummaryLimit) {
+        break;
+      }
+    }
+
+    if (rowResult.rows.length < batchSize) {
+      break;
+    }
+
+    offset += rowResult.rows.length;
+  }
+
+  return summaries;
+}
+
 async function getZoneLinksByShortNames(shortNames: string[]) {
   const normalizedShortNames = [...new Set(shortNames.map((value) => value.trim().toLowerCase()).filter(Boolean))];
   if (!db || normalizedShortNames.length === 0) {
@@ -1738,7 +1917,7 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
       const classColumn = sql.raw(`classes${index + 1}`);
       return sql`(${classColumn} > 0 and ${classColumn} < 255 and ${classColumn} <= ${spellSearchLevelCap})`;
     });
-    const [itemRows, spellRows, npcRows, zoneRows, factionRows, recipeRows] = await Promise.all([
+    const [itemRows, spellRows, npcHits, zoneRows, factionRows, recipeRows] = await Promise.all([
       sql<{ id: number; name: string; icon: number; itemclass: number; itemtype: number; slots: number; damage: number }>`
         select id, Name as name, icon, itemclass, itemtype, slots, damage
         from items i
@@ -1762,29 +1941,7 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
         order by name asc
         limit ${catalogSearchTypeLimit}
       `.execute(db!),
-      sql<{ id: number; name: string; race: number; level: number; zone_name: string | null; zone_short_name: string | null }>`
-        select nt.id, nt.name, nt.race, nt.level, min(ps.long_name) as zone_name, min(ps.zone) as zone_short_name
-        from npc_types nt
-        left join spawnentry se on se.npcID = nt.id
-        left join spawngroup sg on sg.id = se.spawngroupID
-        left join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
-        where (
-          nt.name like ${like(query)}
-          ${npcSearchPatterns.length > 0
-            ? sql`or ${sql.join(
-                npcSearchPatterns.map(
-                  (pattern) =>
-                    sql`lower(trim(replace(replace(replace(replace(nt.name, '_', ' '), '#', ''), '!', ''), '~', ''))) like ${pattern}`
-                ),
-                sql` or `
-              )}`
-            : sql``}
-        )
-          and ${sql.raw(trackableNpcCondition("nt"))}
-        group by nt.id, nt.name, nt.race, nt.level
-        order by nt.name asc
-        limit ${catalogSearchTypeLimit}
-      `.execute(db!),
+      collectCatalogNpcHits(query, npcSearchPatterns),
       sql<{ short_name: string; long_name: string; expansion: number; min_level: number; max_level: number }>`
         select short_name, long_name, expansion, min_level, max_level
         from zone
@@ -1809,11 +1966,6 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
         order by name asc
         limit ${catalogSearchTypeLimit}
       `.execute(db!)
-    ]);
-
-    const [manualZoneLinksByNpcId, lootChestZoneLinksByNpcId] = await Promise.all([
-      getManualNpcZoneLinksByNpcId(npcRows.rows.map((row) => row.id)),
-      getLootChestZoneLinksBySourceNpcId(npcRows.rows.map((row) => row.id))
     ]);
     const dbHits: SearchHit[] = [];
 
@@ -1844,24 +1996,7 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
       });
     }
 
-    for (const row of npcRows.rows) {
-        const liveZones = row.zone_name && row.zone_short_name
-          ? [{ shortName: row.zone_short_name, longName: row.zone_name, href: `/zones/${row.zone_short_name}` }]
-          : [];
-      const zones = mergeZoneLinks(
-        liveZones,
-        manualZoneLinksByNpcId.get(row.id) ?? [],
-        lootChestZoneLinksByNpcId.get(row.id) ?? []
-      );
-      dbHits.push({
-        id: String(row.id),
-        type: "npc",
-        title: formatNpcName(row.name),
-        href: `/npcs/${row.id}`,
-        subtitle: `${formatRace(row.race)} • ${row.level}`,
-        tags: [summarizeZoneNames(zones), isNamedNpcName(row.name) ? "Named" : "Common"]
-      });
-    }
+    dbHits.push(...npcHits);
 
     for (const row of zoneRows.rows) {
       dbHits.push({
@@ -2620,65 +2755,7 @@ export async function listNpcs(filters: NpcFilters = {}) {
 
   return (async () => {
     const npcSearchPatterns = npcSearchTerms(filters.q).map((term) => like(term));
-    const rows = await sql<{ id: number; name: string; race: number; level: number; class: number; zone_name: string | null; zone_short_name: string | null }>`
-      select nt.id, nt.name, nt.race, nt.level, nt.class, min(ps.long_name) as zone_name, min(ps.zone) as zone_short_name
-      from npc_types nt
-      left join spawnentry se on se.npcID = nt.id
-      left join spawngroup sg on sg.id = se.spawngroupID
-      left join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
-      where (
-        nt.name like ${like(filters.q)}
-        ${npcSearchPatterns.length > 0
-          ? sql`or ${sql.join(
-              npcSearchPatterns.map(
-                (pattern) =>
-                  sql`lower(trim(replace(replace(replace(replace(nt.name, '_', ' '), '#', ''), '!', ''), '~', ''))) like ${pattern}`
-              ),
-              sql` or `
-            )}`
-          : sql``}
-      )
-        and ${sql.raw(trackableNpcCondition("nt"))}
-      group by nt.id, nt.name, nt.race, nt.level, nt.class
-      order by nt.level desc, nt.name asc
-      limit 100
-    `.execute(db!);
-
-    const [manualZoneLinksByNpcId, lootChestZoneLinksByNpcId] = await Promise.all([
-      getManualNpcZoneLinksByNpcId(rows.rows.map((row) => row.id)),
-      getLootChestZoneLinksBySourceNpcId(rows.rows.map((row) => row.id))
-    ]);
-
-    return rows.rows
-      .map((row) => {
-        const liveZones = row.zone_name && row.zone_short_name
-          ? [{ shortName: row.zone_short_name, longName: row.zone_name, href: `/zones/${row.zone_short_name}` }]
-          : [];
-        const zones = mergeZoneLinks(
-          liveZones,
-          manualZoneLinksByNpcId.get(row.id) ?? [],
-          lootChestZoneLinksByNpcId.get(row.id) ?? []
-        );
-
-        return {
-          id: row.id,
-          name: formatNpcName(row.name),
-          race: formatRace(row.race),
-          klass: formatNpcClass(row.class),
-          level: String(row.level),
-          zone: summarizeZoneNames(zones),
-          named: isNamedNpcName(row.name)
-        };
-      })
-      .filter((npc) => {
-        if (filters.zone && !includesFolded(npc.zone, filters.zone)) return false;
-        if (filters.race && !includesFolded(npc.race, filters.race)) return false;
-        if (typeof filters.named === "boolean" && npc.named !== filters.named) return false;
-        const min = numberFromLevelRange(npc.level);
-        if (filters.minLevel && min < filters.minLevel) return false;
-        if (filters.maxLevel && min > filters.maxLevel) return false;
-        return true;
-      });
+    return collectNpcSummaries(filters, npcSearchPatterns);
   })();
 }
 

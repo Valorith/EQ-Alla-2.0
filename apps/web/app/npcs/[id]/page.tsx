@@ -7,7 +7,7 @@ import { PageHero, SectionCard } from "../../../components/catalog-shell";
 import { CoinDisplay } from "../../../components/coin-display";
 import { NpcDropsSection } from "../../../components/npc-drops-section";
 import { NpcModelPreview } from "../../../components/npc-model-preview";
-import { SpellIcon } from "../../../components/spell-icon";
+import { NpcSpellList } from "../../../components/npc-spell-list";
 
 type NpcDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -147,21 +147,7 @@ export default async function NpcDetailPage({ params }: NpcDetailPageProps) {
 
           <SectionCard title="This NPC Casts">
             {npc.spells.length > 0 ? (
-              <div className="space-y-3">
-                {npc.spells.map((entry) => (
-                  <Link
-                    key={entry.id}
-                    href={entry.href}
-                    className="group flex items-center gap-3 rounded-[12px] border border-white/10 bg-[linear-gradient(180deg,rgba(19,23,31,0.94),rgba(10,14,21,0.92))] px-3 py-3 transition hover:border-[#c5a869]/45 hover:bg-[linear-gradient(180deg,rgba(35,42,53,0.96),rgba(16,20,28,0.92))]"
-                  >
-                    <SpellIcon icon={entry.icon} name={entry.name} size="sm" />
-                    <div className="min-w-0">
-                      <p className="truncate text-[15px] font-semibold text-[#e6e0d2] transition group-hover:text-white">{entry.name}</p>
-                      <p className="text-[12px] uppercase tracking-[0.18em] text-[#9f8e79]">{entry.type}</p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
+              <NpcSpellList spells={npc.spells} />
             ) : (
               <p className="text-[15px] leading-6 text-[#aeb8ca]">No spell list is configured for this NPC.</p>
             )}

@@ -310,6 +310,120 @@ describe("catalog services", () => {
     }
   }, 20_000);
 
+  it("excludes NPCs from search and browse results when they only spawn in non-base zone versions unless overridden", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const candidateRows = await sql<{ npc_id: number; name: string; zone_short_name: string; zone_long_name: string }>`
+      select nt.id as npc_id, nt.name, min(z.short_name) as zone_short_name, min(z.long_name) as zone_long_name
+      from npc_types nt
+      join spawnentry se on se.npcID = nt.id
+      join spawngroup sg on sg.id = se.spawngroupID
+      join spawn2 s2 on s2.spawngroupID = sg.id
+      left join spawn2_disabled s2d on s2d.spawn2_id = s2.id and coalesce(s2d.disabled, 0) <> 0
+      join zone z on z.short_name = s2.zone and z.version = 0
+      where coalesce(z.min_status, 0) <= 1
+        and coalesce(nt.trackable, 0) = 1
+        and lower(trim(coalesce(nt.name, ''))) <> 'bazaar'
+        and s2d.spawn2_id is null
+        and coalesce(s2.version, 0) not in (0, -1)
+        and (
+          (coalesce(s2.content_flags, '') = '' or exists (
+            select 1
+            from content_flags cf
+            where cf.flag_name = s2.content_flags
+              and coalesce(cf.enabled, 0) <> 0
+          ))
+          and (coalesce(s2.content_flags_disabled, '') = '' or not exists (
+            select 1
+            from content_flags cf
+            where cf.flag_name = s2.content_flags_disabled
+              and coalesce(cf.enabled, 0) <> 0
+          ))
+        )
+        and not exists (
+          select 1
+          from spawnentry se2
+          join spawngroup sg2 on sg2.id = se2.spawngroupID
+          join spawn2 s22 on s22.spawngroupID = sg2.id
+          left join spawn2_disabled s2d2 on s2d2.spawn2_id = s22.id and coalesce(s2d2.disabled, 0) <> 0
+          join zone z2 on z2.short_name = s22.zone and z2.version = 0
+          where se2.npcID = nt.id
+            and coalesce(z2.min_status, 0) <= 1
+            and s2d2.spawn2_id is null
+            and coalesce(s22.version, 0) in (0, -1)
+            and (
+              (coalesce(s22.content_flags, '') = '' or exists (
+                select 1
+                from content_flags cf
+                where cf.flag_name = s22.content_flags
+                  and coalesce(cf.enabled, 0) <> 0
+              ))
+              and (coalesce(s22.content_flags_disabled, '') = '' or not exists (
+                select 1
+                from content_flags cf
+                where cf.flag_name = s22.content_flags_disabled
+                  and coalesce(cf.enabled, 0) <> 0
+              ))
+            )
+        )
+      group by nt.id, nt.name
+      order by nt.id asc
+      limit 25
+    `.execute(db!);
+
+    let sample:
+      | { npc_id: number; name: string; zone_short_name: string; zone_long_name: string }
+      | undefined;
+
+    for (const candidate of candidateRows.rows) {
+      const [searchResults, npcResults] = await Promise.all([
+        searchCatalog(candidate.name),
+        listNpcs({ q: candidate.name })
+      ]);
+
+      if (
+        !searchResults.some((entry) => entry.type === "npc" && entry.id === String(candidate.npc_id)) &&
+        !npcResults.some((entry) => entry.id === candidate.npc_id)
+      ) {
+        sample = candidate;
+        break;
+      }
+    }
+
+    expect(sample).toBeTruthy();
+    if (!sample) {
+      return;
+    }
+
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "eq-alla-base-version-override-"));
+    const overridePath = path.join(tempDir, "manual-npc-zone-overrides.json");
+    const previousOverridePath = process.env.EQ_MANUAL_NPC_ZONE_OVERRIDES_PATH;
+
+    fs.writeFileSync(
+      overridePath,
+      JSON.stringify([{ npcId: sample.npc_id, zoneShortName: sample.zone_short_name }], null, 2),
+      "utf8"
+    );
+
+    process.env.EQ_MANUAL_NPC_ZONE_OVERRIDES_PATH = overridePath;
+
+    try {
+      const npcs = await listNpcs({ q: sample.name });
+      expect(
+        npcs.some((entry) => entry.id === sample.npc_id && entry.zone.includes(sample.zone_long_name))
+      ).toBe(true);
+    } finally {
+      if (previousOverridePath === undefined) {
+        delete process.env.EQ_MANUAL_NPC_ZONE_OVERRIDES_PATH;
+      } else {
+        process.env.EQ_MANUAL_NPC_ZONE_OVERRIDES_PATH = previousOverridePath;
+      }
+
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }, 20_000);
+
   it("matches NPC catalog search against normalized display names", async () => {
     const results = await searchCatalog("The Avatar of War");
     const npcs = await listNpcs({ q: "The Avatar of War" });
@@ -1030,8 +1144,48 @@ describe("catalog services", () => {
   });
 
   it("translates non-player NPC race ids to race names", async () => {
-    const skeletonPets = await listNpcs({ q: "skel_pet_1_" });
-    expect(skeletonPets.some((npc) => npc.race === "Skeleton")).toBe(true);
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{ name: string }>`
+      select nt.name
+      from npc_types nt
+      join spawnentry se on se.npcID = nt.id
+      join spawngroup sg on sg.id = se.spawngroupID
+      join spawn2 s2 on s2.spawngroupID = sg.id
+      left join spawn2_disabled s2d on s2d.spawn2_id = s2.id and coalesce(s2d.disabled, 0) <> 0
+      join zone z on z.short_name = s2.zone and z.version = 0
+      where coalesce(z.min_status, 0) <= 1
+        and coalesce(nt.trackable, 0) = 1
+        and lower(trim(coalesce(nt.name, ''))) <> 'bazaar'
+        and nt.race = 60
+        and s2d.spawn2_id is null
+        and coalesce(s2.version, 0) in (0, -1)
+        and (
+          (coalesce(s2.content_flags, '') = '' or exists (
+            select 1
+            from content_flags cf
+            where cf.flag_name = s2.content_flags
+              and coalesce(cf.enabled, 0) <> 0
+          ))
+          and (coalesce(s2.content_flags_disabled, '') = '' or not exists (
+            select 1
+            from content_flags cf
+            where cf.flag_name = s2.content_flags_disabled
+              and coalesce(cf.enabled, 0) <> 0
+          ))
+        )
+      order by nt.id asc
+      limit 1
+    `.execute(db!);
+
+    if (!rows.rows[0]) {
+      expect(rows.rows).toEqual([]);
+      return;
+    }
+
+    const skeletonNpcs = await listNpcs({ q: rows.rows[0].name });
+    expect(skeletonNpcs.some((npc) => npc.race === "Skeleton")).toBe(true);
   });
 
   it("excludes untrackable NPCs from NPC listings, global search, and direct detail routes", async () => {
@@ -1268,6 +1422,7 @@ describe("catalog services", () => {
           ) z on z.short_name = s2.zone
           where se.npcID = nt.id
             and s2d.spawn2_id is null
+            and coalesce(s2.version, 0) in (0, -1)
             and (
               (coalesce(s2.content_flags, '') = '' or exists (
                 select 1
@@ -1555,6 +1710,7 @@ describe("catalog services", () => {
           group by short_name
         ) z on z.short_name = s2.zone
         where s2d.spawn2_id is null
+          and coalesce(s2.version, 0) in (0, -1)
           and coalesce(nt.trackable, 0) = 1
           and lower(trim(coalesce(nt.name, ''))) <> 'bazaar'
           and (
