@@ -140,6 +140,7 @@ const skillNames: Record<number, string> = {
 
 // Canonical EQEmu skill IDs from common/skills.h.
 const eqEmuSkillTypeNames: Record<number, string> = {
+  [-1]: "Hit",
   0: "1H Blunt",
   1: "1H Slashing",
   2: "2H Blunt",
@@ -290,9 +291,22 @@ const itemElementDamageTypeNames: Record<number, string> = {
   9: "Corruption"
 };
 
+const bardSkillTypeNames: Record<number, string> = {
+  23: "Woodwind",
+  24: "Strings",
+  25: "Brass",
+  26: "Percussion",
+  50: "Singing",
+  51: "All Instruments"
+};
+
 function formatSkillModifierType(skillId: number | null | undefined) {
   const normalized = Number(skillId ?? 0);
-  if (normalized <= 0) {
+  if (normalized < 0) {
+    return eqEmuSkillTypeNames[normalized] ?? `Skill ${normalized}`;
+  }
+
+  if (normalized === 0) {
     return undefined;
   }
 
@@ -316,7 +330,7 @@ function formatExtraDamageSkillType(skillId: number | null | undefined) {
     return undefined;
   }
 
-  return skillNames[normalized - 1] ?? skillNames[normalized] ?? `Skill ${normalized}`;
+  return skillNames[normalized - 1] ?? skillNames[normalized] ?? eqEmuSkillTypeNames[normalized] ?? `Skill ${normalized}`;
 }
 
 function formatItemElementDamageType(typeId: number | null | undefined) {
@@ -331,6 +345,15 @@ function formatItemElementDamageType(typeId: number | null | undefined) {
 function formatItemElementDamageLabel(typeId: number | null | undefined) {
   const typeName = formatItemElementDamageType(typeId);
   return typeName ? `${typeName} Dmg` : "Elemental Dmg";
+}
+
+function formatBardModifierType(typeId: number | null | undefined) {
+  const normalized = Number(typeId ?? 0);
+  if (normalized <= 0) {
+    return undefined;
+  }
+
+  return bardSkillTypeNames[normalized] ?? `Type ${normalized}`;
 }
 
 function formatBaneRace(raceId: number | null | undefined) {
@@ -1314,6 +1337,8 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, spe
       return spellId > 0 ? `${label} ${referencedSpell}` : label;
     case 140:
       return Math.abs(base) > 0 ? `${label} (${Math.abs(base) * 6} sec)` : label;
+    case 211:
+      return base !== 0 ? `${label} for ${formatSeconds(Math.abs(base) * 12)}` : label;
     default:
       if (base !== 0) {
         return formatNumericEffectLabel(label, base, effectId);
@@ -2408,7 +2433,10 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       {
         label: "Bard Modifier",
         section: "utility",
-        value: Number(row.bardvalue ?? 0) !== 0 ? `${Number(row.bardvalue)} (Type ${Number(row.bardtype ?? 0)})` : 0
+        value:
+          Number(row.bardvalue ?? 0) !== 0
+            ? `${formatBardModifierType(row.bardtype) ?? "Instrument"}: ${Number(row.bardvalue)}`
+            : 0
       }
     ];
 

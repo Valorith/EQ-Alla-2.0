@@ -166,6 +166,7 @@ const spellEffectNames: Record<number, string> = {
   201: "Increase Range Proc Modifier",
   205: "Rampage",
   206: "Area of Effect Taunt",
+  211: "AE Melee",
   216: "Increase Accuracy",
   227: "Reduce Skill Timer",
   266: "Increase Attack Chance",

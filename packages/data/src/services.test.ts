@@ -195,6 +195,84 @@ describe("catalog services", () => {
     });
   });
 
+  it("formats non-weapon extra damage skills without exposing raw ids", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{ item_id: number; extradmgskill: number; extradmgamt: number }>`
+      select min(i.id) as item_id, i.extradmgskill, i.extradmgamt
+      from items i
+      where coalesce(i.extradmgamt, 0) <> 0
+        and coalesce(i.extradmgskill, 0) not in (0, 1, 2, 3, 4, 5, 35, 36, 42, 43)
+        and exists (
+          select 1
+          from discovered_items di
+          where di.item_id = i.id
+            and coalesce(di.account_status, 0) <= 0
+        )
+      group by i.extradmgskill, i.extradmgamt
+      order by i.extradmgskill asc, min(i.id) asc
+      limit 1
+    `.execute(db!);
+
+    if (!rows.rows[0]) {
+      expect(rows.rows).toEqual([]);
+      return;
+    }
+
+    const row = rows.rows[0];
+    const item = await getItemDetail(row.item_id);
+    const extraDamage = item?.stats.find(
+      (entry) => entry.section === "offense" && entry.value === `+${Number(row.extradmgamt ?? 0)}` && entry.label.endsWith(" Damage")
+    );
+
+    expect(extraDamage).toBeTruthy();
+    expect(extraDamage?.label).not.toBe(`Skill ${row.extradmgskill} Damage`);
+  }, 20_000);
+
+  it("formats bard modifiers with instrument names instead of type ids", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const bardSkillNames: Record<number, string> = {
+      23: "Woodwind",
+      24: "Strings",
+      25: "Brass",
+      26: "Percussion",
+      50: "Singing",
+      51: "All Instruments"
+    };
+
+    const rows = await sql<{ item_id: number; bardtype: number }>`
+      select min(i.id) as item_id, i.bardtype
+      from items i
+      where coalesce(i.bardvalue, 0) <> 0
+        and i.bardtype in (23, 24, 25, 26, 50, 51)
+        and exists (
+          select 1
+          from discovered_items di
+          where di.item_id = i.id
+            and coalesce(di.account_status, 0) <= 0
+        )
+      group by i.bardtype
+      order by i.bardtype asc
+      limit 1
+    `.execute(db!);
+
+    if (!rows.rows[0]) {
+      expect(rows.rows).toEqual([]);
+      return;
+    }
+
+    const row = rows.rows[0];
+    const item = await getItemDetail(row.item_id);
+    const bardModifier = item?.stats.find((entry) => entry.label === "Bard Modifier");
+
+    expect(bardModifier).toBeTruthy();
+    expect(bardModifier?.value).toContain(bardSkillNames[row.bardtype]);
+    expect(bardModifier?.value).not.toContain(`Type ${row.bardtype}`);
+  }, 20_000);
+
   it("applies manual NPC zone overrides outside the content database", async () => {
     const db = getDb();
     expect(db).toBeTruthy();
@@ -1301,6 +1379,14 @@ describe("catalog services", () => {
     expect(shrinkEffects).toContain("Decrease Player Size by 34%");
     expect(thistlecoatEffects).toContain("Increase Damage Shield by 1");
     expect(turgurEffects).toContain("Decrease Attack Speed by 15%");
+  });
+
+  it("formats EQEmu-specific AE melee spell effects with a translated label", async () => {
+    const spell = await getSpellDetail(38106);
+    const effects = spell?.effects.map((entry) => entry.text) ?? [];
+
+    expect(effects).toContain("AE Melee for 1 min");
+    expect(effects.some((entry) => entry.includes("Effect 211"))).toBe(false);
   });
 
   it("caps spell search results at level 60", async () => {
