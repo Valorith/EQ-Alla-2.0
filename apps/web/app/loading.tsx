@@ -1,6 +1,15 @@
+import { cookies } from "next/headers";
 import { ClassLoadingIndicator } from "../components/class-loading-indicator";
+import { pageLoadingPreferenceCookieName, parsePageLoadingPreference } from "../components/page-loading-preference";
 
-export default function Loading() {
+export default async function Loading() {
+  const cookieStore = await cookies();
+  const isPageLoadingEnabled = parsePageLoadingPreference(cookieStore.get(pageLoadingPreferenceCookieName)?.value);
+
+  if (!isPageLoadingEnabled) {
+    return null;
+  }
+
   return (
     <ClassLoadingIndicator
       fullScreen

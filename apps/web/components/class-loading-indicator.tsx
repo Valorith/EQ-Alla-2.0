@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { usePageLoadingPreference } from "./use-page-loading-preference";
 
 const loadingGifSrc = "/assets/gnome-book-flip-loading.webp";
 
@@ -16,6 +17,7 @@ export function ClassLoadingIndicator({
   overlay?: boolean;
   fullScreen?: boolean;
 }) {
+  const { isPageLoadingEnabled } = usePageLoadingPreference();
   const [gifInstanceKey, setGifInstanceKey] = useState(0);
   const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
 
@@ -23,6 +25,10 @@ export function ClassLoadingIndicator({
     setGifInstanceKey(Date.now());
     setPortalRoot(document.body);
   }, []);
+
+  if (!isPageLoadingEnabled) {
+    return null;
+  }
 
   const content = (
     <div className="px-6 py-8 text-center pointer-events-none">

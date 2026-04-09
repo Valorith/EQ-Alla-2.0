@@ -6,9 +6,10 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { Input } from "@eq-alla/ui";
 import { cn } from "@eq-alla/ui";
-import { ArrowRight, Database, Menu, Search, ShieldCheck, X } from "lucide-react";
+import { ArrowRight, Database, Menu, Search, Settings2, ShieldCheck, X } from "lucide-react";
 import { ItemHoverTooltip } from "./item-hover-tooltip";
 import { RouteLoadingOverlay } from "./route-loading-overlay";
+import { usePageLoadingPreference } from "./use-page-loading-preference";
 
 const routesWithInlineSearch = new Set([
   "/",
@@ -30,12 +31,14 @@ function SidebarNavContent({
   showSidebarSearch,
   navGroups,
   footerClassName,
-  onNavigate
+  onNavigate,
+  onOpenSettings
 }: {
   showSidebarSearch: boolean;
   navGroups: NavGroup[];
   footerClassName: string;
   onNavigate?: () => void;
+  onOpenSettings: () => void;
 }) {
   return (
     <>
@@ -111,8 +114,117 @@ function SidebarNavContent({
             </div>
           </div>
         </div>
+
+        <div className="flex justify-end pt-1">
+          <button
+            type="button"
+            aria-label="Open settings"
+            title="Settings"
+            onClick={onOpenSettings}
+            className="flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/6 text-white/62 transition hover:bg-white/12 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/30"
+          >
+            <Settings2 className="size-4" strokeWidth={2.15} />
+          </button>
+        </div>
       </div>
     </>
+  );
+}
+
+function SettingsModal({
+  isOpen,
+  onClose
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  const { isPageLoadingEnabled, setIsPageLoadingEnabled } = usePageLoadingPreference();
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#06080d]/72 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="eq-settings-title"
+        className="w-full max-w-md rounded-[28px] border border-white/12 bg-[linear-gradient(180deg,rgba(20,24,31,0.98),rgba(34,28,24,0.96))] p-5 text-[#f3ecdf] shadow-[0_30px_80px_rgba(0,0,0,0.45)]"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[#d7c7aa]/72">Preferences</p>
+            <h2 id="eq-settings-title" className="mt-2 font-[var(--font-display)] text-2xl font-semibold tracking-[-0.03em] text-white">
+              Settings
+            </h2>
+            <p className="mt-2 max-w-sm text-sm leading-6 text-[#dccfb7]/82">
+              Control small browser-side behaviors without changing the rest of the site.
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-label="Close settings"
+            onClick={onClose}
+            className="flex size-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/6 text-white/72 transition hover:bg-white/12 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/30"
+          >
+            <X className="size-4" strokeWidth={2.2} />
+          </button>
+        </div>
+
+        <div className="mt-6 rounded-[24px] border border-white/10 bg-black/18 p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-white">Page loading animation</p>
+              <p className="mt-1 text-sm leading-6 text-[#dccfb7]/76">
+                Shows the full-page gnome animation during route transitions and loading boundaries.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isPageLoadingEnabled}
+              aria-label="Toggle page loading animation"
+              onClick={() => setIsPageLoadingEnabled(!isPageLoadingEnabled)}
+              className={cn(
+                "relative mt-1 inline-flex h-7 w-12 shrink-0 rounded-full border transition focus:outline-none focus:ring-2 focus:ring-[#f0c36a]/45",
+                isPageLoadingEnabled
+                  ? "border-[#f0c36a]/55 bg-[linear-gradient(180deg,rgba(240,195,106,0.92),rgba(183,126,56,0.95))]"
+                  : "border-white/12 bg-white/10"
+              )}
+            >
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "absolute top-[3px] size-5 rounded-full bg-[#0f131a] shadow-[0_4px_16px_rgba(0,0,0,0.32)] transition-transform",
+                  isPageLoadingEnabled ? "translate-x-[25px]" : "translate-x-[3px]"
+                )}
+              />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -121,6 +233,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const isHome = pathname === "/";
   const showSidebarSearch = !routesWithInlineSearch.has(pathname);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const mainShellClassName = isHome
     ? "min-w-0 xl:col-[1/-1] xl:row-start-1 xl:self-start"
@@ -154,6 +267,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   ];
 
   const closeMobileNav = () => setMobileNavOpen(false);
+  const openSettings = () => {
+    setMobileNavOpen(false);
+    setSettingsOpen(true);
+  };
+  const closeSettings = () => setSettingsOpen(false);
 
   useEffect(() => {
     setMobileNavOpen(false);
@@ -178,13 +296,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [mobileNavOpen]);
 
   useEffect(() => {
-    if (!mobileNavOpen) return;
+    if (!mobileNavOpen && !settingsOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [mobileNavOpen]);
+  }, [mobileNavOpen, settingsOpen]);
 
   return (
     <div className="eq-app-shell-padding min-h-screen">
@@ -233,6 +351,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   navGroups={navGroups}
                   footerClassName="mt-4 grid gap-3"
                   onNavigate={closeMobileNav}
+                  onOpenSettings={openSettings}
                 />
               </div>
             </div>
@@ -258,6 +377,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 showSidebarSearch={showSidebarSearch}
                 navGroups={navGroups}
                 footerClassName="mt-auto grid gap-3"
+                onOpenSettings={openSettings}
               />
             </div>
           </div>
@@ -268,6 +388,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </main>
       </div>
       <ItemHoverTooltip />
+      <SettingsModal isOpen={settingsOpen} onClose={closeSettings} />
       <Suspense fallback={null}>
         <RouteLoadingOverlay />
       </Suspense>

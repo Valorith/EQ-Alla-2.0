@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { minimumLoadingIndicatorMs } from "./loading-state";
 import { ClassLoadingIndicator } from "./class-loading-indicator";
+import { usePageLoadingPreference } from "./use-page-loading-preference";
 
 function buildRouteKey(pathname: string, searchParams: URLSearchParams) {
   const query = searchParams.toString();
@@ -26,6 +27,7 @@ function shouldIgnoreAnchor(anchor: HTMLAnchorElement) {
 export function RouteLoadingOverlay() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { isPageLoadingEnabled } = usePageLoadingPreference();
   const [isRouteLoading, setIsRouteLoading] = useState(false);
   const activeRouteKeyRef = useRef(buildRouteKey(pathname, searchParams));
   const startedAtRef = useRef(0);
@@ -62,7 +64,29 @@ export function RouteLoadingOverlay() {
   }, [isRouteLoading, pathname, searchParams]);
 
   useEffect(() => {
+    if (isPageLoadingEnabled) {
+      return;
+    }
+
+    setIsRouteLoading(false);
+
+    if (hideTimerRef.current !== null) {
+      window.clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+
+    if (failSafeTimerRef.current !== null) {
+      window.clearTimeout(failSafeTimerRef.current);
+      failSafeTimerRef.current = null;
+    }
+  }, [isPageLoadingEnabled]);
+
+  useEffect(() => {
     const startRouteLoading = () => {
+      if (!isPageLoadingEnabled) {
+        return;
+      }
+
       startedAtRef.current = performance.now();
       setIsRouteLoading(true);
 
@@ -161,9 +185,9 @@ export function RouteLoadingOverlay() {
         failSafeTimerRef.current = null;
       }
     };
-  }, []);
+  }, [isPageLoadingEnabled]);
 
-  if (!isRouteLoading) {
+  if (!isPageLoadingEnabled || !isRouteLoading) {
     return null;
   }
 
