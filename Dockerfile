@@ -37,7 +37,7 @@ ENV DATABASE_URL=$DATABASE_URL
 ENV MYSQL_URL=$MYSQL_URL
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run sync:npc-model-assets && npm run build
+RUN npm run sync:npc-model-assets && npm run sync:crafted-spells && npm run build
 
 FROM base AS runner
 ENV NODE_ENV=production

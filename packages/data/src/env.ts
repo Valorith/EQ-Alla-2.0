@@ -29,6 +29,10 @@ function applyRedisFallbacks() {
   setEnvIfMissing("EQ_REDIS_URL", process.env.REDIS_URL);
 }
 
+function applyGitHubFallbacks() {
+  setEnvIfMissing("EQ_GITHUB_TOKEN", process.env.GITHUB_TOKEN);
+}
+
 function applyDatabaseComponentFallbacks() {
   setEnvIfMissing("EQ_DB_HOST", process.env.MYSQLHOST);
   setEnvIfMissing("EQ_DB_PORT", process.env.MYSQLPORT);
@@ -117,6 +121,7 @@ for (const filename of [".env.local", ".env", "env.local", "env"]) {
 
 applySiteUrlFallbacks();
 applyRedisFallbacks();
+applyGitHubFallbacks();
 applyDatabaseComponentFallbacks();
 applyDatabaseUrlFallbacks();
 
@@ -128,7 +133,8 @@ const envSchema = z.object({
   EQ_DB_NAME: z.string().optional(),
   EQ_DB_USER: z.string().optional(),
   EQ_DB_PASSWORD: z.string().optional(),
-  EQ_REDIS_URL: z.string().optional()
+  EQ_REDIS_URL: z.string().optional(),
+  EQ_GITHUB_TOKEN: z.string().optional()
 });
 
 export const env = envSchema.parse(process.env);

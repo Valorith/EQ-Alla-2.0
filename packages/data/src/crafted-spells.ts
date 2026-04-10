@@ -1,11 +1,9 @@
-import { access, mkdir, rm } from "node:fs/promises";
-import os from "node:os";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { sql } from "kysely";
 import { cacheGet, cacheSet } from "./cache";
 import { getDb } from "./db";
+import { env } from "./env";
 import type {
   CraftedSpellCatalog,
   CraftedSpellComponentCatalogEntry,
@@ -15,19 +13,21 @@ import type {
   CraftedSpellRecipeKind
 } from "./types";
 
-const execFileAsync = promisify(execFile);
-
 const victoriaRepositoryUrl = "https://github.com/Isaaru/cw-quests.git";
 const victoriaRepositoryRef = "main";
 const victoriaScriptPath = "tutorial/Victoria.pl";
+const victoriaContentsApiUrl = `https://api.github.com/repos/Isaaru/cw-quests/contents/${victoriaScriptPath}?ref=${victoriaRepositoryRef}`;
 const craftedSpellCacheKey = "crafted-spells:victoria:v1";
 const craftedSpellRefreshIntervalSeconds = 6 * 60 * 60;
 const craftedSpellStaleTtlSeconds = 24 * 60 * 60;
-const craftedSpellMirrorDir = path.join(os.tmpdir(), `eq-alla-crafted-spells-source-${process.pid}`);
+const craftedSpellRefreshRetryBackoffMs = 10 * 60 * 1_000;
+const craftedSpellSnapshotPath = path.join("data", "crafted-spells", "catalog.json");
+const craftedSpellSourcePath = path.join("data", "crafted-spells", "Victoria.pl");
 const craftedSpellSyntheticRecipeIdOffset = 1_000_000_000;
-const gitLockFileNames = ["shallow.lock", "index.lock", "packed-refs.lock"] as const;
 
 let craftedSpellRefreshPromise: Promise<CraftedSpellCatalog> | null = null;
+let craftedSpellSnapshotPromise: Promise<CraftedSpellCatalog | null> | null = null;
+let craftedSpellLastRefreshAttemptAt = 0;
 
 const classDisplayNames: Record<string, string> = {
   bard: "Bard",
@@ -58,6 +58,17 @@ type ParsedVictoriaRecipe = {
     requiredSpell: number;
     reward: number;
   };
+};
+
+type ResolvedCraftedSpellCatalog = {
+  catalog: CraftedSpellCatalog;
+  source: string;
+};
+
+type GitHubContentsResponse = {
+  content?: string;
+  encoding?: string;
+  download_url?: string | null;
 };
 
 function normalizeSpacing(value: string) {
@@ -252,74 +263,142 @@ async function pathExists(target: string) {
   }
 }
 
-async function ensureGitMirror() {
-  await mkdir(craftedSpellMirrorDir, { recursive: true });
+async function resolveDataBaseDir() {
+  let current = process.cwd();
+  let matched: string | null = null;
 
-  if (await pathExists(path.join(craftedSpellMirrorDir, ".git"))) {
-    return;
-  }
-
-  await execFileAsync("git", ["init"], {
-    cwd: craftedSpellMirrorDir,
-    windowsHide: true,
-    timeout: 20_000
-  });
-
-  await execFileAsync("git", ["remote", "add", "origin", victoriaRepositoryUrl], {
-    cwd: craftedSpellMirrorDir,
-    windowsHide: true,
-    timeout: 20_000
-  });
-}
-
-async function clearStaleGitLocks() {
-  await Promise.all(
-    gitLockFileNames.map((lockFileName) =>
-      rm(path.join(craftedSpellMirrorDir, ".git", lockFileName), {
-        force: true
-      }).catch(() => undefined)
-    )
-  );
-}
-
-function isGitLockError(error: unknown) {
-  return error instanceof Error && /\.lock': File exists\./i.test(error.message);
-}
-
-async function runGitCommand(args: string[], options?: { maxBuffer?: number }) {
-  try {
-    return await execFileAsync("git", args, {
-      cwd: craftedSpellMirrorDir,
-      windowsHide: true,
-      timeout: 30_000,
-      maxBuffer: options?.maxBuffer
-    });
-  } catch (error) {
-    if (!isGitLockError(error)) {
-      throw error;
+  while (true) {
+    if (await pathExists(path.join(current, "data"))) {
+      matched = current;
     }
 
-    await clearStaleGitLocks();
+    const parent = path.dirname(current);
+    if (parent === current) {
+      break;
+    }
 
-    return execFileAsync("git", args, {
-      cwd: craftedSpellMirrorDir,
-      windowsHide: true,
-      timeout: 30_000,
-      maxBuffer: options?.maxBuffer
-    });
+    current = parent;
   }
+
+  return matched ?? process.cwd();
 }
 
-async function fetchVictoriaSource() {
-  await ensureGitMirror();
+async function resolveDataFile(relativePath: string) {
+  const candidate = path.join(await resolveDataBaseDir(), relativePath);
+  return (await pathExists(candidate)) ? candidate : null;
+}
 
-  await runGitCommand(["fetch", "--depth", "1", "origin", victoriaRepositoryRef]);
+async function ensureDataFile(relativePath: string) {
+  const target = path.join(await resolveDataBaseDir(), relativePath);
+  await mkdir(path.dirname(target), { recursive: true });
+  return target;
+}
 
-  const { stdout } = await runGitCommand(["show", `FETCH_HEAD:${victoriaScriptPath}`], {
-    maxBuffer: 1024 * 1024 * 4
+function getCatalogFetchedAt(catalog: CraftedSpellCatalog | null | undefined) {
+  if (!catalog) {
+    return Number.NaN;
+  }
+
+  return Date.parse(catalog.source.fetchedAt);
+}
+
+function isCraftedSpellCatalogStale(catalog: CraftedSpellCatalog) {
+  const fetchedAt = getCatalogFetchedAt(catalog);
+  if (!Number.isFinite(fetchedAt)) {
+    return true;
+  }
+
+  return Date.now() - fetchedAt >= craftedSpellRefreshIntervalSeconds * 1_000;
+}
+
+function chooseFreshestCatalog(...candidates: Array<CraftedSpellCatalog | null | undefined>) {
+  let freshest: CraftedSpellCatalog | null = null;
+
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+
+    if (!freshest || getCatalogFetchedAt(candidate) >= getCatalogFetchedAt(freshest)) {
+      freshest = candidate;
+    }
+  }
+
+  return freshest;
+}
+
+async function readCraftedSpellCatalogSnapshot(forceRefresh = false) {
+  if (!forceRefresh && craftedSpellSnapshotPromise) {
+    return craftedSpellSnapshotPromise;
+  }
+
+  craftedSpellSnapshotPromise = (async () => {
+    const snapshotFile = await resolveDataFile(craftedSpellSnapshotPath);
+
+    if (!snapshotFile) {
+      return null;
+    }
+
+    const payload = await readFile(snapshotFile, "utf8");
+    return JSON.parse(payload) as CraftedSpellCatalog;
+  })();
+
+  return craftedSpellSnapshotPromise;
+}
+
+async function persistCraftedSpellArtifacts(catalog: CraftedSpellCatalog, source: string) {
+  const [snapshotFile, sourceFile] = await Promise.all([
+    ensureDataFile(craftedSpellSnapshotPath),
+    ensureDataFile(craftedSpellSourcePath)
+  ]);
+
+  await Promise.all([
+    writeFile(snapshotFile, `${JSON.stringify(catalog, null, 2)}\n`, "utf8"),
+    writeFile(sourceFile, source, "utf8")
+  ]);
+
+  craftedSpellSnapshotPromise = Promise.resolve(catalog);
+}
+
+async function readVictoriaSource() {
+  const sourceFile = await resolveDataFile(craftedSpellSourcePath);
+
+  if (!sourceFile) {
+    throw new Error(`Unable to locate Victoria source at ${craftedSpellSourcePath}.`);
+  }
+
+  return readFile(sourceFile, "utf8");
+}
+
+function getGitHubHeaders() {
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github+json",
+    "User-Agent": "EQ-Alla-2.0",
+    "X-GitHub-Api-Version": "2022-11-28"
+  };
+
+  if (env.EQ_GITHUB_TOKEN) {
+    headers.Authorization = `Bearer ${env.EQ_GITHUB_TOKEN}`;
+  }
+
+  return headers;
+}
+
+async function fetchVictoriaSourceFromGitHubApi() {
+  const response = await fetch(victoriaContentsApiUrl, {
+    headers: getGitHubHeaders()
   });
 
-  return stdout;
+  if (!response.ok) {
+    throw new Error(`Unable to fetch Victoria.pl from GitHub (${response.status} ${response.statusText}).`);
+  }
+
+  const payload = (await response.json()) as GitHubContentsResponse;
+  if (payload.encoding !== "base64" || !payload.content) {
+    throw new Error("GitHub returned Victoria.pl in an unexpected format.");
+  }
+
+  return Buffer.from(payload.content.replace(/\n/g, ""), "base64").toString("utf8");
 }
 
 async function getItemMetadata(ids: number[]) {
@@ -381,24 +460,12 @@ function createRecipeComponent(
   };
 }
 
-async function resolveCraftedSpellCatalog() {
-  const source = await fetchVictoriaSource();
-  const parsed = parseVictoriaSpellCraftingSource(source);
-  const allItemIds = Array.from(
-    new Set(
-      parsed.glossary.map((entry) => entry.id).concat(
-        parsed.recipes.flatMap((recipe) => [
-          recipe.itemIds.scribestone,
-          recipe.itemIds.focus,
-          recipe.itemIds.catalyst,
-          recipe.itemIds.requiredSpell,
-          recipe.itemIds.reward
-        ])
-      )
-    )
-  ).filter((id) => id > 0);
-  const itemMetadata = await getItemMetadata(allItemIds);
-
+function buildCraftedSpellCatalog(
+  parsed: ReturnType<typeof parseVictoriaSpellCraftingSource>,
+  itemMetadata: Map<number, { name: string; icon: string }>,
+  fetchStrategy: string,
+  fetchedAt: string
+) {
   const recipes = parsed.recipes
     .map<CraftedSpellRecipe>((recipe) => {
       const level = decodeLevelCode(recipe.levelCode);
@@ -451,14 +518,14 @@ async function resolveCraftedSpellCatalog() {
     return leftStart - rightStart;
   });
 
-  const catalog: CraftedSpellCatalog = {
+  return {
     source: {
       repositoryUrl: victoriaRepositoryUrl,
       repositoryRef: victoriaRepositoryRef,
       scriptPath: victoriaScriptPath,
-      fetchedAt: new Date().toISOString(),
+      fetchedAt,
       cacheTtlSeconds: craftedSpellRefreshIntervalSeconds,
-      fetchStrategy: "git-fetch"
+      fetchStrategy
     },
     glossary: parsed.glossary
       .map((entry) => {
@@ -480,48 +547,81 @@ async function resolveCraftedSpellCatalog() {
       amplifierCount: recipes.filter((recipe) => recipe.recipeKind === "amplifier").length,
       stabilizerCount: recipes.filter((recipe) => recipe.recipeKind === "stabilizer").length
     }
-  };
-
-  return catalog;
+  } satisfies CraftedSpellCatalog;
 }
 
-export async function getCraftedSpellCatalog() {
-  const cached = await cacheGet<CraftedSpellCatalog>(craftedSpellCacheKey);
-
-  const cachedFetchedAt = cached ? Date.parse(cached.source.fetchedAt) : Number.NaN;
-  const cacheAgeMs = Number.isFinite(cachedFetchedAt) ? Date.now() - cachedFetchedAt : Number.POSITIVE_INFINITY;
-
-  if (cached && cacheAgeMs < craftedSpellRefreshIntervalSeconds * 1_000) {
-    return cached;
-  }
-
-  if (craftedSpellRefreshPromise) {
-    try {
-      return await craftedSpellRefreshPromise;
-    } catch (error) {
-      if (cached) {
-        return cached;
-      }
-
-      throw error;
-    }
-  }
-
-  craftedSpellRefreshPromise = resolveCraftedSpellCatalog();
+async function resolveCraftedSpellCatalog(): Promise<ResolvedCraftedSpellCatalog> {
+  let source: string;
+  let fetchStrategy = "github-contents-api";
 
   try {
-    const catalog = await craftedSpellRefreshPromise;
-    await cacheSet(craftedSpellCacheKey, catalog, craftedSpellStaleTtlSeconds);
-    return catalog;
-  } catch (error) {
-    if (cached) {
-      return cached;
-    }
+    source = await fetchVictoriaSourceFromGitHubApi();
+  } catch {
+    source = await readVictoriaSource();
+    fetchStrategy = "source-parse";
+  }
 
-    throw error;
+  const parsed = parseVictoriaSpellCraftingSource(source);
+  const allItemIds = Array.from(
+    new Set(
+      parsed.glossary.map((entry) => entry.id).concat(
+        parsed.recipes.flatMap((recipe) => [
+          recipe.itemIds.scribestone,
+          recipe.itemIds.focus,
+          recipe.itemIds.catalyst,
+          recipe.itemIds.requiredSpell,
+          recipe.itemIds.reward
+        ])
+      )
+    )
+  ).filter((id) => id > 0);
+  const itemMetadata = await getItemMetadata(allItemIds);
+
+  return {
+    catalog: buildCraftedSpellCatalog(parsed, itemMetadata, fetchStrategy, new Date().toISOString()),
+    source
+  };
+}
+
+async function refreshCraftedSpellCatalog() {
+  if (craftedSpellRefreshPromise) {
+    return craftedSpellRefreshPromise;
+  }
+
+  craftedSpellLastRefreshAttemptAt = Date.now();
+  craftedSpellRefreshPromise = (async () => {
+    const { catalog, source } = await resolveCraftedSpellCatalog();
+    await cacheSet(craftedSpellCacheKey, catalog, craftedSpellStaleTtlSeconds);
+    await persistCraftedSpellArtifacts(catalog, source);
+    return catalog;
+  })();
+
+  try {
+    return await craftedSpellRefreshPromise;
   } finally {
     craftedSpellRefreshPromise = null;
   }
+}
+
+export async function getCraftedSpellCatalog() {
+  const [cached, snapshot] = await Promise.all([
+    cacheGet<CraftedSpellCatalog>(craftedSpellCacheKey),
+    readCraftedSpellCatalogSnapshot()
+  ]);
+
+  const current = chooseFreshestCatalog(snapshot, cached);
+
+  if (current) {
+    const refreshBackoffElapsed = Date.now() - craftedSpellLastRefreshAttemptAt >= craftedSpellRefreshRetryBackoffMs;
+
+    if (isCraftedSpellCatalogStale(current) && refreshBackoffElapsed) {
+      void refreshCraftedSpellCatalog().catch(() => undefined);
+    }
+
+    return current;
+  }
+
+  return refreshCraftedSpellCatalog();
 }
 
 function craftedSpellRecipeSearchHref(recipe: CraftedSpellRecipe) {

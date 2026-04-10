@@ -14,6 +14,7 @@
     "compose:up": "docker compose up -d --build",
     "compose:down": "docker compose down",
     "compose:logs": "docker compose logs -f web caddy",
+    "sync:crafted-spells": "node scripts/sync-crafted-spells.mjs",
     "sync:npc-model-assets": "node scripts/sync-npc-model-assets.mjs",
     "sync:npc-model-assets:ai": "node scripts/upscale-npc-model-assets-ai.mjs",
     "typecheck": "npm run typecheck -w @eq-alla/data && npm run typecheck -w @eq-alla/ui && npm run typecheck -w @eq-alla/web",
