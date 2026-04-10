@@ -168,7 +168,7 @@ export type NpcDetail = NpcSummary & {
   sells: Array<{
     id: number;
     name: string;
-    href: string;
+    href?: string;
     icon: string;
     price: string;
     coinValue: { pp: number; gp: number; sp: number; cp: number } | null;

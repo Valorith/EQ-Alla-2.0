@@ -1119,6 +1119,65 @@ describe("catalog services", () => {
     expect(npc?.sells.some((entry) => entry.id === rows.rows[0].item_id)).toBe(false);
   }, 20_000);
 
+  it("includes enabled merchant inventory rows even when the item is not discovered", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{ npc_id: number; item_id: number }>`
+      select distinct nt.id as npc_id, ml.item as item_id
+      from npc_types nt
+      join merchantlist ml on ml.merchantid = nt.merchant_id
+      join spawnentry se on se.npcID = nt.id
+      join spawngroup sg on sg.id = se.spawngroupID
+      join spawn2 s2 on s2.spawngroupID = sg.id
+      left join spawn2_disabled s2d on s2d.spawn2_id = s2.id and coalesce(s2d.disabled, 0) <> 0
+      join zone z on z.short_name = s2.zone and coalesce(z.version, 0) = coalesce(s2.version, 0)
+      left join content_flags required_cf on required_cf.flag_name = ml.content_flags
+      left join content_flags disabled_cf on disabled_cf.flag_name = ml.content_flags_disabled
+      where nt.merchant_id > 0
+        and coalesce(nt.trackable, 0) = ${1}
+        and lower(trim(coalesce(nt.name, ''))) <> 'bazaar'
+        and s2d.spawn2_id is null
+        and coalesce(s2.version, 0) in (0, -1)
+        and coalesce(z.min_status, 0) <= ${1}
+        and coalesce(z.version, 0) = 0
+        and (coalesce(s2.content_flags, '') = '' or exists (
+          select 1
+          from content_flags spawn_required_cf
+          where spawn_required_cf.flag_name = s2.content_flags
+            and coalesce(spawn_required_cf.enabled, 0) <> 0
+        ))
+        and (coalesce(s2.content_flags_disabled, '') = '' or not exists (
+          select 1
+          from content_flags spawn_disabled_cf
+          where spawn_disabled_cf.flag_name = s2.content_flags_disabled
+            and coalesce(spawn_disabled_cf.enabled, 0) <> 0
+        ))
+        and coalesce(ml.min_status, 0) <= ${1}
+        and (coalesce(ml.content_flags, '') = '' or coalesce(required_cf.enabled, 0) <> 0)
+        and (coalesce(ml.content_flags_disabled, '') = '' or coalesce(disabled_cf.enabled, 0) = 0)
+        and not exists (
+          select 1
+          from discovered_items di
+          where di.item_id = ml.item
+            and coalesce(di.account_status, 0) <= 0
+        )
+      order by nt.id asc, ml.item asc
+      limit 1
+    `.execute(db!);
+
+    if (!rows.rows[0]) {
+      expect(rows.rows).toEqual([]);
+      return;
+    }
+
+    const npc = await getNpcDetail(rows.rows[0].npc_id);
+    const sellEntry = npc?.sells.find((entry) => entry.id === rows.rows[0].item_id);
+
+    expect(sellEntry).toBeTruthy();
+    expect(sellEntry?.href).toBeUndefined();
+  }, 20_000);
+
   it("matches canonical ingredient-only recipe usage rows", async () => {
     const db = getDb();
     expect(db).toBeTruthy();

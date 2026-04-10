@@ -2926,13 +2926,23 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
             icon: number;
             price: number;
             ldonprice: number;
+            is_discovered: number;
           }>`
-            select i.id, i.Name as name, i.icon, i.price, i.ldonprice
+            select i.id,
+                   i.Name as name,
+                   i.icon,
+                   i.price,
+                   i.ldonprice,
+                   exists (
+                     select 1
+                     from discovered_items di
+                     where di.item_id = i.id
+                       and coalesce(di.account_status, 0) <= 0
+                   ) as is_discovered
             from merchantlist ml
             join items i on i.id = ml.item
             where ml.merchantid = ${row.merchant_id}
               and ${sql.raw(merchantAvailabilityCondition("ml"))}
-              and ${discoveredItemClause("i.id")}
             order by ml.slot asc
           `.execute(db!)
         : Promise.resolve({
@@ -2942,6 +2952,7 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
             icon: number;
             price: number;
             ldonprice: number;
+            is_discovered: number;
           }>
         }),
       sql<{ short_name: string; long_name: string | null }>`
@@ -3078,7 +3089,7 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
       sells: sellRows.rows.map((entry) => ({
         id: entry.id,
         name: entry.name,
-        href: `/items/${entry.id}`,
+        href: Number(entry.is_discovered ?? 0) !== 0 ? `/items/${entry.id}` : undefined,
         icon: String(entry.icon ?? 0),
         price: row.class === 61 ? `${entry.ldonprice ?? 0} points` : formatCoinString(entry.price),
         coinValue: row.class === 61 ? null : formatCoinValue(entry.price)
