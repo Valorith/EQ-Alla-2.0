@@ -372,54 +372,51 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
   return (
     <>
       <SectionCard title="Filters" right={<p className="text-xs font-medium text-[#ccb594]">{statusLabel}</p>}>
-        <div className="grid gap-5">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-            <label className="grid gap-2 text-sm">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">Search For</span>
-              <Input
-                name="q"
-                type="search"
-                value={filters.q}
-                onChange={(event) => setFilter("q", event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    submitSearch();
-                  }
-                }}
-                placeholder="Flame"
-              />
-            </label>
-            <p className="pb-1 text-sm italic text-white/70">Searches name, description, and casting messages.</p>
-          </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <label className="grid gap-2 text-sm md:col-span-2">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">Search For</span>
+            <Input
+              name="q"
+              type="search"
+              value={filters.q}
+              onChange={(event) => setFilter("q", event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  submitSearch();
+                }
+              }}
+              placeholder="Name, description, or casting message..."
+            />
+          </label>
+          <SelectField label="Class" name="class" value={filters.className} onChange={(value) => setFilter("className", value)} options={spellClassOptions} />
+          <SelectField label="Level" name="level" value={filters.level} onChange={(value) => setFilter("level", value)} options={spellLevelOptions} />
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,220px)_minmax(0,220px)_1fr]">
-            <SelectField label="Class" name="class" value={filters.className} onChange={(value) => setFilter("className", value)} options={spellClassOptions} />
-            <SelectField label="Level" name="level" value={filters.level} onChange={(value) => setFilter("level", value)} options={spellLevelOptions} />
-            <fieldset className="grid gap-2 text-sm">
-              <legend className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">Level Match</legend>
-              <div className="flex flex-wrap gap-4 rounded-2xl border border-white/10 bg-black/15 px-4 py-3">
-                <label className="flex items-center gap-2 text-white/85">
-                  <input type="radio" name="levelMode" checked={filters.levelMode === "exact"} onChange={() => setFilter("levelMode", "exact")} />
-                  <span>Only</span>
-                </label>
-                <label className="flex items-center gap-2 text-white/85">
-                  <input type="radio" name="levelMode" checked={filters.levelMode === "min"} onChange={() => setFilter("levelMode", "min")} />
-                  <span>And Higher</span>
-                </label>
-                <label className="flex items-center gap-2 text-white/85">
-                  <input type="radio" name="levelMode" checked={filters.levelMode === "max"} onChange={() => setFilter("levelMode", "max")} />
-                  <span>And Lower</span>
-                </label>
-              </div>
-            </fieldset>
-          </div>
+          <fieldset className="grid gap-2 text-sm md:col-span-2">
+            <legend className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">Level Match</legend>
+            <div className="flex">
+              {([["exact", "Only"], ["min", "And Higher"], ["max", "And Lower"]] as const).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setFilter("levelMode", mode)}
+                  className={`flex-1 border border-white/10 px-4 py-2.5 text-sm font-medium transition first:rounded-l-xl last:rounded-r-xl ${
+                    filters.levelMode === mode
+                      ? "border-[var(--accent)] bg-[var(--accent)]/15 text-[#f5dfb8] shadow-[inset_0_1px_0_rgba(215,164,95,0.2)]"
+                      : "bg-black/15 text-white/60 hover:bg-white/5 hover:text-white/80"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
 
-          <div className="flex flex-wrap gap-3">
-            <Button type="button" onClick={submitSearch}>
+          <div className="flex items-end gap-3 md:col-span-2 xl:col-span-4">
+            <Button type="button" className="w-full sm:w-auto" onClick={submitSearch}>
               Search
             </Button>
-            <Button type="button" variant="outline" onClick={resetSearch}>
+            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={resetSearch}>
               Reset
             </Button>
           </div>

@@ -278,11 +278,11 @@ export function SelectField({
         defaultValue={value === undefined ? defaultValue : undefined}
         value={value}
         onChange={onChange ? (event) => onChange(event.target.value) : undefined}
-        className="h-11 rounded-xl border border-[var(--border-strong)] bg-white/94 px-4 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--accent)] focus:shadow-[0_0_0_4px_rgba(215,164,95,0.12)]"
+        className="h-11 rounded-xl border border-white/10 bg-black/25 px-4 text-sm text-[#e8dfcf] outline-none transition focus:border-[var(--accent)] focus:shadow-[0_0_0_4px_rgba(215,164,95,0.12)]"
       >
-        <option value="">Any</option>
+        <option value="" className="bg-[#1a1d23] text-[#e8dfcf]">Any</option>
         {options.map((option) => (
-          <option key={option} value={option}>
+          <option key={option} value={option} className="bg-[#1a1d23] text-[#e8dfcf]">
             {option}
           </option>
         ))}
