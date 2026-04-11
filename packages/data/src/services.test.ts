@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { sql } from "kysely";
 import {
+  bodyTypeNameMap,
   formatPlayableItemRaceMask,
   formatZoneEra,
   getCatalogStats,
@@ -142,6 +143,44 @@ describe("catalog services", () => {
       const item = await getItemDetail(sampleRows.rows[0].id);
       expect(item?.stats.some((entry) => entry.label === statColumn.label)).toBe(true);
     }
+  }, 20_000);
+
+  it("formats bane body damage with resolved body type names", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{ item_id: number; banedmgbody: number; banedmgamt: number }>`
+      select min(i.id) as item_id, i.banedmgbody, i.banedmgamt
+      from items i
+      where coalesce(i.banedmgamt, 0) <> 0
+        and coalesce(i.banedmgbody, 0) > 0
+        and exists (
+          select 1
+          from discovered_items di
+          where di.item_id = i.id
+            and coalesce(di.account_status, 0) <= 0
+        )
+      group by i.banedmgbody, i.banedmgamt
+      order by i.banedmgbody asc, min(i.id) asc
+      limit 1
+    `.execute(db!);
+
+    if (!rows.rows[0]) {
+      expect(rows.rows).toEqual([]);
+      return;
+    }
+
+    const row = rows.rows[0];
+    const expectedBodyTypeName = bodyTypeNameMap[row.banedmgbody];
+
+    expect(expectedBodyTypeName).toBeTruthy();
+
+    const item = await getItemDetail(row.item_id);
+    const baneDamage = item?.stats.find((entry) => entry.label === "Bane Damage");
+
+    expect(baneDamage).toBeTruthy();
+    expect(baneDamage?.value).toContain(`(${expectedBodyTypeName})`);
+    expect(baneDamage?.value).not.toContain(`Body Type ${row.banedmgbody}`);
   }, 20_000);
 
   it("formats skill modifiers with resolved skill names", async () => {

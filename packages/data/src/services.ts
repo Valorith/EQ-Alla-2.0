@@ -1,4 +1,5 @@
 import { cacheGetOrResolve } from "./cache";
+import { bodyTypeNameMap } from "./body-type-names";
 import { getCraftedSpellRecipeRefsForItem } from "./crafted-spells";
 import { getDb } from "./db";
 import { itemClassNames, itemSlotFlags } from "./item-search-filters";
@@ -372,7 +373,7 @@ function formatBaneBodyType(bodyType: number | null | undefined) {
     return undefined;
   }
 
-  return `Body Type ${normalized}`;
+  return bodyTypeNameMap[normalized] ?? `Body Type ${normalized}`;
 }
 
 function enabledContentFlagsCondition(
