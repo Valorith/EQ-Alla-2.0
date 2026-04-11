@@ -4,6 +4,7 @@ export * from "./crafted-spells";
 export * from "./item-search-filters";
 export * from "./item-types";
 export * from "./legacy-routes";
+export * from "./market";
 export * from "./race-names";
 export * from "./schema-capabilities";
 export * from "./services";

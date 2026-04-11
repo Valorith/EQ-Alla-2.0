@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getItemDetail } from "@eq-alla/data";
+import { getItemDetail, getItemMarketData } from "@eq-alla/data";
 import { ItemDetailPreview } from "../../../components/item-detail-preview";
+import { ItemMarketCard } from "../../../components/item-market-card";
 import { PaginatedRelatedSection } from "../../../components/paginated-related-section";
 
 type ItemDetailPageProps = {
@@ -156,14 +157,20 @@ function formatDropChance(value: number) {
 
 export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
   const { id } = await params;
-  const item = await getItemDetail(Number(id));
+  const itemId = Number(id);
+  const [item, market] = await Promise.all([getItemDetail(itemId), getItemMarketData(itemId)]);
 
   if (!item) notFound();
 
   return (
     <div className="w-full space-y-8 text-[#e6e0d2]">
-      <div className="flex w-full justify-center">
-        <ItemDetailPreview item={item} className="max-w-[650px]" />
+      <div className="mx-auto grid w-full max-w-[1320px] gap-4 xl:grid-cols-[minmax(280px,max-content)_minmax(420px,1fr)] xl:items-start xl:justify-center">
+        <div className="xl:justify-self-end">
+          <ItemDetailPreview item={item} className="max-w-[650px]" />
+        </div>
+        <div className="min-w-0">
+          <ItemMarketCard itemName={item.name} market={market} />
+        </div>
       </div>
 
       <div className="w-full space-y-6">

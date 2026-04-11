@@ -128,6 +128,10 @@ applyDatabaseUrlFallbacks();
 const envSchema = z.object({
   EQ_SITE_NAME: z.string().optional().default("EQ Alla 2.0"),
   EQ_SITE_URL: z.string().optional().default("http://localhost:3000"),
+  EQ_MARKET_API_BASE_URL: z
+    .string()
+    .optional()
+    .default("https://cw-raid-manager-server-production.up.railway.app/api/market/public"),
   EQ_DB_HOST: z.string().optional(),
   EQ_DB_PORT: z.string().optional().default("3306"),
   EQ_DB_NAME: z.string().optional(),

@@ -98,6 +98,102 @@ export type ItemDetail = ItemSummary & {
   usedInRecipes: Array<{ id: number; name: string; href: string }>;
 };
 
+export type ItemMarketHistoryStats = {
+  totalSales: number;
+  totalUnitsSold: number;
+  totalRevenue: number;
+  averagePrice: number;
+  minPrice: number;
+  maxPrice: number;
+  lastSoldAt?: string | null;
+};
+
+export type ItemMarketPricePoint = {
+  occurredAt: string;
+  price: number;
+  quantity: number;
+  totalCost: number;
+};
+
+export type ItemMarketDailyTrend = {
+  saleDate: string;
+  salesCount: number;
+  unitsSold: number;
+  averagePrice: number;
+  minPrice: number;
+  maxPrice: number;
+  totalRevenue: number;
+};
+
+export type ItemMarketRecentSale = {
+  id: string;
+  occurredAt: string;
+  itemId: number;
+  itemName: string;
+  itemIconId: number;
+  price: number;
+  quantity: number;
+  charges: number;
+  totalCost: number;
+  sellerCharacterId: number;
+  sellerCharacterName: string;
+  buyerCharacterId: number;
+  buyerCharacterName: string;
+  itemAveragePrice: number;
+};
+
+export type ItemMarketListing = {
+  sellerCharacterId: number;
+  sellerCharacterName: string;
+  itemId: number;
+  itemName: string;
+  itemIconId: number;
+  itemSlots: number;
+  itemAveragePrice: number;
+  price: number;
+  priceRank: number;
+  charges: number;
+  slotId: number;
+  listedAt: string;
+};
+
+export type ItemMarketData = {
+  itemId: number;
+  rangeDays: number;
+  hasMarketData: boolean;
+  hasSalesHistory: boolean;
+  hasActiveListings: boolean;
+  history: {
+    itemId: number;
+    itemName: string;
+    itemIconId: number;
+    rangeDays: number;
+    stats: ItemMarketHistoryStats;
+    pricePoints: ItemMarketPricePoint[];
+    dailyTrend: ItemMarketDailyTrend[];
+    recentSales: ItemMarketRecentSale[];
+  } | null;
+  listings: {
+    listings: ItemMarketListing[];
+    summary: {
+      totalListings: number;
+      distinctSellers: number;
+      distinctItems: number;
+      newestListingAt?: string | null;
+    };
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+    sourceAvailable: boolean;
+    message?: string | null;
+    syncStatus?: {
+      lastRetrievedAt?: string | null;
+    } | null;
+  } | null;
+  message?: string | null;
+};
+
 export type SpellSummary = {
   id: number;
   name: string;
