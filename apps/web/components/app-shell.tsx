@@ -239,7 +239,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const mainShellClassName = isHome
     ? "min-w-0 xl:col-[1/-1] xl:row-start-1 xl:self-start"
-    : "min-w-0 w-full rounded-[28px] border border-white/10 bg-black/20 p-3 backdrop-blur-sm xl:max-w-[1320px] xl:justify-self-center xl:self-start xl:p-4";
+    : "min-w-0 w-full rounded-[28px] border border-white/10 bg-black/20 p-3 backdrop-blur-sm xl:max-w-[1320px] xl:min-h-0 xl:justify-self-center xl:self-stretch xl:p-4";
+  const desktopGridClassName = isHome
+    ? "relative z-50 grid gap-4 xl:h-full xl:grid-cols-[290px_minmax(0,1fr)] xl:items-start xl:overflow-hidden"
+    : "relative z-50 grid gap-4 xl:h-full xl:grid-cols-[290px_minmax(0,1fr)] xl:items-stretch xl:overflow-hidden";
 
   const navGroups: NavGroup[] = [
     {
@@ -364,7 +367,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       ) : null}
 
       <div
-        className="relative z-50 grid gap-4 xl:h-full xl:grid-cols-[290px_minmax(0,1fr)] xl:items-start xl:overflow-hidden"
+        className={desktopGridClassName}
         onWheelCapture={routeWheelToMainScroll}
       >
         <header className="xl:hidden">
@@ -409,7 +412,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <aside className={isHome ? "hidden xl:block xl:h-full xl:col-start-1 xl:row-start-1 xl:relative xl:z-10" : "hidden xl:block xl:h-full"}>
+        <aside
+          className={
+            isHome ? "hidden xl:block xl:h-full xl:min-h-0 xl:col-start-1 xl:row-start-1 xl:relative xl:z-10" : "hidden xl:block xl:h-full xl:min-h-0"
+          }
+        >
           <div className="eq-sidebar-surface eq-shell-glow overflow-hidden rounded-[26px] border border-[var(--sidebar-border)] xl:h-full">
             <div className="eq-scroll-pane relative z-10 flex min-h-0 flex-col gap-6 p-5 text-[var(--sidebar-text)] xl:h-full xl:overflow-y-auto">
               <div className="space-y-4">
@@ -434,7 +441,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </aside>
 
-        <main ref={mainScrollRef} className={`eq-scroll-pane ${mainShellClassName} xl:h-full xl:overflow-y-auto xl:overscroll-contain`}>
+        <main ref={mainScrollRef} className={`eq-scroll-pane ${mainShellClassName} xl:min-h-0 xl:h-full xl:overflow-y-auto xl:overscroll-contain`}>
           <div className={isHome ? "flex min-w-0 flex-col" : "flex min-w-0 flex-col gap-4"}>{children}</div>
         </main>
       </div>
