@@ -3,5 +3,80 @@
     "npcId": 113457,
     "zoneShortName": "kael",
     "note": "Manual zone presence for scripted spawn"
+  },
+  {
+    "npcId": 93066,
+    "zoneShortName": "kerraridge",
+    "note": "Manual zone presence for scripted spawn"
+  },
+  {
+    "npcId": 13026,
+    "zoneShortName": "kerraridge",
+    "note": "Manual zone presence for scripted spawn"
+  },
+  {
+    "npcId": 13006,
+    "zoneShortName": "kerraridge",
+    "note": "Manual zone presence for scripted spawn"
+  },
+  {
+    "npcId": 13132,
+    "zoneShortName": "kerraridge",
+    "note": "Manual zone presence for scripted spawn"
+  },
+  {
+    "npcId": 126373,
+    "zoneShortName": "mischiefplane",
+    "note": "Manual zone presence for scripted spawn"
+  },
+  {
+    "npcId": 13200,
+    "zoneShortName": "northkarana",
+    "note": "Manual zone presence for scripted spawn"
+  },
+  {
+    "npcId": 13200,
+    "zoneShortName": "southkarana",
+    "note": "Manual zone presence for scripted spawn"
+  },
+  {
+    "npcId": 13200,
+    "zoneShortName": "eastkarana",
+    "note": "Manual zone presence for scripted spawn"
+  },
+  {
+    "npcId": 13200,
+    "zoneShortName": "qey2hh1",
+    "note": "Manual zone presence for scripted spawn"
+  },
+  {
+    "npcId": 13012,
+    "zoneShortName": "northkarana",
+    "note": "Manual zone presence for scripted spawn"
+  },
+  {
+    "npcId": 13012,
+    "zoneShortName": "southkarana",
+    "note": "Manual zone presence for scripted spawn"
+  },
+  {
+    "npcId": 13012,
+    "zoneShortName": "eastkarana",
+    "note": "Manual zone presence for scripted spawn"
+  },
+  {
+    "npcId": 13012,
+    "zoneShortName": "qey2hh1",
+    "note": "Manual zone presence for scripted spawn"
+  },
+  {
+    "npcId": 37012,
+    "zoneShortName": "oasis",
+    "note": "Manual zone presence for scripted spawn"
+  },
+  {
+    "npcId": 127098,
+    "zoneShortName": "growthplane",
+    "note": "Manual zone presence for scripted spawn"
   }
 ]

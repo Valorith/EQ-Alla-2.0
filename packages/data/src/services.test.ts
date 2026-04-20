@@ -549,6 +549,84 @@ describe("catalog services", () => {
     expect(npcs.some((entry) => entry.id === 113457)).toBe(true);
   });
 
+  it("surfaces manually overridden scripted NPCs across search, NPC detail, and zone pages", async () => {
+    const cases = [
+      {
+        id: 93066,
+        query: "Crakuawk the Stormbringer",
+        zoneShortNames: ["kerraridge"]
+      },
+      {
+        id: 13026,
+        query: "Fenris the Furious",
+        zoneShortNames: ["kerraridge"]
+      },
+      {
+        id: 13006,
+        query: "Gastaur the Cruel",
+        zoneShortNames: ["kerraridge"]
+      },
+      {
+        id: 13132,
+        query: "Tukkesk the Devourer",
+        zoneShortNames: ["kerraridge"]
+      },
+      {
+        id: 126373,
+        query: "Bristlebane the King of Thieves",
+        zoneShortNames: ["mischiefplane"]
+      },
+      {
+        id: 13200,
+        query: "Enraged Scarecrow",
+        zoneShortNames: ["eastkarana", "northkarana", "qey2hh1", "southkarana"]
+      },
+      {
+        id: 13012,
+        query: "Harbinger of Fear",
+        zoneShortNames: ["eastkarana", "northkarana", "qey2hh1", "southkarana"]
+      },
+      {
+        id: 37012,
+        query: "Cazel the Arisen",
+        zoneShortNames: ["oasis"]
+      },
+      {
+        id: 127098,
+        query: "Tunare",
+        zoneShortNames: ["growthplane"]
+      }
+    ] as const;
+
+    for (const sample of cases) {
+      const [npc, npcList, searchResults] = await Promise.all([
+        getNpcDetail(sample.id),
+        listNpcs({ q: sample.query }),
+        searchCatalog(sample.query)
+      ]);
+
+      expect(npc).toBeTruthy();
+      expect(npcList.some((entry) => entry.id === sample.id)).toBe(true);
+      expect(searchResults.some((entry) => entry.type === "npc" && entry.id === String(sample.id))).toBe(true);
+
+      const spawnZoneShortNames = npc?.spawnZones.map((entry) => entry.shortName).sort() ?? [];
+      const expectedZoneShortNames = [...sample.zoneShortNames].sort();
+
+      expect(spawnZoneShortNames).toEqual(expectedZoneShortNames);
+      expect(npc?.zone).not.toBe("Unknown");
+
+      const sampleDropId = npc?.drops.flatMap((group) => group.items.map((entry) => entry.id))[0];
+      expect(sampleDropId).toBeTruthy();
+
+      for (const zoneShortName of sample.zoneShortNames) {
+        const zone = await getZoneDetail(zoneShortName);
+
+        expect(zone?.bestiary.some((entry) => entry.id === sample.id)).toBe(true);
+        expect(zone?.itemDrops.some((entry) => entry.id === sampleDropId)).toBe(true);
+      }
+    }
+  }, 120_000);
+
   it("attributes mapped loot chest drops to the source NPC outside the content database", async () => {
     const db = getDb();
     expect(db).toBeTruthy();
