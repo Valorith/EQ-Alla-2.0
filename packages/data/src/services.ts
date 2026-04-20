@@ -653,6 +653,17 @@ function normalizeNumber(value?: number) {
   return Number.isFinite(value) ? Number(value) : undefined;
 }
 
+function parseExactNumericQueryId(value?: string) {
+  const normalized = normalizeText(value);
+
+  if (!normalized || !/^\d+$/.test(normalized)) {
+    return undefined;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isSafeInteger(parsed) ? parsed : undefined;
+}
+
 // In the EQEmu item schema used here, `nodrop = 0` means the item is no-drop
 // and `nodrop = 1` means it can be traded.
 function isTradeableItem(nodrop: number | null | undefined) {
@@ -750,7 +761,9 @@ function itemTypeMatchesFilter(itemType: string, filterType?: string) {
 }
 
 function itemMatchesFilters(item: ItemSummary, filters: ItemFilters) {
-  if (!includesFolded(item.name, filters.q)) return false;
+  const exactQueryId = parseExactNumericQueryId(filters.q);
+
+  if (!includesFolded(item.name, filters.q) && (exactQueryId === undefined || item.id !== exactQueryId)) return false;
   if (
     filters.classNames?.length &&
     !item.classes.includes("All") &&
@@ -2459,17 +2472,32 @@ async function fetchItemCandidateIds(filters: ItemFilters, limit: number) {
   }
 
   const clauses = [...buildItemFilterClauses(filters)];
+  const exactQueryId = parseExactNumericQueryId(filters.q);
 
   if (filters.q) {
-    clauses.push(sql`Name like ${like(filters.q)}`);
+    clauses.push(exactQueryId !== undefined ? sql`(Name like ${like(filters.q)} or i.id = ${exactQueryId})` : sql`Name like ${like(filters.q)}`);
   }
+
+  const orderByClauses = filters.q
+    ? [
+        ...(exactQueryId !== undefined ? [sql`case when i.id = ${exactQueryId} then 0 else 1 end`] : []),
+        sql`
+          case
+            when lower(Name) = ${filters.q.toLowerCase()} then 0
+            when lower(Name) like ${`${filters.q.toLowerCase()}%`} then 1
+            else 2
+          end
+        `,
+        sql`Name asc`
+      ]
+    : [sql`i.id asc`];
 
   const result = await sql<{ id: number }>`
     select i.id
     from items i
     where ${discoveredItemClause("i.id")}
       and ${sql.join(clauses, sql` and `)}
-    order by ${filters.q ? sql`Name asc` : sql`i.id asc`}
+    order by ${sql.join(orderByClauses, sql`, `)}
     limit ${limit}
   `.execute(db);
 
@@ -2498,9 +2526,19 @@ function rankItemSearchResults(items: ItemSummary[], query?: string) {
   }
 
   const loweredQuery = query.toLowerCase();
+  const exactQueryId = parseExactNumericQueryId(query);
 
   const ranked = [...items];
   ranked.sort((left, right) => {
+    if (exactQueryId !== undefined) {
+      const leftIdScore = left.id === exactQueryId ? 0 : 1;
+      const rightIdScore = right.id === exactQueryId ? 0 : 1;
+
+      if (leftIdScore !== rightIdScore) {
+        return leftIdScore - rightIdScore;
+      }
+    }
+
     const leftName = left.name.toLowerCase();
     const rightName = right.name.toLowerCase();
     const leftScore = leftName === loweredQuery ? 0 : leftName.startsWith(loweredQuery) ? 1 : 2;
@@ -2518,8 +2556,18 @@ function rankItemSearchResults(items: ItemSummary[], query?: string) {
 
 function sortSpellResults(results: SpellSummary[], filters: SpellFilters) {
   const sorted = [...results];
+  const exactQueryId = parseExactNumericQueryId(filters.q);
 
   sorted.sort((left, right) => {
+    if (exactQueryId !== undefined) {
+      const leftIdScore = left.id === exactQueryId ? 0 : 1;
+      const rightIdScore = right.id === exactQueryId ? 0 : 1;
+
+      if (leftIdScore !== rightIdScore) {
+        return leftIdScore - rightIdScore;
+      }
+    }
+
     if (filters.className && left.level !== right.level) {
       return left.level - right.level;
     }
@@ -2581,6 +2629,7 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
   requireDatabaseConnection();
   const key = `search:${query.toLowerCase()}`;
   const loweredQuery = query.toLowerCase();
+  const exactQueryId = parseExactNumericQueryId(query);
   const npcSearchPatterns = npcSearchTerms(query).map((term) => like(term));
 
   return cacheGetOrResolve(key, 60, async () => {
@@ -2589,8 +2638,9 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
         select id, Name as name, icon, itemclass, itemtype, slots, damage
         from items i
         where ${discoveredItemClause("i.id")}
-          and Name like ${like(query)}
+          and ${exactQueryId !== undefined ? sql`(Name like ${like(query)} or id = ${exactQueryId})` : sql`Name like ${like(query)}`}
         order by
+          ${exactQueryId !== undefined ? sql`case when id = ${exactQueryId} then 0 else 1 end,` : sql``}
           case
             when lower(Name) = ${loweredQuery} then 0
             when lower(Name) like ${`${loweredQuery}%`} then 1
@@ -2603,8 +2653,15 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
         select id, name, new_icon, skill, cast_on_you, classes1, classes2, classes3, classes4, classes5, classes6, classes7, classes8,
                classes9, classes10, classes11, classes12, classes13, classes14, classes15, classes16
         from spells_new
-        where name like ${like(query)}
-        order by name asc
+        where ${exactQueryId !== undefined ? sql`(name like ${like(query)} or id = ${exactQueryId})` : sql`name like ${like(query)}`}
+        order by
+          ${exactQueryId !== undefined ? sql`case when id = ${exactQueryId} then 0 else 1 end,` : sql``}
+          case
+            when lower(name) = ${loweredQuery} then 0
+            when lower(name) like ${`${loweredQuery}%`} then 1
+            else 2
+          end,
+          name asc
         limit ${catalogSearchTypeLimit}
       `.execute(db!),
       collectCatalogNpcHits(query, npcSearchPatterns),
@@ -3235,6 +3292,7 @@ export async function listSpells(filters: SpellFilters = {}) {
   return (async () => {
     const clauses = [];
     const classId = classIdFromName(filters.className);
+    const exactQueryId = parseExactNumericQueryId(filters.q);
 
     if (filters.q) {
       clauses.push(sql`
@@ -3244,6 +3302,7 @@ export async function listSpells(filters: SpellFilters = {}) {
           or cast_on_other like ${like(filters.q)}
           or you_cast like ${like(filters.q)}
           or spell_fades like ${like(filters.q)}
+          ${exactQueryId !== undefined ? sql`or id = ${exactQueryId}` : sql``}
         )
       `);
     }
@@ -3276,7 +3335,23 @@ export async function listSpells(filters: SpellFilters = {}) {
     }
 
     const whereClause = clauses.length > 0 ? sql`where ${sql.join(clauses, sql` and `)}` : sql``;
-    const orderByClause = classId > 0 ? sql`order by ${sql.raw(`classes${classId}`)} asc, name asc` : sql`order by name asc`;
+    const orderByClauses = [
+      ...(exactQueryId !== undefined ? [sql`case when id = ${exactQueryId} then 0 else 1 end`] : []),
+      ...(classId > 0 ? [sql`${sql.raw(`classes${classId}`)} asc`] : []),
+      ...(filters.q
+        ? [
+            sql`
+              case
+                when lower(name) = ${filters.q.toLowerCase()} then 0
+                when lower(name) like ${`${filters.q.toLowerCase()}%`} then 1
+                else 2
+              end
+            `
+          ]
+        : []),
+      sql`name asc`
+    ];
+    const orderByClause = sql`order by ${sql.join(orderByClauses, sql`, `)}`;
 
     const rows = await sql<Record<string, unknown>>`
       select id, name, new_icon, skill, effectid1, effectid2, effectid3, effectid4, effectid5, effectid6, effectid7, effectid8, effectid9, effectid10, effectid11, effectid12,

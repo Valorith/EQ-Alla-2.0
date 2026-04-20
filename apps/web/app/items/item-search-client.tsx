@@ -687,7 +687,7 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
               <SearchPrompt message="No items matched this search." />
             )
           ) : (
-            <SearchPrompt message="Enter an item name to load results." />
+            <SearchPrompt message="Enter an item name or ID to load results." />
           )}
 
           {isFetching && items.length > 0 ? (

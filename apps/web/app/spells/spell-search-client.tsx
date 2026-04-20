@@ -484,7 +484,7 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
               <SearchPrompt message="No spells matched this search." />
             )
           ) : (
-            <SearchPrompt message="Enter a spell name or browse by class and level." />
+            <SearchPrompt message="Enter a spell name or ID, or browse by class and level." />
           )}
 
           {isFetching && results.length > 0 ? (

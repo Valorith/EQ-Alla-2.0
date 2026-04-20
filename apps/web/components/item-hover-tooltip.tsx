@@ -191,7 +191,7 @@ export function ItemHoverTooltip() {
           throw new Error(`Failed to load item ${hoveredItem.id}`);
         }
 
-        if (controller.signal.aborted || !payload.data) {
+        if (controller.signal.aborted || !payload?.data) {
           return;
         }
 

@@ -1412,6 +1412,13 @@ describe("catalog services", () => {
     expect(spaced.map((item) => item.id)).toEqual(trimmed.map((item) => item.id));
   });
 
+  it("finds items by exact item id in the shared item search query", async () => {
+    const items = await listItems({ q: "1001" });
+
+    expect(items[0]?.id).toBe(1001);
+    expect(items.some((item) => item.id === 1001)).toBe(true);
+  });
+
   it("formats item race masks using only playable races", () => {
     expect(formatPlayableItemRaceMask(1 | 4 | 8)).toBe("Human, Erudite, Wood Elf");
     expect(formatPlayableItemRaceMask(512 | 4096 | 16384)).toBe("Ogre, Iksar, Froglok");
@@ -1612,6 +1619,13 @@ describe("catalog services", () => {
 
     expect(quicknessEffects).toContain("Increase Attack Speed by 20% (lvl 1) to 30% (lvl 60)");
     expect(burnoutEffects).toContain("Increase Attack Speed by 16% (lvl 1) to 60% (lvl 60)");
+  });
+
+  it("finds spells by exact spell id in the shared spell search query", async () => {
+    const spells = await listSpells({ q: "1275" });
+
+    expect(spells[0]?.id).toBe(1275);
+    expect(spells.some((spell) => spell.id === 1275)).toBe(true);
   });
 
   it("formats EQEmu-specific AE melee spell effects with a translated label", async () => {
@@ -1893,6 +1907,18 @@ describe("catalog services", () => {
 
   it("includes item-only spells in global search results", async () => {
     const hits = await searchCatalog("Aura of Blue Petals");
+    expect(hits.some((hit) => hit.type === "spell" && hit.href === "/spells/1275")).toBe(true);
+  });
+
+  it("finds items by exact item id in global search", async () => {
+    const hits = await searchCatalog("1001");
+
+    expect(hits.some((hit) => hit.type === "item" && hit.href === "/items/1001")).toBe(true);
+  });
+
+  it("finds spells by exact spell id in global search", async () => {
+    const hits = await searchCatalog("1275");
+
     expect(hits.some((hit) => hit.type === "spell" && hit.href === "/spells/1275")).toBe(true);
   });
 
