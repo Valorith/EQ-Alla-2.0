@@ -1511,6 +1511,14 @@ describe("catalog services", () => {
     expect(turgurEffects).toContain("Decrease Attack Speed by 15%");
   });
 
+  it("shows the peak scaled value for spell effects instead of the raw base amount", async () => {
+    const spell = await getSpellDetail(1275);
+    const effects = spell?.effects.map((entry) => entry.text) ?? [];
+
+    expect(effects).toContain("Increase Magic Resist by 50");
+    expect(effects).not.toContain("Increase Magic Resist by 10");
+  });
+
   it("formats EQEmu-specific AE melee spell effects with a translated label", async () => {
     const spell = await getSpellDetail(38106);
     const effects = spell?.effects.map((entry) => entry.text) ?? [];

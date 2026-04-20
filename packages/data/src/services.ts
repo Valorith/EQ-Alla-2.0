@@ -1246,6 +1246,200 @@ function normalizeStoredPercentModifier(value: number) {
   return normalized >= 1000 && normalized % 100 === 0 ? normalized / 100 : normalized;
 }
 
+const spellEffectServerMaxLevel = 100;
+
+function spellEffectMinimumLevel(row: Record<string, unknown>) {
+  let minimumLevel = Infinity;
+
+  for (let classId = 1; classId <= 16; classId += 1) {
+    const level = Number(row[`classes${classId}`] ?? 255);
+    if (level > 0 && level < 255 && level < minimumLevel) {
+      minimumLevel = level;
+    }
+  }
+
+  return Number.isFinite(minimumLevel) ? minimumLevel : 1;
+}
+
+function calculateSpellEffectValue(formula: number, base: number, max: number, tick: number, level: number) {
+  if (formula === 0) {
+    return base;
+  }
+
+  if (formula === 100) {
+    if (max > 0 && base > max) {
+      return max;
+    }
+    return base;
+  }
+
+  let change = 0;
+
+  switch (formula) {
+    case 101:
+      change = level / 2;
+      break;
+    case 102:
+      change = level;
+      break;
+    case 103:
+      change = level * 2;
+      break;
+    case 104:
+      change = level * 3;
+      break;
+    case 105:
+      change = level * 4;
+      break;
+    case 107:
+      change = -tick;
+      break;
+    case 108:
+      change = -2 * tick;
+      break;
+    case 109:
+      change = level / 4;
+      break;
+    case 110:
+      change = level / 6;
+      break;
+    case 111:
+      if (level > 16) change = (level - 16) * 6;
+      break;
+    case 112:
+      if (level > 24) change = (level - 24) * 8;
+      break;
+    case 113:
+      if (level > 34) change = (level - 34) * 10;
+      break;
+    case 114:
+      if (level > 44) change = (level - 44) * 15;
+      break;
+    case 115:
+      if (level > 15) change = (level - 15) * 7;
+      break;
+    case 116:
+      if (level > 24) change = (level - 24) * 10;
+      break;
+    case 117:
+      if (level > 34) change = (level - 34) * 13;
+      break;
+    case 118:
+      if (level > 44) change = (level - 44) * 20;
+      break;
+    case 119:
+      change = level / 8;
+      break;
+    case 120:
+      change = -5 * tick;
+      break;
+    case 121:
+      change = level / 3;
+      break;
+    case 122:
+      change = -12 * tick;
+      break;
+    case 123:
+      change = (Math.abs(max) - Math.abs(base)) / 2;
+      break;
+    case 124:
+      if (level > 50) change = level - 50;
+      break;
+    case 125:
+      if (level > 50) change = (level - 50) * 2;
+      break;
+    case 126:
+      if (level > 50) change = (level - 50) * 3;
+      break;
+    case 127:
+      if (level > 50) change = (level - 50) * 4;
+      break;
+    case 128:
+      if (level > 50) change = (level - 50) * 5;
+      break;
+    case 129:
+      if (level > 50) change = (level - 50) * 10;
+      break;
+    case 130:
+      if (level > 50) change = (level - 50) * 15;
+      break;
+    case 131:
+      if (level > 50) change = (level - 50) * 20;
+      break;
+    case 132:
+      if (level > 50) change = (level - 50) * 25;
+      break;
+    case 139:
+      if (level > 30) change = (level - 30) / 2;
+      break;
+    case 140:
+      if (level > 30) change = level - 30;
+      break;
+    case 141:
+      if (level > 30) change = (3 * (level - 30)) / 2;
+      break;
+    case 142:
+      if (level > 30) change = 2 * (level - 60);
+      break;
+    case 143:
+      change = (3 * level) / 4;
+      break;
+    case 3000:
+      return base;
+    default:
+      if (formula > 0 && formula < 1000) {
+        change = level * formula;
+      }
+
+      if (formula >= 1000 && formula < 2000) {
+        change = tick * (formula - 1000) * -1;
+      }
+
+      if (formula >= 2000 && formula < 3000) {
+        change = level * (formula - 2000);
+      }
+
+      if (formula >= 4000 && formula < 5000) {
+        change = -tick * (formula - 4000);
+      }
+      break;
+  }
+
+  let value = Math.abs(base) + change;
+
+  if (max !== 0 && value > Math.abs(max)) {
+    value = Math.abs(max);
+  }
+
+  if (base < 0) {
+    value = -value;
+  }
+
+  return Math.trunc(value);
+}
+
+function peakSpellEffectValue(row: Record<string, unknown>, slot: number) {
+  const base = Number(row[`effect_base_value${slot}`] ?? 0);
+  const max = Number(row[`max${slot}`] ?? 0);
+  const formula = Number(row[`formula${slot}`] ?? 100);
+  const minimumLevel = spellEffectMinimumLevel(row);
+
+  let peakValue = calculateSpellEffectValue(formula, base, max, 1, minimumLevel);
+
+  for (let level = minimumLevel + 1; level <= spellEffectServerMaxLevel; level += 1) {
+    const nextValue = calculateSpellEffectValue(formula, base, max, 1, level);
+    if (Math.abs(nextValue) > Math.abs(peakValue)) {
+      peakValue = nextValue;
+    }
+  }
+
+  return peakValue;
+}
+
+function formatPeakNumericSpellEffectLabel(row: Record<string, unknown>, slot: number, label: string, effectId?: number) {
+  return formatNumericEffectLabel(label, peakSpellEffectValue(row, slot), effectId);
+}
+
 function effectSpellIdFromValues(effectId: number, base: number, limit: number) {
   switch (effectId) {
     case 85:
@@ -1359,13 +1553,19 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, spe
     case 169:
     case 184:
     case 216:
-      return slotSkillName ? `${formatNumericEffectLabel(label, base, effectId)} with ${slotSkillName}` : formatNumericEffectLabel(label, base, effectId);
+      return slotSkillName
+        ? `${formatPeakNumericSpellEffectLabel(row, slot, label, effectId)} with ${slotSkillName}`
+        : formatPeakNumericSpellEffectLabel(row, slot, label, effectId);
     case 185:
     case 197:
     case 220:
-      return slotSkillName ? `${formatNumericEffectLabel(label, base, effectId)} for ${slotSkillName}` : formatNumericEffectLabel(label, base, effectId);
+      return slotSkillName
+        ? `${formatPeakNumericSpellEffectLabel(row, slot, label, effectId)} for ${slotSkillName}`
+        : formatPeakNumericSpellEffectLabel(row, slot, label, effectId);
     case 186:
-      return slotSkillName ? `${formatNumericEffectLabel(label, base, effectId)} for ${slotSkillName}` : formatNumericEffectLabel(label, base, effectId);
+      return slotSkillName
+        ? `${formatPeakNumericSpellEffectLabel(row, slot, label, effectId)} for ${slotSkillName}`
+        : formatPeakNumericSpellEffectLabel(row, slot, label, effectId);
     case 193:
       if (spellSkillName && base !== 0 && limit !== 0) {
         return `${spellSkillName} Attack for ${Math.abs(base)} with ${normalizeStoredPercentModifier(limit)}% Accuracy Mod`;
@@ -1380,14 +1580,18 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, spe
     case 227:
       return slotSkillName ? `${label} for ${slotSkillName} by ${formatMilliseconds(Math.abs(base))}` : `${label} by ${formatMilliseconds(Math.abs(base))}`;
     case 247:
-      return slotSkillName ? `${label} for ${slotSkillName} by ${Math.abs(base)}` : formatNumericEffectLabel(label, base, effectId);
+      return slotSkillName
+        ? `${resolveSpellEffectDirection(label, peakSpellEffectValue(row, slot), effectId)} for ${slotSkillName} by ${Math.abs(peakSpellEffectValue(row, slot))}`
+        : formatPeakNumericSpellEffectLabel(row, slot, label, effectId);
     case 268:
-      return slotSkillName ? `${formatNumericEffectLabel(label, base, effectId)} for ${slotSkillName}` : formatNumericEffectLabel(label, base, effectId);
+      return slotSkillName
+        ? `${formatPeakNumericSpellEffectLabel(row, slot, label, effectId)} for ${slotSkillName}`
+        : formatPeakNumericSpellEffectLabel(row, slot, label, effectId);
     case 211:
       return base !== 0 ? `${label} for ${formatSeconds(Math.abs(base) * 12)}` : label;
     default:
       if (base !== 0) {
-        return formatNumericEffectLabel(label, base, effectId);
+        return formatPeakNumericSpellEffectLabel(row, slot, label, effectId);
       }
       if (limit !== 0) {
         return `${label} (${limit})`;
