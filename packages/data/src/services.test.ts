@@ -1537,13 +1537,26 @@ describe("catalog services", () => {
     expect(spell?.effects.some((entry) => entry.text.includes("Effect 193"))).toBe(false);
   });
 
-  it("caps spell search results at level 60", async () => {
+  it("includes item-only spells in spell name searches", async () => {
+    const itemEffect = await listSpells({ q: "Aura of Blue Petals" });
+    const matchedSpell = itemEffect.find((spell) => spell.id === 1275);
+
+    expect(matchedSpell).toBeTruthy();
+    expect(matchedSpell?.className).toBe("NPC only");
+  });
+
+  it("returns higher-level player spells in spell name searches", async () => {
     const highLevelOnly = await listSpells({ q: "Agility of the Wrulan" });
+
+    expect(highLevelOnly.some((spell) => spell.id === 3378)).toBe(true);
+  });
+
+  it("keeps class-specific spell browse capped at level 60", async () => {
     const upperBand = await listSpells({ className: "Shaman", level: 60, levelMode: "min" });
 
-    expect(highLevelOnly.some((spell) => spell.id === 3378)).toBe(false);
     expect(upperBand.length).toBeGreaterThan(0);
     expect(upperBand.every((spell) => spell.level <= spellSearchLevelCap)).toBe(true);
+    expect(upperBand.some((spell) => spell.id === 3378)).toBe(false);
   });
 
   it("caps pet listings and pet detail routes at level 60", async () => {
@@ -1584,9 +1597,14 @@ describe("catalog services", () => {
     expect(hits.some((hit) => hit.type === "zone" && hit.href === "/zones/poknowledge")).toBe(false);
   });
 
-  it("excludes spells above level 60 from global search results", async () => {
+  it("includes higher-level player spells in global search results", async () => {
     const hits = await searchCatalog("Agility of the Wrulan");
-    expect(hits.some((hit) => hit.type === "spell" && hit.href === "/spells/3378")).toBe(false);
+    expect(hits.some((hit) => hit.type === "spell" && hit.href === "/spells/3378")).toBe(true);
+  });
+
+  it("includes item-only spells in global search results", async () => {
+    const hits = await searchCatalog("Aura of Blue Petals");
+    expect(hits.some((hit) => hit.type === "spell" && hit.href === "/spells/1275")).toBe(true);
   });
 
   it("returns populated search hits", async () => {

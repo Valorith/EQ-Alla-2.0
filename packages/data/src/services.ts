@@ -1992,10 +1992,6 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
   const npcSearchPatterns = npcSearchTerms(query).map((term) => like(term));
 
   return cacheGetOrResolve(key, 60, async () => {
-    const spellSearchClassClauses = classNames.map((_, index) => {
-      const classColumn = sql.raw(`classes${index + 1}`);
-      return sql`(${classColumn} > 0 and ${classColumn} < 255 and ${classColumn} <= ${spellSearchLevelCap})`;
-    });
     const [itemRows, spellRows, npcHits, zoneRows, factionRows, recipeRows] = await Promise.all([
       sql<{ id: number; name: string; icon: number; itemclass: number; itemtype: number; slots: number; damage: number }>`
         select id, Name as name, icon, itemclass, itemtype, slots, damage
@@ -2016,7 +2012,6 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
                classes9, classes10, classes11, classes12, classes13, classes14, classes15, classes16
         from spells_new
         where name like ${like(query)}
-          and (${sql.join(spellSearchClassClauses, sql` or `)})
         order by name asc
         limit ${catalogSearchTypeLimit}
       `.execute(db!),
@@ -2061,8 +2056,7 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
     }
 
     for (const row of spellRows.rows) {
-      const classes = spellClassesFromRow(row).filter((entry) => entry.level <= spellSearchLevelCap);
-      if (classes.length === 0) continue;
+      const classes = spellClassesFromRow(row);
       const primaryClass = classes[0];
       dbHits.push({
         id: String(row.id),
@@ -2070,7 +2064,7 @@ export async function searchCatalog(query: string): Promise<SearchHit[]> {
         title: String(row.name),
         href: `/spells/${row.id}`,
         subtitle: String(row.cast_on_you || `${formatSpellSkill(Number(row.skill ?? 0))} spell`),
-        tags: primaryClass ? [`${primaryClass.klass} ${primaryClass.level}`] : classes.slice(0, 3).map((entry) => entry.klass),
+        tags: primaryClass ? [`${primaryClass.klass} ${primaryClass.level}`] : ["NPC only"],
         icon: String(row.new_icon ?? 0)
       });
     }
@@ -2657,7 +2651,7 @@ export async function listSpells(filters: SpellFilters = {}) {
       });
 
       clauses.push(sql`(${sql.join(levelClauses, sql` or `)})`);
-    } else {
+    } else if (!filters.q) {
       const publicLevelClauses = classNames.map((_, index) => {
         const classColumn = sql.raw(`classes${index + 1}`);
         return sql`(${classColumn} > 0 and ${classColumn} < 255 and ${classColumn} <= ${spellSearchLevelCap})`;
@@ -2684,24 +2678,35 @@ export async function listSpells(filters: SpellFilters = {}) {
     const results = rows.rows
       .map((row) => {
         const classes = spellClassesFromRow(row);
+        const searchableClasses = classes.filter((entry) => entry.level <= spellSearchLevelCap);
+        const enforcePublicLevelCap = !filters.q || Boolean(filters.className || filters.level);
+        const visibleClasses = enforcePublicLevelCap ? searchableClasses : classes;
         const primaryClass =
-          classes.find((entry) => (filters.className ? includesFolded(entry.klass, filters.className) : true)) ?? classes[0];
+          visibleClasses.find((entry) => (filters.className ? includesFolded(entry.klass, filters.className) : true)) ?? visibleClasses[0];
+        const noPlayerClasses = classes.length === 0;
         return {
           id: Number(row.id),
           name: String(row.name),
           icon: String(row.new_icon ?? 0),
-          classes: classes.map((entry) => entry.klass),
-          className: primaryClass?.klass ?? "Unknown",
-          classLevel: primaryClass ? `${primaryClass.klass} ${primaryClass.level}` : "Unknown",
-          level: primaryClass?.level ?? Math.min(...classes.map((entry) => entry.level), 255),
+          classes: visibleClasses.map((entry) => entry.klass),
+          className: primaryClass?.klass ?? (noPlayerClasses ? "NPC only" : "Unknown"),
+          classLevel: primaryClass ? `${primaryClass.klass} ${primaryClass.level}` : noPlayerClasses ? "NPC only" : "Unknown",
+          level: primaryClass?.level ?? 0,
           skill: formatSpellSkill(Number(row.skill ?? 0)),
           effect: summarizeSpellEffects(row),
           mana: Number(row.mana ?? 0),
-          target: formatTarget(Number(row.targettype ?? 0))
+          target: formatTarget(Number(row.targettype ?? 0)),
+          _allClassCount: classes.length,
+          _visibleClassCount: visibleClasses.length,
+          _enforcePublicLevelCap: enforcePublicLevelCap
         };
       })
       .filter((spell) => {
-        if (spell.level > spellSearchLevelCap) return false;
+        if (spell._enforcePublicLevelCap) {
+          if (spell._visibleClassCount === 0) return false;
+          if (spell.level > spellSearchLevelCap) return false;
+        }
+
         if (filters.className && !spell.classes.some((klass) => includesFolded(klass, filters.className))) return false;
         if (filters.level) {
           if (filters.levelMode === "min" && spell.level < filters.level) return false;
@@ -2709,7 +2714,8 @@ export async function listSpells(filters: SpellFilters = {}) {
           else if ((!filters.levelMode || filters.levelMode === "exact") && spell.level !== filters.level) return false;
         }
         return true;
-      });
+      })
+      .map(({ _allClassCount: _discardedClassCount, _visibleClassCount: _discardedVisibleClassCount, _enforcePublicLevelCap: _discardedCapFlag, ...spell }) => spell);
     return sortSpellResults(results, filters);
   })();
 }

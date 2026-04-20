@@ -3,9 +3,9 @@
     "repositoryUrl": "https://github.com/Isaaru/cw-quests.git",
     "repositoryRef": "main",
     "scriptPath": "tutorial/Victoria.pl",
-    "fetchedAt": "2026-04-11T13:31:24.275Z",
+    "fetchedAt": "2026-04-20T01:04:01.104Z",
     "cacheTtlSeconds": 21600,
-    "fetchStrategy": "github-contents-api"
+    "fetchStrategy": "source-parse"
   },
   "glossary": [
     {
