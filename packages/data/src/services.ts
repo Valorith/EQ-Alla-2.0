@@ -14,7 +14,7 @@ import {
 } from "./loot-chest-npc-attribution";
 import { getManualNpcIdsForZone, getManualNpcZoneLinksByNpcId } from "./manual-npc-zone-overrides";
 import { formatPlayableItemRaceMask, raceNames } from "./race-names";
-import { getSpellEffectName, resolveSpellEffectDirection, summarizeSpellEffects } from "./spell-effects";
+import { getReferenceSpellEffectName, getSpellEffectName, resolveSpellEffectDirection, summarizeSpellEffects } from "./spell-effects";
 import { formatExpansion, formatZoneEra, getZoneEraLabels, listZoneEraDefinitions, matchesZoneEraFilter } from "./zone-eras";
 import { sql } from "kysely";
 import type {
@@ -898,6 +898,16 @@ function formatSpellSkill(skill: number | null | undefined) {
   return spellSkillNames[normalized] ?? eqEmuSkillTypeNames[normalized] ?? `Skill ${normalized}`;
 }
 
+function formatSpellClassMask(mask: number | null | undefined) {
+  const normalized = Math.abs(Number(mask ?? 0));
+  if (!Number.isFinite(normalized) || normalized <= 0) {
+    return undefined;
+  }
+
+  const matched = classNames.filter((_, index) => (normalized & (1 << index)) !== 0);
+  return matched.length > 0 ? matched.join(", ") : `Class ${normalized}`;
+}
+
 function formatEffectSkillName(skill: number | null | undefined) {
   const normalized = Number(skill ?? 0);
   if (!Number.isFinite(normalized) || normalized === 0) {
@@ -1162,6 +1172,10 @@ function formatMilliseconds(value: number | null | undefined) {
   return Number.isInteger(seconds) ? `${seconds} sec` : `${seconds.toFixed(1)} sec`;
 }
 
+function formatCompactNumber(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, "");
+}
+
 function calculateBuffDuration(level: number, formula: number, duration: number) {
   switch (formula) {
     case 0:
@@ -1234,6 +1248,36 @@ function formatNumericEffectLabel(label: string, value: number, effectId?: numbe
   return `${nextLabel} by ${Math.abs(value)}`;
 }
 
+function formatNumericEffectLevelRangeLabel(
+  label: string,
+  minimumValue: number,
+  maximumValue: number,
+  effectId?: number
+) {
+  if (minimumValue === maximumValue) {
+    return formatNumericEffectLabel(label, maximumValue, effectId);
+  }
+
+  const nextLabel = resolveSpellEffectDirection(label, maximumValue, effectId);
+
+  return `${nextLabel} by ${Math.abs(minimumValue)} (lvl 1) to ${Math.abs(maximumValue)} (lvl 60)`;
+}
+
+function formatPercentEffectLevelRangeLabel(
+  label: string,
+  minimumValue: number,
+  maximumValue: number,
+  effectId?: number
+) {
+  const nextLabel = resolveSpellEffectDirection(label, maximumValue, effectId);
+
+  if (minimumValue === maximumValue) {
+    return `${nextLabel} by ${Math.abs(maximumValue)}%`;
+  }
+
+  return `${nextLabel} by ${Math.abs(minimumValue)}% (lvl 1) to ${Math.abs(maximumValue)}% (lvl 60)`;
+}
+
 function formatLegacyPercentDeltaEffect(label: string, storedValue: number, effectId: number) {
   const nextLabel = resolveSpellEffectDirection(label, storedValue, effectId);
   const amount = Math.abs(storedValue - 100);
@@ -1241,24 +1285,93 @@ function formatLegacyPercentDeltaEffect(label: string, storedValue: number, effe
   return amount > 0 ? `${nextLabel} by ${amount}%` : nextLabel;
 }
 
+function formatLegacyPercentDeltaEffectLevelRange(
+  label: string,
+  minimumStoredValue: number,
+  maximumStoredValue: number,
+  effectId: number
+) {
+  if (minimumStoredValue === maximumStoredValue) {
+    return formatLegacyPercentDeltaEffect(label, maximumStoredValue, effectId);
+  }
+
+  const nextLabel = resolveSpellEffectDirection(label, maximumStoredValue, effectId);
+  const minimumAmount = Math.abs(minimumStoredValue - 100);
+  const maximumAmount = Math.abs(maximumStoredValue - 100);
+
+  return `${nextLabel} by ${minimumAmount}% (lvl 1) to ${maximumAmount}% (lvl 60)`;
+}
+
 function normalizeStoredPercentModifier(value: number) {
   const normalized = Math.abs(value);
   return normalized >= 1000 && normalized % 100 === 0 ? normalized / 100 : normalized;
 }
 
-const spellEffectServerMaxLevel = 100;
+type SpellEffectReferenceMaps = {
+  spellNames: Map<number, string>;
+  itemNames: Map<number, string>;
+  spellGroupNames: Map<number, string>;
+};
 
-function spellEffectMinimumLevel(row: Record<string, unknown>) {
-  let minimumLevel = Infinity;
+type PercentEffectMetadata = {
+  invert?: boolean;
+  name: string;
+};
 
-  for (let classId = 1; classId <= 16; classId += 1) {
-    const level = Number(row[`classes${classId}`] ?? 255);
-    if (level > 0 && level < 255 && level < minimumLevel) {
-      minimumLevel = level;
-    }
+const percentEffectMetadataById: Record<number, PercentEffectMetadata> = {
+  124: { name: "Spell Damage" },
+  125: { name: "Spell Healing" },
+  126: { invert: true, name: "Spell Resist Rate" },
+  127: { name: "Spell Haste" },
+  128: { name: "Spell Duration" },
+  129: { name: "Spell Range" },
+  130: { name: "Spell and Bash Hate" },
+  131: { invert: true, name: "Chance of Using Reagent" },
+  132: { invert: true, name: "Spell Mana Cost" },
+  133: { name: "Spell Stun Duration" },
+  393: { name: "Healing Received" },
+  395: { name: "Healing Received" },
+  461: { name: "Spell Damage" },
+  483: { name: "Spell Damage Taken" },
+  500: { name: "Spell Haste" },
+  507: { name: "Spell Power" }
+};
+
+const spellEffectDisplayMinimumLevel = 1;
+const spellEffectDisplayMaximumLevel = 60;
+
+function isPlaceholderSpellEffect(effectId: number, base: number, formula: number) {
+  return effectId === 10 && base === 0 && formula === 100;
+}
+
+function formatPercentRangeEffect(effectId: number, base: number, limit: number) {
+  const metadata = percentEffectMetadataById[effectId];
+  if (!metadata) {
+    return undefined;
   }
 
-  return Number.isFinite(minimumLevel) ? minimumLevel : 1;
+  const normalizeValue = (value: number) => (metadata.invert ? -value : value);
+
+  if (limit === 0) {
+    const value = normalizeValue(base);
+    const direction = value < 0 ? "Decrease" : "Increase";
+    return `${direction} ${metadata.name} by ${Math.abs(value)}%`;
+  }
+
+  let minimum = normalizeValue(base);
+  let maximum = normalizeValue(limit);
+
+  if ((minimum < 0 && minimum < maximum) || (minimum > 0 && minimum > maximum)) {
+    [minimum, maximum] = [maximum, minimum];
+  }
+
+  const direction = maximum < 0 ? "Decrease" : "Increase";
+
+  if (minimum === maximum || maximum === 0) {
+    return `${direction} ${metadata.name} by ${Math.abs(minimum)}%`;
+  }
+
+  return `${direction} ${metadata.name} by ${Math.abs(minimum)}% to ${Math.abs(maximum)}%`;
 }
 
 function calculateSpellEffectValue(formula: number, base: number, max: number, tick: number, level: number) {
@@ -1418,32 +1531,36 @@ function calculateSpellEffectValue(formula: number, base: number, max: number, t
   return Math.trunc(value);
 }
 
-function peakSpellEffectValue(row: Record<string, unknown>, slot: number) {
+function spellEffectValueRange(row: Record<string, unknown>, slot: number) {
   const base = Number(row[`effect_base_value${slot}`] ?? 0);
   const max = Number(row[`max${slot}`] ?? 0);
   const formula = Number(row[`formula${slot}`] ?? 100);
-  const minimumLevel = spellEffectMinimumLevel(row);
+  const minimumValue = calculateSpellEffectValue(formula, base, max, 1, spellEffectDisplayMinimumLevel);
+  const maximumValue = calculateSpellEffectValue(formula, base, max, 1, spellEffectDisplayMaximumLevel);
 
-  let peakValue = calculateSpellEffectValue(formula, base, max, 1, minimumLevel);
-
-  for (let level = minimumLevel + 1; level <= spellEffectServerMaxLevel; level += 1) {
-    const nextValue = calculateSpellEffectValue(formula, base, max, 1, level);
-    if (Math.abs(nextValue) > Math.abs(peakValue)) {
-      peakValue = nextValue;
-    }
-  }
-
-  return peakValue;
+  return {
+    maximumValue,
+    minimumValue
+  };
 }
 
-function formatPeakNumericSpellEffectLabel(row: Record<string, unknown>, slot: number, label: string, effectId?: number) {
-  return formatNumericEffectLabel(label, peakSpellEffectValue(row, slot), effectId);
+function formatScaledNumericSpellEffectLabel(row: Record<string, unknown>, slot: number, label: string, effectId?: number) {
+  const { minimumValue, maximumValue } = spellEffectValueRange(row, slot);
+
+  return formatNumericEffectLevelRangeLabel(label, minimumValue, maximumValue, effectId);
+}
+
+function formatScaledPercentSpellEffectLabel(row: Record<string, unknown>, slot: number, label: string, effectId?: number) {
+  const { minimumValue, maximumValue } = spellEffectValueRange(row, slot);
+
+  return formatPercentEffectLevelRangeLabel(label, minimumValue, maximumValue, effectId);
 }
 
 function effectSpellIdFromValues(effectId: number, base: number, limit: number) {
   switch (effectId) {
     case 85:
     case 139:
+    case 201:
     case 289:
     case 323:
     case 333:
@@ -1451,6 +1568,15 @@ function effectSpellIdFromValues(effectId: number, base: number, limit: number) 
     case 377:
     case 386:
     case 387:
+    case 406:
+    case 407:
+    case 419:
+    case 427:
+    case 429:
+    case 442:
+    case 443:
+    case 453:
+    case 454:
       return Math.abs(base);
     case 339:
     case 340:
@@ -1459,7 +1585,29 @@ function effectSpellIdFromValues(effectId: number, base: number, limit: number) 
     case 365:
     case 374:
     case 383:
+    case 475:
+    case 476:
+    case 481:
       return Math.abs(limit);
+    default:
+      return 0;
+  }
+}
+
+function effectItemIdFromValues(effectId: number, base: number) {
+  switch (effectId) {
+    case 32:
+    case 109:
+      return Math.abs(base);
+    default:
+      return 0;
+  }
+}
+
+function effectSpellGroupIdFromValues(effectId: number, base: number) {
+  switch (effectId) {
+    case 385:
+      return Math.abs(base);
     default:
       return 0;
   }
@@ -1473,9 +1621,35 @@ function formatReferencedSpell(spellId: number, spellNames: Map<number, string>)
   return spellNames.get(spellId) ?? `Spell ${spellId}`;
 }
 
-function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, spellNames: Map<number, string> = new Map()) {
+function formatReferencedItem(itemId: number, itemNames: Map<number, string>) {
+  if (itemId <= 0) {
+    return "";
+  }
+
+  return itemNames.get(itemId) ?? `Item ${itemId}`;
+}
+
+function formatReferencedSpellGroup(spellGroupId: number, spellGroupNames: Map<number, string>) {
+  if (spellGroupId <= 0) {
+    return "";
+  }
+
+  return spellGroupNames.get(spellGroupId) ?? `Spell Group ${spellGroupId}`;
+}
+
+function stackingCheckSlot(limit: number, formula: number) {
+  const explicitSlot = Math.abs(limit);
+  if (explicitSlot > 0) {
+    return explicitSlot;
+  }
+
+  const derivedSlot = Math.abs(formula) % 100;
+  return derivedSlot > 0 ? derivedSlot : undefined;
+}
+
+function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, references: Partial<SpellEffectReferenceMaps> = {}) {
   const effectId = Number(row[`effectid${slot}`] ?? 254);
-  if (!Number.isFinite(effectId) || effectId < 0 || effectId === 10 || effectId === 254) {
+  if (!Number.isFinite(effectId) || effectId < 0 || effectId === 254) {
     return undefined;
   }
 
@@ -1483,22 +1657,37 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, spe
   const base = Number(row[`effect_base_value${slot}`] ?? 0);
   const limit = Number(row[`effect_limit_value${slot}`] ?? 0);
   const max = Number(row[`max${slot}`] ?? 0);
+  const formula = Number(row[`formula${slot}`] ?? 100);
+  if (isPlaceholderSpellEffect(effectId, base, formula)) {
+    return undefined;
+  }
+
   const teleportZone = normalizeText(String(row.teleport_zone ?? "")) ?? "";
   const spellId = effectSpellIdFromValues(effectId, base, limit);
-  const referencedSpell = formatReferencedSpell(spellId, spellNames);
+  const itemId = effectItemIdFromValues(effectId, base);
+  const spellGroupId = effectSpellGroupIdFromValues(effectId, base);
+  const referencedSpell = formatReferencedSpell(spellId, references.spellNames ?? new Map());
+  const referencedItem = formatReferencedItem(itemId, references.itemNames ?? new Map());
+  const referencedSpellGroup = formatReferencedSpellGroup(spellGroupId, references.spellGroupNames ?? new Map());
   const slotSkillName = formatEffectSkillName(limit);
   const spellSkillName = formatEffectSkillName(Number(row.skill ?? 0));
+  const percentRangeText = formatPercentRangeEffect(effectId, base, limit);
 
   switch (effectId) {
     case 11:
-    case 89:
-      return formatLegacyPercentDeltaEffect(label, base, effectId);
+    case 89: {
+      const { minimumValue, maximumValue } = spellEffectValueRange(row, slot);
+      return formatLegacyPercentDeltaEffectLevelRange(label, minimumValue, maximumValue, effectId);
+    }
     case 21:
       return `${label} (${Math.abs(base) / 1000} sec)`;
     case 22:
     case 23:
     case 31:
       return max > 0 ? `${label} up to level ${max}` : label;
+    case 32:
+    case 109:
+      return itemId > 0 ? `${label} ${referencedItem}${max > 1 ? ` (Stacks: ${max})` : ""}` : label;
     case 33:
     case 71:
     case 106:
@@ -1506,8 +1695,12 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, spe
     case 113:
     case 152:
       return teleportZone ? `${label} ${teleportZone}` : label;
+    case 58:
+      return base !== 0 ? `${label} ${formatRace(Math.abs(base))}` : label;
     case 81:
       return base !== 0 ? `${label} and restore ${Math.abs(base)}% experience` : label;
+    case 84:
+      return label;
     case 83:
     case 88:
     case 145:
@@ -1518,8 +1711,41 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, spe
       return spellId > 0
         ? `${label} ${referencedSpell}${limit !== 0 ? ` (rate modifier ${Math.abs(limit)})` : ""}`
         : label;
+    case 201:
+      return spellId > 0 ? `Add Range Proc ${referencedSpell}${limit !== 0 ? ` with ${Math.abs(limit)}% Rate Mod` : ""}` : label;
+    case 124:
+    case 125:
+    case 126:
+    case 127:
+    case 128:
+    case 129:
+    case 130:
+    case 131:
+    case 132:
+    case 133:
+    case 393:
+    case 395:
+    case 461:
+    case 483:
+    case 500:
+    case 507:
+      return percentRangeText ?? label;
+    case 134:
+      return `Limit: Max Level ${Math.abs(base)}${Math.abs(limit) > 0 ? ` (lose ${Math.abs(limit)}% per level)` : ""}`;
+    case 135:
+      return `Limit: Resist (${base < 0 ? "Exclude " : ""}${formatResist(Math.abs(base))})`;
     case 333:
       return spellId > 0 ? `${label} ${referencedSpell}` : label;
+    case 334: {
+      const { minimumValue, maximumValue } = spellEffectValueRange(row, slot);
+      return minimumValue === maximumValue
+        ? `Decrease Current HP by ${Math.abs(maximumValue)}% (If Target Not Moving)`
+        : `Decrease Current HP by ${Math.abs(minimumValue)}% (lvl 1) to ${Math.abs(maximumValue)}% (lvl 60) (If Target Not Moving)`;
+    }
+    case 137:
+      return `Limit: Effect (${base < 0 ? "Exclude " : ""}${getReferenceSpellEffectName(Math.abs(base))})`;
+    case 138:
+      return `Limit: Spell Type (${base ? "Beneficial" : "Detrimental"})`;
     case 339:
     case 340:
     case 360:
@@ -1550,22 +1776,34 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, spe
       return spellId > 0 ? `${label} ${referencedSpell}` : label;
     case 140:
       return Math.abs(base) > 0 ? `${label} (${Math.abs(base) * 6} sec)` : label;
+    case 141:
+      return `Limit: Duration Type (${base ? "Instant spells only" : "Duration spells only"})`;
+    case 160:
+      return `Intoxicate if Tolerance under ${Math.abs(base)}`;
+    case 163:
+      return `Absorb ${Math.abs(base)} Hits or Spells ${Math.abs(base)}%${max > 0 ? `, Max Per Hit ${Math.abs(max)}` : ""}`;
+    case 210:
+      return `Pet Shielding for ${Math.abs(base) * 12} sec${limit !== 0 ? ` (Owner Mitigation: ${Math.abs(limit)}%)` : ""}${max !== 0 ? ` (Pet Mitigation: ${Math.abs(max)}%)` : ""}`;
+    case 214:
+      return `${base < 0 ? "Decrease" : "Increase"} Max HP by ${formatCompactNumber(Math.abs(base) / 100)}%`;
     case 169:
     case 184:
     case 216:
       return slotSkillName
-        ? `${formatPeakNumericSpellEffectLabel(row, slot, label, effectId)} with ${slotSkillName}`
-        : formatPeakNumericSpellEffectLabel(row, slot, label, effectId);
+        ? `${formatScaledNumericSpellEffectLabel(row, slot, label, effectId)} with ${slotSkillName}`
+        : formatScaledNumericSpellEffectLabel(row, slot, label, effectId);
     case 185:
     case 197:
     case 220:
       return slotSkillName
-        ? `${formatPeakNumericSpellEffectLabel(row, slot, label, effectId)} for ${slotSkillName}`
-        : formatPeakNumericSpellEffectLabel(row, slot, label, effectId);
+        ? `${formatScaledNumericSpellEffectLabel(row, slot, label, effectId)} for ${slotSkillName}`
+        : formatScaledNumericSpellEffectLabel(row, slot, label, effectId);
     case 186:
       return slotSkillName
-        ? `${formatPeakNumericSpellEffectLabel(row, slot, label, effectId)} for ${slotSkillName}`
-        : formatPeakNumericSpellEffectLabel(row, slot, label, effectId);
+        ? `${formatScaledNumericSpellEffectLabel(row, slot, label, effectId)} for ${slotSkillName}`
+        : formatScaledNumericSpellEffectLabel(row, slot, label, effectId);
+    case 225:
+      return `${formatScaledPercentSpellEffectLabel(row, slot, label, effectId)} (Additive)`;
     case 193:
       if (spellSkillName && base !== 0 && limit !== 0) {
         return `${spellSkillName} Attack for ${Math.abs(base)} with ${normalizeStoredPercentModifier(limit)}% Accuracy Mod`;
@@ -1581,17 +1819,123 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, spe
       return slotSkillName ? `${label} for ${slotSkillName} by ${formatMilliseconds(Math.abs(base))}` : `${label} by ${formatMilliseconds(Math.abs(base))}`;
     case 247:
       return slotSkillName
-        ? `${resolveSpellEffectDirection(label, peakSpellEffectValue(row, slot), effectId)} for ${slotSkillName} by ${Math.abs(peakSpellEffectValue(row, slot))}`
-        : formatPeakNumericSpellEffectLabel(row, slot, label, effectId);
+        ? `${formatScaledNumericSpellEffectLabel(row, slot, label, effectId)} for ${slotSkillName}`
+        : formatScaledNumericSpellEffectLabel(row, slot, label, effectId);
     case 268:
       return slotSkillName
-        ? `${formatPeakNumericSpellEffectLabel(row, slot, label, effectId)} for ${slotSkillName}`
-        : formatPeakNumericSpellEffectLabel(row, slot, label, effectId);
+        ? `${formatScaledNumericSpellEffectLabel(row, slot, label, effectId)} for ${slotSkillName}`
+        : formatScaledNumericSpellEffectLabel(row, slot, label, effectId);
+    case 259:
+      return `${base < 0 ? "Decrease" : "Increase"} AC Soft Cap by ${Math.abs(base)}%`;
+    case 272:
+      return formatScaledNumericSpellEffectLabel(row, slot, label, effectId);
+    case 274:
+    case 319:
+      return formatScaledPercentSpellEffectLabel(row, slot, label, effectId);
+    case 300:
+      return teleportZone ? `${label} ${teleportZone}` : label;
+    case 305:
+      return `${base < 0 ? "Decrease" : "Increase"} Offhand Damage Shield Taken by ${Math.abs(base)}%`;
+    case 306:
+      return teleportZone
+        ? `Wake the Dead: ${teleportZone} x ${Math.abs(base)}${max > 0 ? ` for ${Math.abs(max)} sec` : ""}`
+        : `Wake the Dead x ${Math.abs(base)}${max > 0 ? ` for ${Math.abs(max)} sec` : ""}`;
+    case 328:
+      return `${base < 0 ? "Decrease" : "Increase"} ${label} by ${Math.abs(base)}`;
+    case 311:
+      return `Limit: Combat Skills (${base === 1 ? "Allowed only" : "Not allowed"})`;
+    case 329:
+      return `Absorb Damage using Mana: ${Math.abs(base)}%`;
+    case 348:
+      return `Limit: Min Mana Cost ${Math.abs(base)}`;
+    case 350:
+      return `Manaburn: Consumes up to ${Math.abs(base)} mana to deal ${Math.abs(limit)}% of that mana as direct damage`;
+    case 353:
+      return `${base < 0 ? "Decrease" : "Increase"} Aura Count by ${Math.abs(base)}`;
+    case 368:
+      return `Modify Faction ${Math.abs(base)}${limit !== 0 ? ` by ${Math.abs(limit)}` : ""}`;
+    case 385:
+      return spellGroupId > 0 ? `Limit: Spell Group (${referencedSpellGroup})` : label;
+    case 391:
+      return `Limit: Max Mana Cost ${Math.abs(base)}`;
+    case 400: {
+      const hpPerMana = Math.abs(limit) / 10;
+      const normalizedHpPerMana = Number.isInteger(hpPerMana) ? String(hpPerMana) : hpPerMana.toFixed(1);
+      return `Increase Group Current HP by up to ${Math.abs(Math.floor((base * limit) / 10))} (${normalizedHpPerMana} HP per 1 Mana Drained)`;
+    }
+    case 401: {
+      const hpPerMana = Math.abs(limit) / 10;
+      const normalizedHpPerMana = Number.isInteger(hpPerMana) ? String(hpPerMana) : hpPerMana.toFixed(1);
+      return `Decrease Current HP by up to ${Math.abs(Math.floor((base * limit) / 10))} and Drain up to ${Math.abs(base)} mana (${normalizedHpPerMana} HP per 1 Target Mana Drained)`;
+    }
+    case 403:
+      return `Limit: Spell Class (ID ${Math.abs(base)})`;
+    case 406:
+      return spellId > 0 ? `Cast ${referencedSpell} if Max Hits Used` : label;
+    case 407:
+      return spellId > 0 ? `Cast ${referencedSpell} on Focus Limit Match` : label;
+    case 411: {
+      const classMask = formatSpellClassMask(base);
+      return classMask ? `Limit: Class (${base < 0 ? "Exclude " : ""}${classMask})` : label;
+    }
+    case 417:
+      return `${base < 0 ? "Decrease" : "Increase"} Current Mana by ${Math.abs(base)}`;
+    case 418:
+      return `${slotSkillName ? `Increase ${slotSkillName} Damage Bonus` : "Increase Damage Bonus"} by ${Math.abs(base)}`;
+    case 419:
+      return spellId > 0 ? `Add Melee Proc ${referencedSpell}${limit !== 0 ? ` with ${Math.abs(limit)}% Rate Mod` : ""}` : label;
+    case 427:
+      return spellId > 0 ? `Add Skill Proc ${referencedSpell}${limit !== 0 ? ` with ${Math.abs(limit)}% Rate Mod` : ""}` : label;
+    case 429:
+      return spellId > 0 ? `Add Skill Proc on Successful Hit ${referencedSpell}${limit !== 0 ? ` with ${Math.abs(limit)}% Rate Mod` : ""}` : label;
+    case 430:
+      return `Alter Vision: Base1=${base} Base2=${limit} Max=${max}`;
+    case 431:
+      if (base < 0) {
+        return `Tint Vision: Red=${(base >>> 16) & 0xff} Green=${(base >>> 8) & 0xff} Blue=${base & 0xff}`;
+      }
+      return `Alter Vision: Base1=${base} Base2=${limit} Max=${max}`;
+    case 442:
+      return spellId > 0 ? `Cast ${referencedSpell} once if target restriction ${Math.abs(limit)}` : label;
+    case 443:
+      return spellId > 0 ? `Cast ${referencedSpell} once if caster restriction ${Math.abs(limit)}` : label;
+    case 444:
+      return `Lock Aggro on Caster and ${limit < 100 ? "Decrease" : "Increase"} Other Aggro by ${Math.abs(limit - 100)}%${base > 0 ? ` up to level ${Math.abs(base)}` : ""}`;
+    case 450:
+      return `Absorb DoT Damage: ${Math.abs(base)}%${limit > 0 ? ` Max Per Hit ${Math.abs(limit)}` : ""}${max > 0 ? ` Total ${Math.abs(max)}` : ""}`;
+    case 453:
+      return spellId > 0 ? `Cast ${referencedSpell} if ${Math.abs(limit)} melee damage is taken in a single hit` : label;
+    case 454:
+      return spellId > 0 ? `Cast ${referencedSpell} if ${Math.abs(limit)} spell damage is taken in a single hit` : label;
+    case 457: {
+      const resourceName = limit === 1 ? "Mana" : limit === 2 ? "Endurance" : "HP";
+      const percentReturned = Math.abs(base) / 10;
+      return `Return ${percentReturned}% of Spell Damage as ${resourceName}${max > 0 ? ` (max per hit ${Math.abs(max)})` : ""}`;
+    }
+    case 370:
+      return formatScaledNumericSpellEffectLabel(row, slot, label, effectId);
+    case 476:
+      return spellId > 0
+        ? `Weapon Stance: Apply ${referencedSpell} when using ${base === 0 ? "2H weapons" : base === 1 ? "shields" : base === 2 ? "dual wield" : `stance ${base}`}`
+        : label;
+    case 526:
+      return `${base < 0 ? "Decrease" : "Increase"} Current Endurance by ${Math.abs(base)}%${max > 0 ? ` up to ${Math.abs(max)}` : ""}`;
+    case 148:
+    case 149: {
+      const checkedSlot = stackingCheckSlot(limit, formula);
+      const checkedEffect = getReferenceSpellEffectName(Math.abs(base));
+
+      if (!checkedSlot) {
+        return label;
+      }
+
+      return `${label} if slot ${checkedSlot} is ${checkedEffect}${max !== 0 ? ` and less than ${Math.abs(max)}` : ""}`;
+    }
     case 211:
       return base !== 0 ? `${label} for ${formatSeconds(Math.abs(base) * 12)}` : label;
     default:
       if (base !== 0) {
-        return formatPeakNumericSpellEffectLabel(row, slot, label, effectId);
+        return formatScaledNumericSpellEffectLabel(row, slot, label, effectId);
       }
       if (limit !== 0) {
         return `${label} (${limit})`;
@@ -1603,12 +1947,12 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, spe
   }
 }
 
-function describeSpellEffects(row: Record<string, unknown>, spellNames: Map<number, string> = new Map()) {
+function describeSpellEffects(row: Record<string, unknown>, references: Partial<SpellEffectReferenceMaps> = {}) {
   const effects: Array<{ slots: number[]; text: string }> = [];
   const dedupedByText = new Map<string, { slots: number[]; text: string }>();
 
   for (let slot = 1; slot <= 12; slot += 1) {
-    const text = describeSpellEffectSlot(row, slot, spellNames);
+    const text = describeSpellEffectSlot(row, slot, references);
     if (text) {
       const existing = dedupedByText.get(text);
       if (existing) {
@@ -2001,6 +2345,49 @@ async function spellNamesById(ids: number[]) {
   `.execute(db);
 
   return new Map(rows.rows.map((row) => [row.id, row.name]));
+}
+
+async function itemNamesById(ids: number[]) {
+  if (!db || ids.length === 0) {
+    return new Map<number, string>();
+  }
+
+  const uniqueIds = [...new Set(ids.filter((id) => id > 0))];
+  if (uniqueIds.length === 0) {
+    return new Map<number, string>();
+  }
+
+  const rows = await sql<{ id: number; name: string }>`
+    select id, Name as name
+    from items
+    where id in (${sql.join(uniqueIds)})
+  `.execute(db);
+
+  return new Map(rows.rows.map((row) => [row.id, row.name]));
+}
+
+async function spellGroupNamesById(ids: number[]) {
+  if (!db || ids.length === 0) {
+    return new Map<number, string>();
+  }
+
+  const uniqueIds = [...new Set(ids.filter((id) => id > 0))];
+  if (uniqueIds.length === 0) {
+    return new Map<number, string>();
+  }
+
+  const rows = await sql<{ spellgroup: number; name: string }>`
+    select s.spellgroup, s.name
+    from spells_new s
+    join (
+      select spellgroup, min(id) as id
+      from spells_new
+      where spellgroup in (${sql.join(uniqueIds)})
+      group by spellgroup
+    ) first_spell on first_spell.spellgroup = s.spellgroup and first_spell.id = s.id
+  `.execute(db);
+
+  return new Map(rows.rows.map((row) => [row.spellgroup, row.name]));
 }
 
 function mapItemRowToSummary(row: ItemSearchRow): ItemSummary {
@@ -2968,7 +3355,27 @@ export async function getSpellDetail(id: number): Promise<SpellDetail | undefine
         }).filter((spellId) => spellId > 0)
       )
     );
-    const [componentResult, itemSourceResult] = await Promise.all([
+    const referencedItemIds = Array.from(
+      new Set(
+        Array.from({ length: 12 }, (_, index) => {
+          const slot = index + 1;
+          const effectId = Number(row[`effectid${slot}`] ?? 0);
+          const base = Number(row[`effect_base_value${slot}`] ?? 0);
+          return effectItemIdFromValues(effectId, base);
+        }).filter((itemId) => itemId > 0)
+      )
+    );
+    const referencedSpellGroupIds = Array.from(
+      new Set(
+        Array.from({ length: 12 }, (_, index) => {
+          const slot = index + 1;
+          const effectId = Number(row[`effectid${slot}`] ?? 0);
+          const base = Number(row[`effect_base_value${slot}`] ?? 0);
+          return effectSpellGroupIdFromValues(effectId, base);
+        }).filter((spellGroupId) => spellGroupId > 0)
+      )
+    );
+    const [componentResult, itemSourceResult, referencedSpellNames, referencedItemNames, referencedSpellGroupNames] = await Promise.all([
       componentIds.length > 0
         ? sql<{ id: number; name: string }>`
             select i.id, i.Name as name
@@ -2983,11 +3390,13 @@ export async function getSpellDetail(id: number): Promise<SpellDetail | undefine
         where ${discoveredItemClause("i.id")}
           and i.scrolleffect = ${id}
         order by i.Name asc
-      `.execute(db!)
+      `.execute(db!),
+      spellNamesById(referencedSpellIds),
+      itemNamesById(referencedItemIds),
+      spellGroupNamesById(referencedSpellGroupIds)
     ]);
 
     const componentNames = new Map(componentResult.rows.map((entry) => [entry.id, entry.name]));
-    const referencedSpellNames = await spellNamesById(referencedSpellIds);
     const messages = [
       { label: "When you cast", text: normalizeText(String(row.you_cast ?? "")) },
       { label: "When others cast", text: normalizeText(String(row.other_casts ?? "")) },
@@ -3041,7 +3450,11 @@ export async function getSpellDetail(id: number): Promise<SpellDetail | undefine
           href: `/items/${reagentId}`
         };
       }).filter((entry): entry is { id: number; name: string; count: number; href: string } => Boolean(entry)),
-      effects: describeSpellEffects(row, referencedSpellNames),
+      effects: describeSpellEffects(row, {
+        spellNames: referencedSpellNames,
+        itemNames: referencedItemNames,
+        spellGroupNames: referencedSpellGroupNames
+      }),
       itemSources: itemSourceResult.rows.map((entry) => ({
         id: entry.id,
         name: entry.name,

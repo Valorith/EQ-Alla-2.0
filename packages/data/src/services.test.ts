@@ -1511,12 +1511,22 @@ describe("catalog services", () => {
     expect(turgurEffects).toContain("Decrease Attack Speed by 15%");
   });
 
-  it("shows the peak scaled value for spell effects instead of the raw base amount", async () => {
+  it("shows the lvl 1 to lvl 60 range for level-scaled spell effects", async () => {
     const spell = await getSpellDetail(1275);
     const effects = spell?.effects.map((entry) => entry.text) ?? [];
 
-    expect(effects).toContain("Increase Magic Resist by 50");
-    expect(effects).not.toContain("Increase Magic Resist by 10");
+    expect(effects).toContain("Increase Magic Resist by 11 (lvl 1) to 50 (lvl 60)");
+  });
+
+  it("shows lvl 1 to lvl 60 ranges for scaled legacy percent haste effects", async () => {
+    const quickness = await getSpellDetail(39);
+    const burnout = await getSpellDetail(107);
+
+    const quicknessEffects = quickness?.effects.map((entry) => entry.text) ?? [];
+    const burnoutEffects = burnout?.effects.map((entry) => entry.text) ?? [];
+
+    expect(quicknessEffects).toContain("Increase Attack Speed by 20% (lvl 1) to 30% (lvl 60)");
+    expect(burnoutEffects).toContain("Increase Attack Speed by 16% (lvl 1) to 60% (lvl 60)");
   });
 
   it("formats EQEmu-specific AE melee spell effects with a translated label", async () => {
@@ -1531,6 +1541,7 @@ describe("catalog services", () => {
     expect(getSpellEffectName(193)).toBe("Skill Attack");
     expect(getSpellEffectName(220)).toBe("Skill Damage Bonus");
     expect(getSpellEffectName(262)).toBe("Raise Stat Cap");
+    expect(getSpellEffectName(385)).toBe("Limit: Spell Group");
   });
 
   it("deduplicates repeated spell effect slots and renders skill attacks with translated skill names", async () => {
@@ -1543,6 +1554,191 @@ describe("catalog services", () => {
       text: "Throwing Attack for 26 with 100% Accuracy Mod"
     });
     expect(spell?.effects.some((entry) => entry.text.includes("Effect 193"))).toBe(false);
+  });
+
+  it("keeps real CHA effects while still skipping empty placeholder slots", async () => {
+    const spell = await getSpellDetail(156);
+    const effects = spell?.effects.map((entry) => entry.text) ?? [];
+
+    expect(effects).toContain("Increase CHA by 40");
+    expect(effects.some((entry) => entry.includes("Effect 10"))).toBe(false);
+    expect(summarizeSpellEffects({
+      effectid1: 10,
+      effect_base_value1: 40,
+      formula1: 100,
+      effectid2: 10,
+      effect_base_value2: 0,
+      formula2: 100
+    })).toBe("Increase CHA");
+  });
+
+  it("renders Spire-style item, illusion, focus range, and limit text for common spell effects", async () => {
+    const summonItem = await getSpellDetail(4);
+    const illusion = await getSpellDetail(243);
+    const focus = await getSpellDetail(1104);
+    const constrainedFocus = await getSpellDetail(5946);
+
+    const summonEffects = summonItem?.effects.map((entry) => entry.text) ?? [];
+    const illusionEffects = illusion?.effects.map((entry) => entry.text) ?? [];
+    const focusEffects = focus?.effects.map((entry) => entry.text) ?? [];
+    const constrainedEffects = constrainedFocus?.effects.map((entry) => entry.text) ?? [];
+
+    expect(summonEffects).toContain("Summon Item Summoned: Waterstone");
+    expect(illusionEffects).toContain("Illusion Iksar");
+    expect(focusEffects).toContain("Increase Spell Damage by 1% to 5%");
+    expect(focusEffects).toContain("Limit: Max Level 80 (lose 10% per level)");
+    expect(focusEffects).toContain("Limit: Effect (Current HP)");
+    expect(focusEffects).toContain("Limit: Combat Skills (Not allowed)");
+    expect(constrainedEffects).toContain("Increase Spell Mana Cost by 31%");
+    expect(constrainedEffects).toContain("Limit: Duration Type (Instant spells only)");
+    expect(constrainedEffects).toContain("Limit: Min Mana Cost 10");
+  });
+
+  it("resolves spell groups and referenced proc spells instead of falling back to raw ids", async () => {
+    const spellGroupLimit = await getSpellDetail(4629);
+    const rangedProc = await getSpellDetail(4633);
+    const incomingHealing = await getSpellDetail(12146);
+
+    const spellGroupEffects = spellGroupLimit?.effects.map((entry) => entry.text) ?? [];
+    const rangedProcEffects = rangedProc?.effects.map((entry) => entry.text) ?? [];
+    const incomingHealingEffects = incomingHealing?.effects.map((entry) => entry.text) ?? [];
+
+    expect(spellGroupEffects).toContain("Limit: Spell Group (Focused Tempest of Arrows)");
+    expect(spellGroupEffects.some((entry) => entry.includes("Effect 385"))).toBe(false);
+    expect(rangedProcEffects).toContain("Add Range Proc Nature's Fury with 550% Rate Mod");
+    expect(incomingHealingEffects).toContain("Decrease Healing Received by 50%");
+  });
+
+  it("renders Divine Might Effect resource tap text for SPA 457", async () => {
+    const spell = await getSpellDetail(823);
+    const effects = spell?.effects.map((entry) => entry.text) ?? [];
+
+    expect(effects).toContain("Decrease Hitpoints by 32 (lvl 1) to 150 (lvl 60)");
+    expect(effects).toContain("Return 50% of Spell Damage as HP");
+    expect(effects.some((entry) => entry.includes("Effect 457"))).toBe(false);
+  });
+
+  it("renders Spire-style text for the first QA pass fallback spell effects", async () => {
+    const criticalHealAura = await getSpellDetail(6134);
+    const doubleAttackBuff = await getSpellDetail(11279);
+    const gravityFlux = await getSpellDetail(12319);
+    const manaburn = await getSpellDetail(12667);
+    const absorbDamage = await getSpellDetail(14711);
+    const manaShield = await getSpellDetail(16745);
+    const healFromMana = await getSpellDetail(28436);
+    const skillDamageBonus = await getSpellDetail(30245);
+    const criticalRenewal = await getSpellDetail(35163);
+    const corruptionDebuff = await getSpellDetail(38149);
+
+    expect(criticalHealAura?.effects.map((entry) => entry.text)).toContain("Increase Chance to Critical Heal by 12%");
+    expect(doubleAttackBuff?.effects.map((entry) => entry.text)).toContain("Increase Chance to Double Attack by 100% (Additive)");
+    expect(gravityFlux?.effects.map((entry) => entry.text)).toContain("Gravity Flux");
+    expect(manaburn?.effects.map((entry) => entry.text)).toContain(
+      "Manaburn: Consumes up to 12000 mana to deal 40% of that mana as direct damage"
+    );
+    expect(absorbDamage?.effects.map((entry) => entry.text)).toContain("Absorb 10 Hits or Spells 10%");
+    expect(manaShield?.effects.map((entry) => entry.text)).toContain("Absorb Damage using Mana: 70%");
+    expect(healFromMana?.effects.map((entry) => entry.text)).toContain(
+      "Increase Group Current HP by up to 30786 (11.6 HP per 1 Mana Drained)"
+    );
+    expect(skillDamageBonus?.effects.map((entry) => entry.text)).toContain("Increase Hit Damage Bonus by 102");
+    expect(criticalRenewal?.effects.map((entry) => entry.text)).toContain("Increase Chance to Critical Heal by 23%");
+    expect(criticalRenewal?.effects.map((entry) => entry.text)).toContain("Increase Chance to Critical HoT by 23%");
+    expect(corruptionDebuff?.effects.map((entry) => entry.text)).toContain("Decrease Corruption Resist by 32");
+    expect(
+      [
+        ...(criticalHealAura?.effects.map((entry) => entry.text) ?? []),
+        ...(doubleAttackBuff?.effects.map((entry) => entry.text) ?? []),
+        ...(gravityFlux?.effects.map((entry) => entry.text) ?? []),
+        ...(manaburn?.effects.map((entry) => entry.text) ?? []),
+        ...(absorbDamage?.effects.map((entry) => entry.text) ?? []),
+        ...(manaShield?.effects.map((entry) => entry.text) ?? []),
+        ...(healFromMana?.effects.map((entry) => entry.text) ?? []),
+        ...(skillDamageBonus?.effects.map((entry) => entry.text) ?? []),
+        ...(criticalRenewal?.effects.map((entry) => entry.text) ?? []),
+        ...(corruptionDebuff?.effects.map((entry) => entry.text) ?? [])
+      ].some((entry) => /^Effect \d+\b/.test(entry))
+    ).toBe(false);
+  });
+
+  it("renders the broader QA sweep spell effects without raw fallback ids", async () => {
+    const petShield = await getSpellDetail(5239);
+    const intoxicate = await getSpellDetail(11415);
+    const visionSpell = await getSpellDetail(12458);
+    const castingLevel = await getSpellDetail(17561);
+    const negativeHp = await getSpellDetail(18922);
+    const spellClassLimit = await getSpellDetail(23668);
+    const doppelganger = await getSpellDetail(24617);
+    const maxHpPercent = await getSpellDetail(27107);
+    const tauntLock = await getSpellDetail(28740);
+    const softCap = await getSpellDetail(30876);
+    const factionMod = await getSpellDetail(37246);
+    const currentMana = await getSpellDetail(38630);
+    const manaDrain = await getSpellDetail(39654);
+    const dotRune = await getSpellDetail(42191);
+    const endurancePct = await getSpellDetail(5034);
+    const wakeTheDead = await getSpellDetail(12599);
+    const offhandDs = await getSpellDetail(18041);
+    const auraCount = await getSpellDetail(18719);
+
+    expect(petShield?.effects.map((entry) => entry.text)).toContain("Pet Shielding for 60 sec");
+    expect(intoxicate?.effects.map((entry) => entry.text)).toContain("Intoxicate if Tolerance under 60");
+    expect(visionSpell?.effects.map((entry) => entry.text)).toContain("Limit: Class (Paladin, Monk, Necromancer)");
+    expect(visionSpell?.effects.map((entry) => entry.text)).toContain("Alter Vision: Base1=2 Base2=50 Max=0");
+    expect(visionSpell?.effects.map((entry) => entry.text)).toContain("Tint Vision: Red=255 Green=128 Blue=0");
+    expect(castingLevel?.effects.map((entry) => entry.text)).toContain("Decrease Effective Casting Level by 15");
+    expect(negativeHp?.effects.map((entry) => entry.text)).toContain("Increase Max Negative HP by 11449");
+    expect(spellClassLimit?.effects.map((entry) => entry.text)).toContain("Limit: Spell Class (ID 3)");
+    expect(doppelganger?.effects.map((entry) => entry.text)).toContain("Summon Doppelganger AKMOverlordAdd");
+    expect(maxHpPercent?.effects.map((entry) => entry.text)).toContain("Decrease Max HP by 4.5%");
+    expect(tauntLock?.effects.map((entry) => entry.text)).toContain(
+      "Lock Aggro on Caster and Decrease Other Aggro by 10% up to level 100"
+    );
+    expect(softCap?.effects.map((entry) => entry.text)).toContain("Increase AC Soft Cap by 25%");
+    expect(factionMod?.effects.map((entry) => entry.text)).toContain("Modify Faction 1838 by 99");
+    expect(currentMana?.effects.map((entry) => entry.text)).toContain("Increase Current Mana by 125");
+    expect(manaDrain?.effects.map((entry) => entry.text)).toContain(
+      "Decrease Current HP by up to 15000 and Drain up to 10000 mana (1.5 HP per 1 Target Mana Drained)"
+    );
+    expect(dotRune?.effects.map((entry) => entry.text)).toContain("Absorb DoT Damage: 25% Total 100000000");
+    expect(endurancePct?.effects.map((entry) => entry.text)).toContain("Decrease Current Endurance by 50% up to 75");
+    expect(wakeTheDead?.effects.map((entry) => entry.text)).toContain("Wake the Dead: animateDead6 x 5 for 90 sec");
+    expect(offhandDs?.effects.map((entry) => entry.text)).toContain("Decrease Offhand Damage Shield Taken by 57%");
+    expect(auraCount?.effects.map((entry) => entry.text)).toContain("Increase Aura Count by 1");
+    expect(
+      [
+        ...(petShield?.effects.map((entry) => entry.text) ?? []),
+        ...(intoxicate?.effects.map((entry) => entry.text) ?? []),
+        ...(visionSpell?.effects.map((entry) => entry.text) ?? []),
+        ...(castingLevel?.effects.map((entry) => entry.text) ?? []),
+        ...(negativeHp?.effects.map((entry) => entry.text) ?? []),
+        ...(spellClassLimit?.effects.map((entry) => entry.text) ?? []),
+        ...(doppelganger?.effects.map((entry) => entry.text) ?? []),
+        ...(maxHpPercent?.effects.map((entry) => entry.text) ?? []),
+        ...(tauntLock?.effects.map((entry) => entry.text) ?? []),
+        ...(softCap?.effects.map((entry) => entry.text) ?? []),
+        ...(factionMod?.effects.map((entry) => entry.text) ?? []),
+        ...(currentMana?.effects.map((entry) => entry.text) ?? []),
+        ...(manaDrain?.effects.map((entry) => entry.text) ?? []),
+        ...(dotRune?.effects.map((entry) => entry.text) ?? []),
+        ...(endurancePct?.effects.map((entry) => entry.text) ?? []),
+        ...(wakeTheDead?.effects.map((entry) => entry.text) ?? []),
+        ...(offhandDs?.effects.map((entry) => entry.text) ?? []),
+        ...(auraCount?.effects.map((entry) => entry.text) ?? [])
+      ].some((entry) => /^Effect \d+\b/.test(entry))
+    ).toBe(false);
+  });
+
+  it("renders bard AE dot percent damage effects without raw fallback ids", async () => {
+    const chords = await getSpellDetail(703);
+    const denon = await getSpellDetail(730);
+
+    const chordsEffects = chords?.effects.map((entry) => entry.text) ?? [];
+    const denonEffects = denon?.effects.map((entry) => entry.text) ?? [];
+
+    expect(chordsEffects).toContain("Decrease Current HP by 2% (lvl 1) to 17% (lvl 60) (If Target Not Moving)");
+    expect(denonEffects).toContain("Decrease Current HP by 4% (lvl 1) to 19% (lvl 60) (If Target Not Moving)");
+    expect([...chordsEffects, ...denonEffects].some((entry) => /^Effect 334\b/.test(entry))).toBe(false);
   });
 
   it("includes item-only spells in spell name searches", async () => {

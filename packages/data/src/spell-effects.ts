@@ -1,9 +1,84 @@
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const ignoredSpellEffectIds = new Set([10, 254]);
+const ignoredSpellEffectIds = new Set([254]);
 const negativeValuesThatStillRepresentIncreases = new Set([59]);
+const spireSpellEffectFallbackNames: Record<number, string> = {
+  84: "Gravity Flux",
+  126: "Focus: Spell Resist Rate",
+  133: "Focus: Spell Stun Duration",
+  160: "Intoxicate",
+  161: "Absorb Spell Damage Rune",
+  162: "Absorb Melee Damage Rune",
+  163: "Absorb Damage",
+  170: "Increase Spell Critical Chance",
+  189: "Endurance",
+  193: "Skill Attack",
+  197: "Skill Damage Taken",
+  201: "Range Proc Modifier",
+  210: "Pet Shielding",
+  214: "Change Max HP",
+  220: "Skill Damage Bonus",
+  225: "Increase Chance to Double Attack",
+  259: "AC Soft Cap",
+  262: "Raise Stat Cap",
+  272: "Increase Effective Casting Level",
+  274: "Increase Chance to Critical Heal",
+  286: "Focus: Spell Damage Amount",
+  287: "Focus: Buff Duration by Ticks",
+  296: "Focus: Incoming Spell Damage",
+  297: "Focus: Incoming Spell Damage Amount",
+  300: "Summon Doppelganger",
+  303: "Focus: Spell Damage Amount",
+  305: "Offhand Damage Shield Taken",
+  306: "Wake the Dead",
+  310: "Reduce Reuse Timer",
+  319: "Increase Chance to Critical HoT",
+  328: "Max Negative HP",
+  329: "Mana Shield Absorb Damage",
+  334: "Bard AE Dot",
+  348: "Limit: Min Mana Cost",
+  350: "Manaburn",
+  351: "Aura Effect",
+  353: "Aura Count",
+  368: "Modify Faction",
+  369: "Corruption Counter",
+  370: "Increase Corruption Resist",
+  371: "Attack Speed: Inhibit Melee",
+  380: "Knockback",
+  382: "Negate Spell Effect",
+  385: "Limit: Spell Group",
+  400: "Heal Group From Mana",
+  401: "Damage for Amount Mana Drained",
+  403: "Limit: Spell Class",
+  411: "Limit: Class",
+  413: "Focus: Base Spell Value",
+  414: "Limit: Casting Skill",
+  416: "Increase AC",
+  417: "Current Mana",
+  418: "Skill Damage Bonus",
+  419: "Add Melee Proc",
+  424: "Gravitate",
+  430: "Alter Vision",
+  431: "Tint Vision",
+  427: "Add Skill Proc",
+  428: "Limit: Skill",
+  429: "Add Skill Proc on Successful Hit",
+  442: "Trigger Spell on Target Requirement",
+  443: "Trigger Spell on Caster Requirement",
+  444: "Improved Taunt",
+  453: "Trigger Spell on Melee Threshold",
+  454: "Trigger Spell on Spell Threshold",
+  457: "Resource Tap",
+  450: "Absorb Damage Over Time Rune",
+  476: "Weapon Stance",
+  526: "Current Endurance"
+};
+const spellEffectReferenceNames: Record<number, string> = {
+  0: "Current HP",
+  11: "Attack Speed",
+  15: "Mana",
+  59: "Damage Shield",
+  79: "Current HP",
+  100: "Current HP"
+};
 
 const spellEffectNames: Record<number, string> = {
   0: "Increase Hitpoints",
@@ -207,53 +282,29 @@ const spellEffectNames: Record<number, string> = {
   330: "Critical Damage Mob"
 };
 
-let cachedSpireSpellEffectNames: Record<number, string> | undefined;
-
 function normalizeSpellEffectName(name: string) {
   return name.replace(/:\s*$/, "").replace(/\s+/g, " ").trim();
 }
 
-function loadSpireSpellEffectNames() {
-  if (cachedSpireSpellEffectNames) {
-    return cachedSpireSpellEffectNames;
-  }
-
-  const constantsPath = path.resolve(
-    path.dirname(fileURLToPath(import.meta.url)),
-    "../../../.spire-reference/frontend/src/app/constants/eq-spell-constants.ts"
-  );
-
-  try {
-    const source = fs.readFileSync(constantsPath, "utf8");
-    const match = source.match(/export const DB_SPA\s*=\s*{([\s\S]*?)^\s*}/m);
-
-    if (!match) {
-      cachedSpireSpellEffectNames = {};
-      return cachedSpireSpellEffectNames;
-    }
-
-    const names: Record<number, string> = {};
-
-    for (const entry of match[1].matchAll(/"(-?\d+)":\s*"([^"]*)"/g)) {
-      const effectId = Number(entry[1]);
-      if (!Number.isFinite(effectId)) {
-        continue;
-      }
-
-      names[effectId] = entry[2].replaceAll("\\/", "/").replaceAll('\\"', '"');
-    }
-
-    cachedSpireSpellEffectNames = names;
-    return cachedSpireSpellEffectNames;
-  } catch {
-    cachedSpireSpellEffectNames = {};
-    return cachedSpireSpellEffectNames;
-  }
+export function getSpellEffectName(effectId: number) {
+  const fallbackName = spireSpellEffectFallbackNames[effectId];
+  return normalizeSpellEffectName(spellEffectNames[effectId] ?? fallbackName ?? `Effect ${effectId}`);
 }
 
-export function getSpellEffectName(effectId: number) {
-  const fallbackName = loadSpireSpellEffectNames()[effectId];
-  return normalizeSpellEffectName(spellEffectNames[effectId] ?? fallbackName ?? `Effect ${effectId}`);
+export function getReferenceSpellEffectName(effectId: number) {
+  const preferredName = spellEffectReferenceNames[effectId];
+
+  if (preferredName) {
+    return normalizeSpellEffectName(preferredName);
+  }
+
+  const label = getSpellEffectName(effectId);
+
+  return normalizeSpellEffectName(
+    label
+      .replace(/^Focus:\s*/, "")
+      .replace(/^(Increase|Decrease)\s+/, "")
+  );
 }
 
 export function resolveSpellEffectDirection(label: string, value: number, effectId?: number) {
@@ -276,6 +327,10 @@ export function resolveSpellEffectDirection(label: string, value: number, effect
     return label.replace("Increase", "Decrease");
   }
 
+  if (label.startsWith("Decrease") && value < 0) {
+    return label.replace("Decrease", "Increase");
+  }
+
   return label;
 }
 
@@ -290,6 +345,11 @@ export function summarizeSpellEffects(row: Record<string, unknown>) {
     }
 
     const base = Number(row[`effect_base_value${slot}`] ?? 0);
+    const formula = Number(row[`formula${slot}`] ?? 100);
+    if (effectId === 10 && base === 0 && formula === 100) {
+      continue;
+    }
+
     const label = resolveSpellEffectDirection(getSpellEffectName(effectId), base, effectId);
 
     if (label && !labels.includes(label)) {
