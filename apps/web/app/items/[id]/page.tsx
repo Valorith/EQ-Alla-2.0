@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Button } from "@eq-alla/ui";
-import { Package2 } from "lucide-react";
+import { Package2, Search } from "lucide-react";
 import { getItemAvailability, getItemDetail, getItemMarketData } from "@eq-alla/data";
-import { PageHero, SectionCard } from "../../../components/catalog-shell";
+import { SectionCard } from "../../../components/catalog-shell";
 import { ItemDetailPreview } from "../../../components/item-detail-preview";
 import { ItemMarketCard } from "../../../components/item-market-card";
 import { PaginatedRelatedSection } from "../../../components/paginated-related-section";
@@ -159,17 +159,18 @@ function formatDropChance(value: number) {
 }
 
 function UndiscoveredItemGraphic({ compact = false }: { compact?: boolean }) {
-  const frameClassName = compact ? "h-18 w-18" : "h-34 w-34";
-  const iconClassName = compact ? "size-8" : "size-14";
+  const frameClassName = compact ? "h-18 w-18" : "h-38 w-38";
+  const iconClassName = compact ? "size-8" : "size-16";
   const badgeClassName = compact
     ? "bottom-1 right-1 h-6 min-w-6 px-1.5 text-[0.8rem]"
-    : "bottom-2 right-2 h-10 min-w-10 px-2.5 text-[1.35rem]";
+    : "bottom-3 right-3 h-11 min-w-11 px-2.5 text-[1.35rem]";
 
   return (
     <div className={`relative ${frameClassName} shrink-0`}>
-      <div className="absolute inset-0 rounded-[28px] bg-[radial-gradient(circle_at_30%_20%,rgba(239,206,123,0.3),transparent_42%),radial-gradient(circle_at_70%_78%,rgba(102,157,214,0.28),transparent_45%),linear-gradient(180deg,rgba(47,54,66,0.98),rgba(21,26,34,0.96))] shadow-[0_20px_50px_rgba(0,0,0,0.32)]" />
-      <div className="absolute inset-[1px] rounded-[27px] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))]" />
-      <div className="absolute left-1/2 top-1/2 flex size-[68%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[24px] border border-[#e2c27a]/28 bg-[linear-gradient(180deg,rgba(226,194,122,0.16),rgba(60,67,80,0.2))] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+      <div className="absolute -inset-2 rounded-[34px] bg-[radial-gradient(circle_at_50%_10%,rgba(242,205,121,0.18),transparent_48%),radial-gradient(circle_at_15%_80%,rgba(122,184,255,0.16),transparent_42%)] blur-xl" />
+      <div className="absolute inset-0 rounded-[30px] border border-[#d7b06c]/18 bg-[radial-gradient(circle_at_30%_20%,rgba(239,206,123,0.26),transparent_42%),radial-gradient(circle_at_70%_78%,rgba(102,157,214,0.22),transparent_45%),linear-gradient(180deg,rgba(47,54,66,0.98),rgba(21,26,34,0.96))] shadow-[0_24px_58px_rgba(0,0,0,0.38)]" />
+      <div className="absolute inset-[1px] rounded-[29px] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.015))]" />
+      <div className="absolute left-1/2 top-1/2 flex size-[68%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[24px] border border-[#e2c27a]/24 bg-[linear-gradient(180deg,rgba(226,194,122,0.18),rgba(44,50,62,0.24))] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_18px_28px_rgba(0,0,0,0.18)]">
         <Package2 className={`${iconClassName} text-[#f0d8a0] drop-shadow-[0_6px_18px_rgba(0,0,0,0.35)]`} strokeWidth={1.8} />
       </div>
       <div
@@ -183,34 +184,90 @@ function UndiscoveredItemGraphic({ compact = false }: { compact?: boolean }) {
 
 function UndiscoveredItemState({ itemId }: { itemId: number }) {
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6">
-      <PageHero
-        eyebrow="Item Unavailable"
-        title={`Item ${itemId} has not been discovered yet`}
-        description="This item link points to a valid record, but the detail page stays hidden until that item has been discovered in-game."
-        actions={
-          <div className="flex flex-col items-start gap-4 xl:items-end">
-            <div className="rounded-[30px] border border-[#e2c27a]/18 bg-[linear-gradient(180deg,rgba(31,36,45,0.88),rgba(17,21,28,0.84))] p-3 shadow-[0_16px_36px_rgba(0,0,0,0.25)]">
-              <UndiscoveredItemGraphic />
+    <div className="w-full space-y-7 text-[#e6e0d2]">
+      <section className="overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,29,39,0.96),rgba(15,21,29,0.92))] shadow-[0_22px_56px_rgba(0,0,0,0.28)]">
+        <div className="grid gap-8 p-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-center lg:p-8 xl:p-10">
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-[#dcb46e]">Item unavailable</p>
+              <h1 className="max-w-4xl font-[var(--font-display)] text-4xl font-semibold tracking-[-0.05em] text-white sm:text-5xl xl:text-[3.4rem]">
+                Item {itemId} has not been discovered yet
+              </h1>
+              <p className="max-w-3xl text-base leading-8 text-slate-300 sm:text-[1.02rem]">
+                This item link points to a valid record, but the detail page stays hidden until that item has been discovered in-game.
+              </p>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <Button asChild>
-                <Link href="/items">Browse Items</Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link href="/">Search the Catalog</Link>
-              </Button>
+
+            <div className="flex flex-wrap gap-2">
+              {["Valid database record", "Read-only for now", "Auto-unlocks later"].map((badge) => (
+                <span
+                  key={badge}
+                  className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d7ddeb]"
+                >
+                  {badge}
+                </span>
+              ))}
             </div>
           </div>
-        }
-      />
 
-      <SectionCard title="Why this page is different">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          <UndiscoveredItemGraphic compact />
-          <div className="space-y-3 text-sm leading-7 text-slate-300">
-            <p>This item exists in the database, but it is not publicly viewable yet because it has not been discovered.</p>
-            <p>Once the item is discovered, this link will open the normal item detail page automatically.</p>
+          <div className="flex justify-start lg:justify-end">
+            <div className="flex items-start">
+              <UndiscoveredItemGraphic />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <SectionCard
+        title="What this means"
+        right={
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#d7af68]/20 bg-[#d7af68]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#e9cd97]">
+            <Search className="size-3.5" strokeWidth={2} />
+            Read-only by design
+          </div>
+        }
+      >
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.015))] p-5">
+            <p className="text-sm leading-8 text-slate-300">
+              This record exists in the archive, but its public detail view stays hidden until the item has been discovered in-game. Once that happens, this same URL will open the normal item page automatically.
+            </p>
+          </div>
+
+          <div className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,29,38,0.82),rgba(13,17,24,0.9))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+            <div className="flex items-start gap-4">
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#b99a67]">What you can do now</p>
+                <h4 className="font-[var(--font-display)] text-xl font-semibold tracking-[-0.03em] text-[#f3ead9]">Keep exploring the archive</h4>
+                <p className="text-sm leading-7 text-[#b4bdcc]">
+                  You can browse discovered items, search the wider catalog, and revisit this exact URL later once the item becomes publicly visible.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3">
+              <Link
+                href="/items"
+                className="group flex items-center justify-between rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 transition hover:border-[#d7af68]/35 hover:bg-white/[0.05]"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-[#f0e6d6]">Browse discovered items</p>
+                  <p className="text-xs leading-5 text-[#98a3b7]">Return to the public item index.</p>
+                </div>
+                <span className="text-sm font-semibold text-[#dbbd83] transition group-hover:translate-x-0.5">Go</span>
+              </Link>
+
+              <Link
+                href="/"
+                className="group flex items-center justify-between rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 transition hover:border-[#7ab8ff]/30 hover:bg-white/[0.05]"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-[#f0e6d6]">Search the catalog</p>
+                  <p className="text-xs leading-5 text-[#98a3b7]">Explore zones, NPCs, spells, and more.</p>
+                </div>
+                <span className="text-sm font-semibold text-[#a7d2ff] transition group-hover:translate-x-0.5">Open</span>
+              </Link>
+            </div>
           </div>
         </div>
       </SectionCard>
