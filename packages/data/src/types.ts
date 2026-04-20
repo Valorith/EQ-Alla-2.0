@@ -51,6 +51,8 @@ export type ItemDetailStat = {
   section: ItemDetailStatSection;
 };
 
+export type ItemAvailability = "available" | "undiscovered" | "missing";
+
 export type ItemDetail = ItemSummary & {
   icon: string;
   lore: string;

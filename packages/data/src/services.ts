@@ -20,6 +20,7 @@ import { sql } from "kysely";
 import type {
   CatalogStats,
   FactionDetail,
+  ItemAvailability,
   FactionSummary,
   ItemDetail,
   ItemDetailStat,
@@ -2712,6 +2713,29 @@ export async function listItems(filters: ItemFilters = {}) {
       normalizedFilters.q
     );
   });
+}
+
+export async function getItemAvailability(id: number): Promise<ItemAvailability> {
+  requireDatabaseConnection();
+
+  const result = await sql<{ item_exists: number; is_discovered: number }>`
+    select
+      exists(select 1 from items where id = ${id}) as item_exists,
+      exists(
+        select 1
+        from items i
+        where i.id = ${id}
+          and ${discoveredItemClause("i.id")}
+      ) as is_discovered
+  `.execute(db!);
+
+  const row = result.rows[0];
+
+  if (!row || Number(row.item_exists ?? 0) === 0) {
+    return "missing";
+  }
+
+  return Number(row.is_discovered ?? 0) !== 0 ? "available" : "undiscovered";
 }
 
 export async function getItemDetail(id: number): Promise<ItemDetail | undefined> {

@@ -9,6 +9,7 @@ import {
   formatZoneEra,
   getCatalogStats,
   getFactionDetail,
+  getItemAvailability,
   getItemDetail,
   getNpcDetail,
   getPetDetail,
@@ -83,6 +84,12 @@ describe("catalog services", () => {
 
     expect(detail).toBeUndefined();
     expect(results.some((item) => item.id === itemId)).toBe(false);
+  });
+
+  it("distinguishes available, undiscovered, and missing item availability", async () => {
+    expect(await getItemAvailability(1001)).toBe("available");
+    expect(await getItemAvailability(150873)).toBe("undiscovered");
+    expect(await getItemAvailability(987654321)).toBe("missing");
   });
 
   it("includes damage shield stats shown in-game for cloak of death", async () => {

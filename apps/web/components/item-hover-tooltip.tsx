@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ItemDetail } from "@eq-alla/data";
+import { Package2 } from "lucide-react";
 import { ItemDetailPreview } from "./item-detail-preview";
 
 type HoveredItem = {
@@ -19,6 +20,23 @@ type CursorPosition = {
 };
 
 const itemDetailCache = new Map<number, ItemDetail>();
+
+function unavailableCard(message: string) {
+  return (
+    <div className="inline-block max-w-full rounded-[12px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,29,38,0.96),rgba(14,19,27,0.94))] px-4 py-4 text-[#e6e0d2] shadow-[0_18px_40px_rgba(0,0,0,0.3)] backdrop-blur-sm">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b99a67]">Item Preview</p>
+      <div className="mt-3 flex items-start gap-3">
+        <div className="relative mt-0.5 flex size-12 shrink-0 items-center justify-center rounded-[16px] border border-[#e2c27a]/24 bg-[radial-gradient(circle_at_30%_20%,rgba(239,206,123,0.24),transparent_45%),linear-gradient(180deg,rgba(48,55,67,0.96),rgba(21,26,34,0.94))] shadow-[0_12px_24px_rgba(0,0,0,0.26)]">
+          <Package2 className="size-5 text-[#f0d8a0]" strokeWidth={1.8} />
+          <div className="absolute -bottom-1 -right-1 flex size-5 items-center justify-center rounded-full border border-[#f4d58f]/45 bg-[radial-gradient(circle_at_30%_30%,rgba(255,248,220,0.98),rgba(236,192,91,0.82))] text-[0.72rem] font-semibold leading-none text-[#3c2a12] shadow-[0_6px_12px_rgba(0,0,0,0.25)]">
+            ?
+          </div>
+        </div>
+        <p className="text-sm leading-7 text-[#d7cfbf]">{message}</p>
+      </div>
+    </div>
+  );
+}
 
 function getHoveredItemTrigger(target: EventTarget | null) {
   if (!(target instanceof Element)) {
@@ -56,7 +74,7 @@ export function ItemHoverTooltip() {
   const [hoveredItem, setHoveredItem] = useState<HoveredItem | null>(null);
   const [item, setItem] = useState<ItemDetail | null>(null);
   const [position, setPosition] = useState<TooltipPosition | null>(null);
-  const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error" | "undiscovered">("idle");
 
   useEffect(() => {
     if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
@@ -160,11 +178,19 @@ export function ItemHoverTooltip() {
     void (async () => {
       try {
         const response = await fetch(`/api/items/${hoveredItem.id}`, { signal: controller.signal });
+        const payload = (await response.json().catch(() => null)) as
+          | { data?: ItemDetail; code?: string; error?: string }
+          | null;
+
         if (!response.ok) {
+          if (response.status === 403 && payload?.code === "ITEM_UNDISCOVERED") {
+            setStatus("undiscovered");
+            return;
+          }
+
           throw new Error(`Failed to load item ${hoveredItem.id}`);
         }
 
-        const payload = (await response.json()) as { data?: ItemDetail };
         if (controller.signal.aborted || !payload.data) {
           return;
         }
@@ -249,11 +275,11 @@ export function ItemHoverTooltip() {
     >
       {status === "ready" && item ? <ItemDetailPreview item={item} /> : null}
       {status === "loading" ? loadingCard() : null}
+      {status === "undiscovered"
+        ? unavailableCard("This item cannot be previewed yet because it has not been discovered.")
+        : null}
       {status === "error" ? (
-        <div className="inline-block max-w-full rounded-[12px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,29,38,0.96),rgba(14,19,27,0.94))] px-4 py-4 text-[#e6e0d2] shadow-[0_18px_40px_rgba(0,0,0,0.3)] backdrop-blur-sm">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b99a67]">Item Preview</p>
-          <p className="mt-3 text-sm leading-7 text-[#d7cfbf]">Could not load the item tooltip.</p>
-        </div>
+        unavailableCard("Could not load the item tooltip.")
       ) : null}
     </div>
   );
