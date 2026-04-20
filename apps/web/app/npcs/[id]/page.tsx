@@ -66,73 +66,28 @@ export default async function NpcDetailPage({ params }: NpcDetailPageProps) {
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(340px,0.95fr)]">
         <SectionCard title="Overview">
-          <div className="space-y-4">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b99a67]">Identity</p>
-              <div className="mt-4">
-                <OverviewDetails
-                  items={[
-                    { label: "Full name", value: npc.fullName },
-                    { label: "Level", value: npc.level },
-                    { label: "Race", value: npc.race },
-                    { label: "Class", value: npc.klass },
-                    {
-                      label: "Main faction",
-                      value: npc.mainFaction ? (
-                        <Link href={npc.mainFaction.href} className="text-[#7ab8ff] underline decoration-[1.5px] underline-offset-2 hover:text-[#a7d2ff]">
-                          {npc.mainFaction.name}
-                        </Link>
-                      ) : (
-                        npc.faction
-                      )
-                    }
-                  ]}
-                />
-              </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b99a67]">Identity</p>
+            <div className="mt-4">
+              <OverviewDetails
+                items={[
+                  { label: "Full name", value: npc.fullName },
+                  { label: "Level", value: npc.level },
+                  { label: "Race", value: npc.race },
+                  { label: "Class", value: npc.klass },
+                  {
+                    label: "Main faction",
+                    value: npc.mainFaction ? (
+                      <Link href={npc.mainFaction.href} className="text-[#7ab8ff] underline decoration-[1.5px] underline-offset-2 hover:text-[#a7d2ff]">
+                        {npc.mainFaction.name}
+                      </Link>
+                    ) : (
+                      npc.faction
+                    )
+                  }
+                ]}
+              />
             </div>
-
-            <div className="border-t border-white/10 pt-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b99a67]">Combat Profile</p>
-              <div className="mt-4 rounded-[16px] border border-white/10 bg-[linear-gradient(180deg,rgba(16,20,28,0.86),rgba(10,13,20,0.9))] px-4 py-4">
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {[
-                    { label: "Health points", value: npc.hp.toLocaleString() },
-                    { label: "Mana", value: npc.mana.toLocaleString(), show: npc.mana > 0 },
-                    { label: "Damage", value: npc.damage.replace(" - ", " to ") },
-                    { label: "Attack delay", value: npc.attackDelay, show: npc.attackDelay > 0 }
-                  ]
-                    .filter((item) => item.show !== false)
-                    .map((item, index) => (
-                      <div
-                        key={item.label}
-                        className={index === 0 ? "" : "border-t border-white/8 pt-4 sm:border-t-0 sm:border-l sm:pl-4 sm:pt-0"}
-                      >
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#9f8e79]">{item.label}</p>
-                        <p className="mt-2 text-[1.9rem] font-semibold tracking-[-0.04em] text-[#f1eadc]">{item.value}</p>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            </div>
-
-            {npc.specialAttacks.length > 0 ? (
-              <div className="border-t border-white/10 pt-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="max-w-[220px]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b99a67]">Special Attacks</p>
-                    <p className="mt-2 text-sm leading-6 text-[#aeb8ca]">Encounter flags and combat immunities shown at a glance.</p>
-                  </div>
-                  <ul className="grid gap-x-6 gap-y-3 border-l border-white/10 pl-5 sm:grid-cols-2 xl:grid-cols-3 lg:max-w-[70%] lg:flex-1">
-                    {npc.specialAttacks.map((attack) => (
-                      <li key={attack} className="flex items-start gap-2 text-[15px] font-medium leading-6 text-[#ede4d3]">
-                        <span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#c5a869]" />
-                        <span>{attack}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            ) : null}
           </div>
         </SectionCard>
 
