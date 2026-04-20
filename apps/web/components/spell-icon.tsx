@@ -10,7 +10,7 @@ const iconSizes = {
 } as const;
 
 function getRemoteSpellIconSrc(icon: string) {
-  return /^\d+$/.test(icon) ? `https://alla.clumsysworld.com/images/icons/${icon}.gif` : null;
+  return /^\d+$/.test(icon) ? `/assets/spell-icons/${icon}.png` : null;
 }
 
 export function SpellIcon({ icon, name, size = "sm" }: SpellIconProps) {

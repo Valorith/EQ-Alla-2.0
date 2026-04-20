@@ -13,7 +13,7 @@ const iconSizes = {
 } as const;
 
 function getRemoteIconSrc(icon: string) {
-  return /^\d+$/.test(icon) ? `https://alla.clumsysworld.com/images/icons/item_${icon}.png` : null;
+  return /^\d+$/.test(icon) ? `/assets/item-icons/item_${icon}.png` : null;
 }
 
 export function ItemIcon({ icon, name, size = "md", tooltipItemId }: ItemIconProps) {
