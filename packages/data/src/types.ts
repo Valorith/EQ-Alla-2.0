@@ -210,6 +210,17 @@ export type SpellSummary = {
   target: string;
 };
 
+export type SpellEffectLink = {
+  href: string;
+  label: string;
+};
+
+export type SpellEffect = {
+  slots: number[];
+  text: string;
+  link?: SpellEffectLink;
+};
+
 export type SpellDetail = SpellSummary & {
   description: string;
   classLevels: Array<{ className: string; level: number }>;
@@ -227,7 +238,7 @@ export type SpellDetail = SpellSummary & {
   aoeMaxTargets: number;
   aoeDuration: string;
   reagents: Array<{ id: number; name: string; count: number; href: string }>;
-  effects: Array<{ slots: number[]; text: string }>;
+  effects: SpellEffect[];
   itemSources: Array<{ id: number; name: string; href: string; icon: string }>;
 };
 

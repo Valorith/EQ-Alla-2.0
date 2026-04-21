@@ -35,6 +35,7 @@ import type {
   RecipeStationZone,
   RecipeSummary,
   SearchHit,
+  SpellEffect,
   SpellDetail,
   SpellSummary,
   SpawnGroupDetail,
@@ -1643,6 +1644,27 @@ function formatReferencedItem(itemId: number, itemNames: Map<number, string>) {
   return itemNames.get(itemId) ?? `Item ${itemId}`;
 }
 
+function describeSpellEffectLink(
+  effectId: number,
+  itemId: number,
+  references: Partial<SpellEffectReferenceMaps> = {}
+): SpellEffect["link"] | undefined {
+  if (itemId <= 0) {
+    return undefined;
+  }
+
+  switch (effectId) {
+    case 32:
+    case 109:
+      return {
+        href: `/items/${itemId}`,
+        label: formatReferencedItem(itemId, references.itemNames ?? new Map())
+      };
+    default:
+      return undefined;
+  }
+}
+
 function formatReferencedSpellGroup(spellGroupId: number, spellGroupNames: Map<number, string>) {
   if (spellGroupId <= 0) {
     return "";
@@ -1962,17 +1984,21 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, ref
 }
 
 function describeSpellEffects(row: Record<string, unknown>, references: Partial<SpellEffectReferenceMaps> = {}) {
-  const effects: Array<{ slots: number[]; text: string }> = [];
-  const dedupedByText = new Map<string, { slots: number[]; text: string }>();
+  const effects: SpellEffect[] = [];
+  const dedupedByText = new Map<string, SpellEffect>();
 
   for (let slot = 1; slot <= 12; slot += 1) {
+    const effectId = Number(row[`effectid${slot}`] ?? 254);
     const text = describeSpellEffectSlot(row, slot, references);
     if (text) {
+      const itemId = effectItemIdFromValues(effectId, Number(row[`effect_base_value${slot}`] ?? 0));
+      const link = describeSpellEffectLink(effectId, itemId, references);
       const existing = dedupedByText.get(text);
       if (existing) {
         existing.slots.push(slot);
+        existing.link ??= link;
       } else {
-        const effect = { slots: [slot], text };
+        const effect = { slots: [slot], text, ...(link ? { link } : {}) };
         dedupedByText.set(text, effect);
         effects.push(effect);
       }

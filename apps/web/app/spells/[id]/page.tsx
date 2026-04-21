@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-import { getSpellDetail } from "@eq-alla/data";
+import { getSpellDetail, type SpellEffect } from "@eq-alla/data";
 import { ItemIcon } from "../../../components/item-icon";
 import { PageHero, SectionCard } from "../../../components/catalog-shell";
 import { SpellIcon } from "../../../components/spell-icon";
@@ -43,6 +43,35 @@ function BulletList({
         <li key={index}>{item}</li>
       ))}
     </ul>
+  );
+}
+
+function renderSpellEffect(entry: SpellEffect) {
+  if (!entry.link) {
+    return entry.text;
+  }
+
+  const labelIndex = entry.text.indexOf(entry.link.label);
+  if (labelIndex === -1) {
+    return entry.text;
+  }
+
+  const leadingText = entry.text.slice(0, labelIndex);
+  const trailingText = entry.text.slice(labelIndex + entry.link.label.length);
+
+  return (
+    <>
+      {leadingText}
+      <Link
+        href={entry.link.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-[#7ab8ff] underline decoration-[1.5px] underline-offset-2 hover:text-[#a7d2ff]"
+      >
+        {entry.link.label}
+      </Link>
+      {trailingText}
+    </>
   );
 }
 
@@ -134,7 +163,7 @@ export default async function SpellDetailPage({ params }: SpellDetailPageProps) 
         {spell.effects.length > 0 ? (
           <BulletList
             items={spell.effects.map((entry) => (
-              <span key={`${entry.text}:${entry.slots.join(",")}`}>{entry.text}</span>
+              <span key={`${entry.text}:${entry.slots.join(",")}`}>{renderSpellEffect(entry)}</span>
             ))}
           />
         ) : (

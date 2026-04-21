@@ -1681,8 +1681,11 @@ describe("catalog services", () => {
     const illusionEffects = illusion?.effects.map((entry) => entry.text) ?? [];
     const focusEffects = focus?.effects.map((entry) => entry.text) ?? [];
     const constrainedEffects = constrainedFocus?.effects.map((entry) => entry.text) ?? [];
+    const summonItemEffect = summonItem?.effects.find((entry) => entry.text === "Summon Item Summoned: Waterstone");
 
     expect(summonEffects).toContain("Summon Item Summoned: Waterstone");
+    expect(summonItemEffect?.link?.label).toBe("Waterstone");
+    expect(summonItemEffect?.link?.href).toMatch(/^\/items\/\d+$/);
     expect(illusionEffects).toContain("Illusion Iksar");
     expect(focusEffects).toContain("Increase Spell Damage by 1% to 5%");
     expect(focusEffects).toContain("Limit: Max Level 80 (lose 10% per level)");
