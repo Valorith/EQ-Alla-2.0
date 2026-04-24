@@ -38,6 +38,12 @@ import {
 import { getDb } from "./db";
 import { getSpellEffectName, resolveSpellEffectDirection, summarizeSpellEffects } from "./spell-effects";
 
+const ignoredNpcSpawnContentFlags = ["cw_halloween", "cw_christmas"];
+
+function ignoredNpcSpawnContentFlagsSql() {
+  return sql.join(ignoredNpcSpawnContentFlags.map((flag) => sql`${flag}`), sql`, `);
+}
+
 describe("catalog services", () => {
   it("filters items by tradeable flag", async () => {
     const tradeableItems = await listItems({ tradeable: true });
@@ -1030,7 +1036,7 @@ describe("catalog services", () => {
     expect(item?.soldBy.some((entry) => entry.id === rows.rows[0].npc_id)).toBe(true);
   }, 20_000);
 
-  it("includes merchants on item sold-by lists when their spawn requires a disabled content flag", async () => {
+  it("includes merchants on item sold-by lists when their spawn requires an ignored disabled content flag", async () => {
     const db = getDb();
     expect(db).toBeTruthy();
 
@@ -1042,8 +1048,19 @@ describe("catalog services", () => {
       join spawngroup sg on sg.id = se.spawngroupID
       join spawn2 s2 on s2.spawngroupID = sg.id
       join zone z on z.short_name = s2.zone and z.version = s2.version
-      join content_flags cf on cf.flag_name = s2.content_flags and coalesce(cf.enabled, 0) = 0
+      left join content_flags required_cf on required_cf.flag_name = s2.content_flags
+      left join content_flags disabled_cf on disabled_cf.flag_name = s2.content_flags_disabled
       where coalesce(z.min_status, 0) <= ${1}
+        and (
+          (
+            lower(trim(coalesce(s2.content_flags, ''))) in (${ignoredNpcSpawnContentFlagsSql()})
+            and coalesce(required_cf.enabled, 0) = 0
+          )
+          or (
+            lower(trim(coalesce(s2.content_flags_disabled, ''))) in (${ignoredNpcSpawnContentFlagsSql()})
+            and coalesce(disabled_cf.enabled, 0) <> 0
+          )
+        )
         and exists (
           select 1
           from discovered_items di
@@ -1062,6 +1079,70 @@ describe("catalog services", () => {
     const item = await getItemDetail(rows.rows[0].item_id);
 
     expect(item?.soldBy.some((entry) => entry.id === rows.rows[0].npc_id)).toBe(true);
+  }, 20_000);
+
+  it("excludes merchants from item sold-by lists when their only public spawn requires a non-ignored disabled content flag", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{ item_id: number; npc_id: number }>`
+      select distinct ml.item as item_id, nt.id as npc_id
+      from merchantlist ml
+      join npc_types nt on nt.merchant_id = ml.merchantid
+      join spawnentry se on se.npcID = nt.id
+      join spawngroup sg on sg.id = se.spawngroupID
+      join spawn2 s2 on s2.spawngroupID = sg.id
+      left join spawn2_disabled s2d on s2d.spawn2_id = s2.id and coalesce(s2d.disabled, 0) <> 0
+      join zone z on z.short_name = s2.zone and z.version = s2.version
+      join content_flags cf on cf.flag_name = s2.content_flags and coalesce(cf.enabled, 0) = 0
+      where coalesce(z.min_status, 0) <= ${1}
+        and s2d.spawn2_id is null
+        and coalesce(s2.version, 0) in (0, -1)
+        and lower(trim(coalesce(s2.content_flags, ''))) not in (${ignoredNpcSpawnContentFlagsSql()})
+        and exists (
+          select 1
+          from discovered_items di
+          where di.item_id = ml.item
+            and coalesce(di.account_status, 0) <= 0
+        )
+        and not exists (
+          select 1
+          from spawnentry se2
+          join spawngroup sg2 on sg2.id = se2.spawngroupID
+          join spawn2 s22 on s22.spawngroupID = sg2.id
+          left join spawn2_disabled s2d2 on s2d2.spawn2_id = s22.id and coalesce(s2d2.disabled, 0) <> 0
+          join zone z2 on z2.short_name = s22.zone and z2.version = s22.version
+          left join content_flags required_cf2 on required_cf2.flag_name = s22.content_flags
+          left join content_flags disabled_cf2 on disabled_cf2.flag_name = s22.content_flags_disabled
+          where se2.npcID = nt.id
+            and coalesce(z2.min_status, 0) <= ${1}
+            and s2d2.spawn2_id is null
+            and coalesce(s22.version, 0) in (0, -1)
+            and (
+              (
+                coalesce(s22.content_flags, '') = ''
+                or lower(trim(coalesce(s22.content_flags, ''))) in (${ignoredNpcSpawnContentFlagsSql()})
+                or coalesce(required_cf2.enabled, 0) <> 0
+              )
+              and (
+                coalesce(s22.content_flags_disabled, '') = ''
+                or lower(trim(coalesce(s22.content_flags_disabled, ''))) in (${ignoredNpcSpawnContentFlagsSql()})
+                or coalesce(disabled_cf2.enabled, 0) = 0
+              )
+            )
+        )
+      order by ml.item asc
+      limit 1
+    `.execute(db!);
+
+    if (!rows.rows[0]) {
+      expect(rows.rows).toEqual([]);
+      return;
+    }
+
+    const item = await getItemDetail(rows.rows[0].item_id);
+
+    expect(item?.soldBy.some((entry) => entry.id === rows.rows[0].npc_id)).toBe(false);
   }, 20_000);
 
   it("excludes merchants from item sold-by lists when their only public spawn is disabled", async () => {
@@ -1468,7 +1549,67 @@ describe("catalog services", () => {
     expect(npcDetail).toBeUndefined();
   }, 60_000);
 
-  it("includes NPCs whose spawn requires a currently disabled content flag", async () => {
+  it("includes NPCs whose spawn requires an ignored disabled content flag", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{ id: number; name: string; zone_short_name: string }>`
+      select nt.id, nt.name, min(s2.zone) as zone_short_name
+      from npc_types nt
+      join spawnentry se on se.npcID = nt.id
+      join spawngroup sg on sg.id = se.spawngroupID
+      join spawn2 s2 on s2.spawngroupID = sg.id
+      left join spawn2_disabled s2d on s2d.spawn2_id = s2.id and coalesce(s2d.disabled, 0) <> 0
+      join (
+        select short_name
+        from zone
+        where coalesce(version, 0) = 0
+          and coalesce(min_status, 0) <= ${1}
+        group by short_name
+      ) z on z.short_name = s2.zone
+      left join content_flags required_cf on required_cf.flag_name = s2.content_flags
+      left join content_flags disabled_cf on disabled_cf.flag_name = s2.content_flags_disabled
+      where coalesce(nt.trackable, 0) = ${1}
+        and lower(trim(coalesce(nt.name, ''))) <> 'bazaar'
+        and s2d.spawn2_id is null
+        and coalesce(s2.version, 0) in (0, -1)
+        and (
+          (
+            lower(trim(coalesce(s2.content_flags, ''))) in (${ignoredNpcSpawnContentFlagsSql()})
+            and coalesce(required_cf.enabled, 0) = 0
+          )
+          or (
+            lower(trim(coalesce(s2.content_flags_disabled, ''))) in (${ignoredNpcSpawnContentFlagsSql()})
+            and coalesce(disabled_cf.enabled, 0) <> 0
+          )
+        )
+      group by nt.id, nt.name
+      order by nt.id asc
+      limit 1
+    `.execute(db!);
+
+    if (!rows.rows[0]) {
+      expect(rows.rows).toEqual([]);
+      return;
+    }
+
+    const sample = rows.rows[0];
+    const query = sample.name;
+    const [npcResults, searchHits, detail, zone] = await Promise.all([
+      listNpcs({ q: query }),
+      searchCatalog(query),
+      getNpcDetail(sample.id),
+      getZoneDetail(sample.zone_short_name)
+    ]);
+
+    expect(npcResults.some((npc) => npc.id === sample.id)).toBe(true);
+    expect(searchHits.some((hit) => hit.type === "npc" && hit.id === String(sample.id))).toBe(true);
+    expect(detail?.id).toBe(sample.id);
+    expect(detail?.spawnZones.some((entry) => entry.shortName === sample.zone_short_name)).toBe(true);
+    expect(zone?.bestiary.some((npc) => npc.id === sample.id)).toBe(true);
+  }, 60_000);
+
+  it("excludes NPCs whose only public spawn requires a non-ignored disabled content flag", async () => {
     const db = getDb();
     expect(db).toBeTruthy();
 
@@ -1491,8 +1632,40 @@ describe("catalog services", () => {
         and lower(trim(coalesce(nt.name, ''))) <> 'bazaar'
         and s2d.spawn2_id is null
         and coalesce(s2.version, 0) in (0, -1)
+        and lower(trim(coalesce(s2.content_flags, ''))) not in (${ignoredNpcSpawnContentFlagsSql()})
+        and not exists (
+          select 1
+          from spawnentry se2
+          join spawngroup sg2 on sg2.id = se2.spawngroupID
+          join spawn2 s22 on s22.spawngroupID = sg2.id
+          left join spawn2_disabled s2d2 on s2d2.spawn2_id = s22.id and coalesce(s2d2.disabled, 0) <> 0
+          join (
+            select short_name
+            from zone
+            where coalesce(version, 0) = 0
+              and coalesce(min_status, 0) <= ${1}
+            group by short_name
+          ) z2 on z2.short_name = s22.zone
+          left join content_flags required_cf2 on required_cf2.flag_name = s22.content_flags
+          left join content_flags disabled_cf2 on disabled_cf2.flag_name = s22.content_flags_disabled
+          where se2.npcID = nt.id
+            and s2d2.spawn2_id is null
+            and coalesce(s22.version, 0) in (0, -1)
+            and (
+              (
+                coalesce(s22.content_flags, '') = ''
+                or lower(trim(coalesce(s22.content_flags, ''))) in (${ignoredNpcSpawnContentFlagsSql()})
+                or coalesce(required_cf2.enabled, 0) <> 0
+              )
+              and (
+                coalesce(s22.content_flags_disabled, '') = ''
+                or lower(trim(coalesce(s22.content_flags_disabled, ''))) in (${ignoredNpcSpawnContentFlagsSql()})
+                or coalesce(disabled_cf2.enabled, 0) = 0
+              )
+            )
+        )
       group by nt.id, nt.name
-      order by case when nt.id = 86121 then 0 else 1 end, nt.id asc
+      order by nt.id asc
       limit 1
     `.execute(db!);
 
@@ -1502,19 +1675,17 @@ describe("catalog services", () => {
     }
 
     const sample = rows.rows[0];
-    const query = sample.id === 86121 ? "Abominable Snowman" : sample.name;
     const [npcResults, searchHits, detail, zone] = await Promise.all([
-      listNpcs({ q: query }),
-      searchCatalog(query),
+      listNpcs({ q: sample.name }),
+      searchCatalog(sample.name),
       getNpcDetail(sample.id),
       getZoneDetail(sample.zone_short_name)
     ]);
 
-    expect(npcResults.some((npc) => npc.id === sample.id)).toBe(true);
-    expect(searchHits.some((hit) => hit.type === "npc" && hit.id === String(sample.id))).toBe(true);
-    expect(detail?.id).toBe(sample.id);
-    expect(detail?.spawnZones.some((entry) => entry.shortName === sample.zone_short_name)).toBe(true);
-    expect(zone?.bestiary.some((npc) => npc.id === sample.id)).toBe(true);
+    expect(npcResults.some((npc) => npc.id === sample.id)).toBe(false);
+    expect(searchHits.some((hit) => hit.type === "npc" && hit.id === String(sample.id))).toBe(false);
+    expect(detail).toBeUndefined();
+    expect(zone?.bestiary.some((npc) => npc.id === sample.id)).toBe(false);
   }, 60_000);
 
   it("excludes NPCs named Bazaar from listings, search, detail, and zone bestiary views", async () => {
@@ -2239,6 +2410,8 @@ describe("catalog services", () => {
         join spawngroup sg on sg.id = se.spawngroupID
         join spawn2 s2 on s2.spawngroupID = sg.id
         left join spawn2_disabled s2d on s2d.spawn2_id = s2.id and coalesce(s2d.disabled, 0) <> 0
+        left join content_flags required_cf on required_cf.flag_name = s2.content_flags
+        left join content_flags disabled_cf on disabled_cf.flag_name = s2.content_flags_disabled
         join (
           select short_name
           from zone
@@ -2248,6 +2421,18 @@ describe("catalog services", () => {
         ) z on z.short_name = s2.zone
         where s2d.spawn2_id is null
           and coalesce(s2.version, 0) in (0, -1)
+          and (
+            (
+              coalesce(s2.content_flags, '') = ''
+              or lower(trim(coalesce(s2.content_flags, ''))) in (${ignoredNpcSpawnContentFlagsSql()})
+              or coalesce(required_cf.enabled, 0) <> 0
+            )
+            and (
+              coalesce(s2.content_flags_disabled, '') = ''
+              or lower(trim(coalesce(s2.content_flags_disabled, ''))) in (${ignoredNpcSpawnContentFlagsSql()})
+              or coalesce(disabled_cf.enabled, 0) = 0
+            )
+          )
           and coalesce(nt.trackable, 0) = 1
           and lower(trim(coalesce(nt.name, ''))) <> 'bazaar'
       `.execute(db!),

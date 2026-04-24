@@ -378,14 +378,33 @@ function formatBaneBodyType(bodyType: number | null | undefined) {
   return bodyTypeNameMap[normalized] ?? `Body Type ${normalized}`;
 }
 
+const npcSpawnContentFlagsIgnoredForAvailability = ["cw_halloween", "cw_christmas"] as const;
+
+function sqlStringLiteral(value: string) {
+  return `'${value.replaceAll("'", "''")}'`;
+}
+
+function ignoredContentFlagCondition(alias: string, column: string, ignoredFlags: readonly string[]) {
+  if (ignoredFlags.length === 0) {
+    return "";
+  }
+
+  return `lower(trim(coalesce(${alias}.${column}, ''))) in (${ignoredFlags.map(sqlStringLiteral).join(", ")})`;
+}
+
 function enabledContentFlagsCondition(
   alias: string,
   requiredColumn = "content_flags",
-  disabledColumn = "content_flags_disabled"
+  disabledColumn = "content_flags_disabled",
+  ignoredFlags: readonly string[] = []
 ) {
+  const ignoredRequiredFlag = ignoredContentFlagCondition(alias, requiredColumn, ignoredFlags);
+  const ignoredDisabledFlag = ignoredContentFlagCondition(alias, disabledColumn, ignoredFlags);
+
   return `(
     (
       coalesce(${alias}.${requiredColumn}, '') = ''
+      ${ignoredRequiredFlag ? `or ${ignoredRequiredFlag}` : ""}
       or exists (
         select 1
         from content_flags required_cf
@@ -395,6 +414,7 @@ function enabledContentFlagsCondition(
     )
     and (
       coalesce(${alias}.${disabledColumn}, '') = ''
+      ${ignoredDisabledFlag ? `or ${ignoredDisabledFlag}` : ""}
       or not exists (
         select 1
         from content_flags disabled_cf
@@ -450,7 +470,12 @@ function publicEnabledSpawnSubquery(alias: string) {
     ) z on z.short_name = s2.zone
     where s2d.spawn2_id is null
       and coalesce(s2.version, 0) in (0, -1)
-      -- Content-gated spawn rows still represent catalogable NPC data.
+      and ${enabledContentFlagsCondition(
+        "s2",
+        "content_flags",
+        "content_flags_disabled",
+        npcSpawnContentFlagsIgnoredForAvailability
+      )}
   ) ${alias}`);
 }
 
@@ -3771,6 +3796,10 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
       manualZoneLinksByNpcId.get(id) ?? [],
       lootChestZoneLinksByNpcId.get(id) ?? []
     );
+
+    if (spawnZones.length === 0) {
+      return undefined;
+    }
 
     const dropGroups = new Map<
       number,
