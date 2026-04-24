@@ -451,20 +451,6 @@ describe("catalog services", () => {
         and lower(trim(coalesce(nt.name, ''))) <> 'bazaar'
         and s2d.spawn2_id is null
         and coalesce(s2.version, 0) not in (0, -1)
-        and (
-          (coalesce(s2.content_flags, '') = '' or exists (
-            select 1
-            from content_flags cf
-            where cf.flag_name = s2.content_flags
-              and coalesce(cf.enabled, 0) <> 0
-          ))
-          and (coalesce(s2.content_flags_disabled, '') = '' or not exists (
-            select 1
-            from content_flags cf
-            where cf.flag_name = s2.content_flags_disabled
-              and coalesce(cf.enabled, 0) <> 0
-          ))
-        )
         and not exists (
           select 1
           from spawnentry se2
@@ -476,20 +462,6 @@ describe("catalog services", () => {
             and coalesce(z2.min_status, 0) <= 1
             and s2d2.spawn2_id is null
             and coalesce(s22.version, 0) in (0, -1)
-            and (
-              (coalesce(s22.content_flags, '') = '' or exists (
-                select 1
-                from content_flags cf
-                where cf.flag_name = s22.content_flags
-                  and coalesce(cf.enabled, 0) <> 0
-              ))
-              and (coalesce(s22.content_flags_disabled, '') = '' or not exists (
-                select 1
-                from content_flags cf
-                where cf.flag_name = s22.content_flags_disabled
-                  and coalesce(cf.enabled, 0) <> 0
-              ))
-            )
         )
       group by nt.id, nt.name
       order by nt.id asc
@@ -1058,7 +1030,7 @@ describe("catalog services", () => {
     expect(item?.soldBy.some((entry) => entry.id === rows.rows[0].npc_id)).toBe(true);
   }, 20_000);
 
-  it("excludes merchants from item sold-by lists when their required content flag is disabled", async () => {
+  it("includes merchants on item sold-by lists when their spawn requires a disabled content flag", async () => {
     const db = getDb();
     expect(db).toBeTruthy();
 
@@ -1089,7 +1061,7 @@ describe("catalog services", () => {
 
     const item = await getItemDetail(rows.rows[0].item_id);
 
-    expect(item?.soldBy.some((entry) => entry.id === rows.rows[0].npc_id)).toBe(false);
+    expect(item?.soldBy.some((entry) => entry.id === rows.rows[0].npc_id)).toBe(true);
   }, 20_000);
 
   it("excludes merchants from item sold-by lists when their only public spawn is disabled", async () => {
@@ -1265,18 +1237,6 @@ describe("catalog services", () => {
         and coalesce(s2.version, 0) in (0, -1)
         and coalesce(z.min_status, 0) <= ${1}
         and coalesce(z.version, 0) = 0
-        and (coalesce(s2.content_flags, '') = '' or exists (
-          select 1
-          from content_flags spawn_required_cf
-          where spawn_required_cf.flag_name = s2.content_flags
-            and coalesce(spawn_required_cf.enabled, 0) <> 0
-        ))
-        and (coalesce(s2.content_flags_disabled, '') = '' or not exists (
-          select 1
-          from content_flags spawn_disabled_cf
-          where spawn_disabled_cf.flag_name = s2.content_flags_disabled
-            and coalesce(spawn_disabled_cf.enabled, 0) <> 0
-        ))
         and coalesce(ml.min_status, 0) <= ${1}
         and (coalesce(ml.content_flags, '') = '' or coalesce(required_cf.enabled, 0) <> 0)
         and (coalesce(ml.content_flags_disabled, '') = '' or coalesce(disabled_cf.enabled, 0) = 0)
@@ -1461,20 +1421,6 @@ describe("catalog services", () => {
         and nt.race = 60
         and s2d.spawn2_id is null
         and coalesce(s2.version, 0) in (0, -1)
-        and (
-          (coalesce(s2.content_flags, '') = '' or exists (
-            select 1
-            from content_flags cf
-            where cf.flag_name = s2.content_flags
-              and coalesce(cf.enabled, 0) <> 0
-          ))
-          and (coalesce(s2.content_flags_disabled, '') = '' or not exists (
-            select 1
-            from content_flags cf
-            where cf.flag_name = s2.content_flags_disabled
-              and coalesce(cf.enabled, 0) <> 0
-          ))
-        )
       order by nt.id asc
       limit 1
     `.execute(db!);
@@ -1520,6 +1466,55 @@ describe("catalog services", () => {
     expect(npcResults.some((npc) => npc.name.replaceAll(" ", "_") === query)).toBe(false);
     expect(searchHits.some((hit) => hit.type === "npc")).toBe(false);
     expect(npcDetail).toBeUndefined();
+  }, 60_000);
+
+  it("includes NPCs whose spawn requires a currently disabled content flag", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{ id: number; name: string; zone_short_name: string }>`
+      select nt.id, nt.name, min(s2.zone) as zone_short_name
+      from npc_types nt
+      join spawnentry se on se.npcID = nt.id
+      join spawngroup sg on sg.id = se.spawngroupID
+      join spawn2 s2 on s2.spawngroupID = sg.id
+      left join spawn2_disabled s2d on s2d.spawn2_id = s2.id and coalesce(s2d.disabled, 0) <> 0
+      join (
+        select short_name
+        from zone
+        where coalesce(version, 0) = 0
+          and coalesce(min_status, 0) <= ${1}
+        group by short_name
+      ) z on z.short_name = s2.zone
+      join content_flags cf on cf.flag_name = s2.content_flags and coalesce(cf.enabled, 0) = 0
+      where coalesce(nt.trackable, 0) = ${1}
+        and lower(trim(coalesce(nt.name, ''))) <> 'bazaar'
+        and s2d.spawn2_id is null
+        and coalesce(s2.version, 0) in (0, -1)
+      group by nt.id, nt.name
+      order by case when nt.id = 86121 then 0 else 1 end, nt.id asc
+      limit 1
+    `.execute(db!);
+
+    if (!rows.rows[0]) {
+      expect(rows.rows).toEqual([]);
+      return;
+    }
+
+    const sample = rows.rows[0];
+    const query = sample.id === 86121 ? "Abominable Snowman" : sample.name;
+    const [npcResults, searchHits, detail, zone] = await Promise.all([
+      listNpcs({ q: query }),
+      searchCatalog(query),
+      getNpcDetail(sample.id),
+      getZoneDetail(sample.zone_short_name)
+    ]);
+
+    expect(npcResults.some((npc) => npc.id === sample.id)).toBe(true);
+    expect(searchHits.some((hit) => hit.type === "npc" && hit.id === String(sample.id))).toBe(true);
+    expect(detail?.id).toBe(sample.id);
+    expect(detail?.spawnZones.some((entry) => entry.shortName === sample.zone_short_name)).toBe(true);
+    expect(zone?.bestiary.some((npc) => npc.id === sample.id)).toBe(true);
   }, 60_000);
 
   it("excludes NPCs named Bazaar from listings, search, detail, and zone bestiary views", async () => {
@@ -1993,20 +1988,6 @@ describe("catalog services", () => {
           where se.npcID = nt.id
             and s2d.spawn2_id is null
             and coalesce(s2.version, 0) in (0, -1)
-            and (
-              (coalesce(s2.content_flags, '') = '' or exists (
-                select 1
-                from content_flags cf
-                where cf.flag_name = s2.content_flags
-                  and coalesce(cf.enabled, 0) <> 0
-              ))
-              and (coalesce(s2.content_flags_disabled, '') = '' or not exists (
-                select 1
-                from content_flags cf
-                where cf.flag_name = s2.content_flags_disabled
-                  and coalesce(cf.enabled, 0) <> 0
-              ))
-            )
         )
       group by nfe.faction_id
       order by count(distinct nt.id) desc
@@ -2239,20 +2220,6 @@ describe("catalog services", () => {
         and s2.version in (z.version, -1)
         and s2d.spawn2_id is null
         and coalesce(se.chance, 0) > 0
-        and (
-          (coalesce(s2.content_flags, '') = '' or exists (
-            select 1
-            from content_flags cf
-            where cf.flag_name = s2.content_flags
-              and coalesce(cf.enabled, 0) <> 0
-          ))
-          and (coalesce(s2.content_flags_disabled, '') = '' or not exists (
-            select 1
-            from content_flags cf
-            where cf.flag_name = s2.content_flags_disabled
-              and coalesce(cf.enabled, 0) <> 0
-          ))
-        )
       group by nt.id
     `.execute(db!);
 
@@ -2283,20 +2250,6 @@ describe("catalog services", () => {
           and coalesce(s2.version, 0) in (0, -1)
           and coalesce(nt.trackable, 0) = 1
           and lower(trim(coalesce(nt.name, ''))) <> 'bazaar'
-          and (
-            (coalesce(s2.content_flags, '') = '' or exists (
-              select 1
-              from content_flags cf
-              where cf.flag_name = s2.content_flags
-                and coalesce(cf.enabled, 0) <> 0
-            ))
-            and (coalesce(s2.content_flags_disabled, '') = '' or not exists (
-              select 1
-              from content_flags cf
-              where cf.flag_name = s2.content_flags_disabled
-                and coalesce(cf.enabled, 0) <> 0
-            ))
-          )
       `.execute(db!),
       sql<{ count: number }>`
         select count(*) as count

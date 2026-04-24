@@ -450,7 +450,7 @@ function publicEnabledSpawnSubquery(alias: string) {
     ) z on z.short_name = s2.zone
     where s2d.spawn2_id is null
       and coalesce(s2.version, 0) in (0, -1)
-      and ${enabledContentFlagsCondition("s2")}
+      -- Content-gated spawn rows still represent catalogable NPC data.
   ) ${alias}`);
 }
 
