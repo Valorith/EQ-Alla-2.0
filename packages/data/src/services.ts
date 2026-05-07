@@ -1669,6 +1669,10 @@ function formatReferencedItem(itemId: number, itemNames: Map<number, string>) {
   return itemNames.get(itemId) ?? `Item ${itemId}`;
 }
 
+function formatReferencedItemLinkLabel(itemId: number, itemNames: Map<number, string>) {
+  return formatReferencedItem(itemId, itemNames).replace(/^Summoned:\s*/i, "");
+}
+
 function describeSpellEffectLink(
   effectId: number,
   itemId: number,
@@ -1683,7 +1687,7 @@ function describeSpellEffectLink(
     case 109:
       return {
         href: `/items/${itemId}`,
-        label: formatReferencedItem(itemId, references.itemNames ?? new Map())
+        label: formatReferencedItemLinkLabel(itemId, references.itemNames ?? new Map())
       };
     default:
       return undefined;
@@ -4961,7 +4965,7 @@ export async function listPets(filters: PetFilters = {}): Promise<PetSummary[]> 
             nt.maxdmg
           from spells_new s
           inner join pets p on p.type = s.teleport_zone
-          inner join npc_types nt on nt.name = s.teleport_zone
+          inner join npc_types nt on nt.id = p.npcID
           where ${classColumn} > 0 and ${classColumn} < 255 and nt.level <= ${petSearchLevelCap}
           group by s.id, s.name, s.new_icon, spell_level, nt.race, nt.level, nt.class, nt.hp, nt.mana, nt.ac, nt.mindmg, nt.maxdmg
           order by spell_level asc, s.name asc
@@ -5023,7 +5027,7 @@ export async function getPetDetail(id: number): Promise<PetDetail | undefined> {
         nt.maxdmg
       from spells_new s
       inner join pets p on p.type = s.teleport_zone
-      inner join npc_types nt on nt.name = s.teleport_zone
+      inner join npc_types nt on nt.id = p.npcID
       where s.id = ${id} and nt.level <= ${petSearchLevelCap}
       limit 1
     `.execute(db!);

@@ -1766,7 +1766,7 @@ describe("catalog services", () => {
 
     expect(shrinkEffects).toContain("Decrease Player Size by 34%");
     expect(thistlecoatEffects).toContain("Increase Damage Shield by 1");
-    expect(turgurEffects).toContain("Decrease Attack Speed by 15%");
+    expect(turgurEffects).toContain("Decrease Attack Speed by 75%");
   });
 
   it("shows the lvl 1 to lvl 60 range for level-scaled spell effects", async () => {
