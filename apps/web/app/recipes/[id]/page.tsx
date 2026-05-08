@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, FlaskConical, Package2, Wrench } from "lucide-react";
+import { ArrowRight, FlaskConical, Package2, RotateCcw, ShieldCheck, Wrench } from "lucide-react";
 import { getRecipeDetail } from "@eq-alla/data";
 import { ItemIcon } from "../../../components/item-icon";
 import { RecipeStationAccess } from "../../../components/recipe-station-access";
@@ -189,22 +189,64 @@ export default async function RecipeDetailPage({ params }: RecipeDetailPageProps
               </div>
 
               <section className="px-5 py-5 sm:px-6 sm:py-6">
-                <div className="flex items-center gap-3">
-                  <Wrench className="size-5 text-[#dcb46e]" />
+                <div className="space-y-6">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b99a67]">Crafted Output</p>
-                    <p className="mt-1 text-sm text-[var(--foreground)]/78">Resolved result items and their final yields.</p>
-                  </div>
-                </div>
+                    <div className="flex items-center gap-3">
+                      <Wrench className="size-5 text-[#dcb46e]" />
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b99a67]">Crafted Output</p>
+                        <p className="mt-1 text-sm text-[var(--foreground)]/78">Resolved result items and their final yields.</p>
+                      </div>
+                    </div>
 
-                <div className="mt-5">
-                  {recipe.creates.length > 0 ? (
-                    recipe.creates.map((entry) => (
-                      <RecipeEntryRow key={`create-${entry.id}-${entry.count}`} entry={entry} quantityLabel={`Yield x${entry.count}`} />
-                    ))
-                  ) : (
-                    <p className="py-3 text-sm leading-7 text-[var(--foreground)]/78">No output items were resolved for this recipe.</p>
-                  )}
+                    <div className="mt-5">
+                      {recipe.creates.length > 0 ? (
+                        recipe.creates.map((entry) => (
+                          <RecipeEntryRow key={`create-${entry.id}-${entry.count}`} entry={entry} quantityLabel={`Yield x${entry.count}`} />
+                        ))
+                      ) : (
+                        <p className="py-3 text-sm leading-7 text-[var(--foreground)]/78">No output items were resolved for this recipe.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-white/10 pt-5">
+                    <div className="flex items-center gap-3">
+                      <RotateCcw className="size-5 text-[#dcb46e]" />
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b99a67]">Returned on Failure</p>
+                        <p className="mt-1 text-sm text-[var(--foreground)]/78">Items explicitly returned after a failed combine.</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-5">
+                      {recipe.failureReturns.length > 0 ? (
+                        recipe.failureReturns.map((entry) => (
+                          <RecipeEntryRow key={`failure-${entry.id}-${entry.count}`} entry={entry} quantityLabel={`Return x${entry.count}`} />
+                        ))
+                      ) : (
+                        <p className="py-3 text-sm leading-7 text-[var(--foreground)]/78">No guaranteed failure returns are recorded for this recipe.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {recipe.salvageReturns.length > 0 ? (
+                    <div className="border-t border-white/10 pt-5">
+                      <div className="flex items-center gap-3">
+                        <ShieldCheck className="size-5 text-[#dcb46e]" />
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b99a67]">Salvageable on Failure</p>
+                          <p className="mt-1 text-sm text-[var(--foreground)]/78">Items eligible to be salvaged when the combine fails.</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-5">
+                        {recipe.salvageReturns.map((entry) => (
+                          <RecipeEntryRow key={`salvage-${entry.id}-${entry.count}`} entry={entry} quantityLabel={`Salvage x${entry.count}`} />
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </section>
             </div>

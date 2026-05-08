@@ -97,6 +97,7 @@ export type ItemDetail = ItemSummary & {
     href: string;
     zone: { shortName: string; longName: string; href: string };
   }>;
+  createdByRecipes: Array<{ id: number; name: string; href: string }>;
   usedInRecipes: Array<{ id: number; name: string; href: string }>;
 };
 
@@ -512,6 +513,8 @@ export type RecipeDetail = RecipeSummary & {
   availableZonesByStation: Array<RecipeStationRequirement & { zones: RecipeStationZone[] }>;
   creates: Array<{ id: number; name: string; href: string; count: number; icon: string }>;
   ingredients: Array<{ id: number; name: string; href: string; count: number; icon: string }>;
+  failureReturns: Array<{ id: number; name: string; href: string; count: number; icon: string }>;
+  salvageReturns: Array<{ id: number; name: string; href: string; count: number; icon: string }>;
 };
 
 export type PetDetail = {

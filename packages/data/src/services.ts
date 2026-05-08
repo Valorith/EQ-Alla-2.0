@@ -3043,6 +3043,18 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       limit 40
     `.execute(db!);
 
+    const createdByRecipeRowsPromise = sql<{ id: number; name: string }>`
+      select distinct tr.id, tr.name
+      from tradeskill_recipe_entries tre
+      join tradeskill_recipe tr on tr.id = tre.recipe_id
+      where tre.item_id = ${id}
+        and ${sql.raw(enabledRecipeCondition("tr"))}
+        and coalesce(tre.iscontainer, 0) = 0
+        and coalesce(tre.successcount, 0) > 0
+      order by tr.name asc
+      limit 40
+    `.execute(db!);
+
     const effectNameMapPromise = spellNamesById([row.proceffect, row.worneffect, row.focuseffect, row.clickeffect, row.scrolleffect].map(Number));
     const craftedSpellRecipeRefsPromise = getCraftedSpellRecipeRefsForItem(id);
     const globalLootRowsPromise = sql<{ id: number }>`
@@ -3056,10 +3068,11 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       limit 1
     `.execute(db!);
 
-    const [droppedByCandidateRows, soldByRows, recipeRows, effectNameMap, craftedSpellRecipeRefs, globalLootRows] = await Promise.all([
+    const [droppedByCandidateRows, soldByRows, recipeRows, createdByRecipeRows, effectNameMap, craftedSpellRecipeRefs, globalLootRows] = await Promise.all([
       droppedByCandidateRowsPromise,
       soldByRowsPromise,
       recipeRowsPromise,
+      createdByRecipeRowsPromise,
       effectNameMapPromise,
       craftedSpellRecipeRefsPromise,
       globalLootRowsPromise
@@ -3277,6 +3290,13 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
     )
       .sort((left, right) => left.name.localeCompare(right.name) || left.href.localeCompare(right.href));
 
+    const createdByRecipes = createdByRecipeRows.rows
+      .map((entry) => ({ id: entry.id, name: entry.name, href: `/recipes/${entry.id}` }))
+      .filter(
+        (entry, index, entries) => entries.findIndex((candidate) => candidate.href === entry.href && candidate.name === entry.name) === index
+      )
+      .sort((left, right) => left.name.localeCompare(right.name) || left.id - right.id);
+
     const detail: ItemDetail = {
       id: row.id,
       name: row.name,
@@ -3335,6 +3355,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
           href: `/zones/${entry.short_name}`
         }
       })),
+      createdByRecipes,
       usedInRecipes
     };
     return detail;
@@ -4798,15 +4819,29 @@ export async function getRecipeDetail(id: number): Promise<RecipeDetail | undefi
     const entryRows = await sql<{
       item_id: number;
       successcount: number;
+      failcount: number;
       componentcount: number;
+      salvagecount: number;
       iscontainer: number;
       item_name: string | null;
       item_icon: number | null;
+      item_is_discovered: number;
     }>`
-      select tre.item_id, tre.successcount, tre.componentcount, tre.iscontainer, i.Name as item_name, i.icon as item_icon
+      select
+        tre.item_id,
+        tre.successcount,
+        tre.failcount,
+        tre.componentcount,
+        tre.salvagecount,
+        tre.iscontainer,
+        coalesce(visible_items.Name, container_items.Name) as item_name,
+        coalesce(visible_items.icon, container_items.icon) as item_icon,
+        case when visible_items.id is null then 0 else 1 end as item_is_discovered
       from tradeskill_recipe_entries tre
-      left join items i on i.id = tre.item_id
-        and ${discoveredItemClause("i.id")}
+      left join items visible_items on visible_items.id = tre.item_id
+        and ${discoveredItemClause("visible_items.id")}
+      left join items container_items on container_items.id = tre.item_id
+        and coalesce(tre.iscontainer, 0) = 1
       where tre.recipe_id = ${id}
       order by tre.id asc
     `.execute(db!);
@@ -4821,7 +4856,7 @@ export async function getRecipeDetail(id: number): Promise<RecipeDetail | undefi
         accumulator.push({
           id: entry.item_id,
           name: entry.item_name?.trim() || staticTradeskillContainers[entry.item_id]?.name || `Item ${entry.item_id}`,
-          href: entry.item_name ? `/items/${entry.item_id}` : undefined,
+          href: Number(entry.item_is_discovered ?? 0) !== 0 ? `/items/${entry.item_id}` : undefined,
           icon: String(entry.item_icon ?? staticTradeskillContainers[entry.item_id]?.icon ?? "")
         });
 
@@ -4848,6 +4883,26 @@ export async function getRecipeDetail(id: number): Promise<RecipeDetail | undefi
         name: entry.item_name?.trim() || `Item ${entry.item_id}`,
         href: `/items/${entry.item_id}`,
         count: Number(entry.componentcount ?? 0),
+        icon: String(entry.item_icon ?? "")
+      }));
+
+    const failureReturns = entryRows.rows
+      .filter((entry) => Number(entry.failcount ?? 0) > 0 && Boolean(entry.item_name))
+      .map((entry) => ({
+        id: entry.item_id,
+        name: entry.item_name?.trim() || `Item ${entry.item_id}`,
+        href: `/items/${entry.item_id}`,
+        count: Number(entry.failcount ?? 0),
+        icon: String(entry.item_icon ?? "")
+      }));
+
+    const salvageReturns = entryRows.rows
+      .filter((entry) => Number(entry.salvagecount ?? 0) > 0 && Boolean(entry.item_name))
+      .map((entry) => ({
+        id: entry.item_id,
+        name: entry.item_name?.trim() || `Item ${entry.item_id}`,
+        href: `/items/${entry.item_id}`,
+        count: Number(entry.salvagecount ?? 0),
         icon: String(entry.item_icon ?? "")
       }));
 
@@ -4915,7 +4970,9 @@ export async function getRecipeDetail(id: number): Promise<RecipeDetail | undefi
       requiredStations,
       availableZonesByStation,
       creates,
-      ingredients
+      ingredients,
+      failureReturns,
+      salvageReturns
     };
   })();
 }

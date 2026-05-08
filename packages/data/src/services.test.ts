@@ -1390,6 +1390,106 @@ describe("catalog services", () => {
     );
   }, 20_000);
 
+  it("matches canonical output recipe provenance rows", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const seedRows = await sql<{ item_id: number }>`
+      select distinct tre.item_id
+      from tradeskill_recipe_entries tre
+      join tradeskill_recipe tr on tr.id = tre.recipe_id
+      where exists (
+        select 1
+        from discovered_items di
+        where di.item_id = tre.item_id
+          and coalesce(di.account_status, 0) <= 0
+      )
+        and coalesce(tr.enabled, 1) = 1
+        and coalesce(tre.iscontainer, 0) = 0
+        and coalesce(tre.successcount, 0) > 0
+      order by tre.item_id asc
+      limit 1
+    `.execute(db!);
+
+    if (!seedRows.rows[0]) {
+      expect(seedRows.rows).toEqual([]);
+      return;
+    }
+
+    const itemId = seedRows.rows[0].item_id;
+    const expectedRows = await sql<{ id: number; name: string }>`
+      select distinct tr.id, tr.name
+      from tradeskill_recipe_entries tre
+      join tradeskill_recipe tr on tr.id = tre.recipe_id
+      where tre.item_id = ${itemId}
+        and coalesce(tr.enabled, 1) = 1
+        and coalesce(tre.iscontainer, 0) = 0
+        and coalesce(tre.successcount, 0) > 0
+      order by tr.name asc, tr.id asc
+    `.execute(db!);
+
+    const item = await getItemDetail(itemId);
+
+    expect(item?.createdByRecipes.map((entry) => entry.id)).toEqual(expectedRows.rows.map((row) => row.id));
+  }, 20_000);
+
+  it("includes the tradeskill recipe that creates Ancient Manastone", async () => {
+    const item = await getItemDetail(150788);
+
+    expect(item).toBeTruthy();
+    expect(item?.createdByRecipes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 27970,
+          name: "Ancient Manastone",
+          href: "/recipes/27970"
+        })
+      ])
+    );
+  }, 20_000);
+
+  it("shows concrete containers and failure returns for Ancient Manastone recipe", async () => {
+    const recipe = await getRecipeDetail(27970);
+
+    expect(recipe).toBeTruthy();
+    expect(recipe?.container).toBe("Clumsy's Arcane Tome");
+    expect(recipe?.containers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 150603,
+          name: "Clumsy's Arcane Tome",
+          icon: "1497"
+        })
+      ])
+    );
+    expect(recipe?.failureReturns).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 150288,
+          name: "Ancient Lightstone",
+          href: "/items/150288",
+          count: 1
+        }),
+        expect.objectContaining({
+          id: 13401,
+          name: "Manastone",
+          href: "/items/13401",
+          count: 1
+        })
+      ])
+    );
+    expect(recipe?.salvageReturns).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 150623,
+          name: "Enchanted Diamond Dust",
+          href: "/items/150623",
+          count: 2
+        })
+      ])
+    );
+  }, 20_000);
+
   it("includes Victoria crafted spell outputs in used in recipes for spell items", async () => {
     const item = await getItemDetail(150456);
 

@@ -330,7 +330,7 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
           emptyText="No NPC drop data recorded."
         />
 
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
           <GroupedNpcSection
             title="Sold by merchants"
             entries={item.soldBy.map((entry) => ({
@@ -339,6 +339,11 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
               zone: { href: entry.zone.href, label: entry.zone.longName }
             }))}
             emptyText="This item is not sold by merchants."
+          />
+          <PaginatedRelatedSection
+            title="Created by recipes"
+            items={item.createdByRecipes.map((entry) => ({ href: entry.href, label: entry.name }))}
+            emptyText="This item is not created by recorded recipes."
           />
           <PaginatedRelatedSection
             title="Used in recipes"
