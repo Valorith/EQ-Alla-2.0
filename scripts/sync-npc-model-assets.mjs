@@ -7,11 +7,19 @@ const repoRoot = process.cwd();
 const targetDir = path.join(repoRoot, "apps/web/public/assets/npc-models");
 const assetBaseUrl = "https://cdn.jsdelivr.net/gh/EQEmuTools/eq-asset-preview@master/assets/npc_models";
 const playableRaceIds = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 128, 130, 330, 522]);
+const defaultConnectTimeoutMs = 10_000;
+const defaultFetchTimeoutMs = 15_000;
+const defaultProgressInterval = 250;
 const mockAppearances = [
   { raceId: 6, gender: 0, texture: 0, helmTexture: 0 },
   { raceId: 6, gender: 1, texture: 0, helmTexture: 0 },
   { raceId: 1, gender: 0, texture: 0, helmTexture: 0 }
 ];
+
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 function parseEnv(contents) {
   const values = {};
@@ -126,7 +134,8 @@ async function getDatabaseAppearances(env) {
     port: Number(env.EQ_DB_PORT || 3306),
     database: env.EQ_DB_NAME,
     user: env.EQ_DB_USER,
-    password: env.EQ_DB_PASSWORD || ""
+    password: env.EQ_DB_PASSWORD || "",
+    connectTimeout: parsePositiveInteger(env.EQ_DB_CONNECT_TIMEOUT_MS, defaultConnectTimeoutMs)
   });
 
   try {
@@ -155,9 +164,12 @@ async function ensureDirectory() {
   );
 }
 
-async function fetchAsset(filename) {
+async function fetchAsset(filename, timeoutMs) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
-    const response = await fetch(`${assetBaseUrl}/${filename}`);
+    const response = await fetch(`${assetBaseUrl}/${filename}`, { signal: controller.signal });
     if (!response.ok) {
       return false;
     }
@@ -167,6 +179,8 @@ async function fetchAsset(filename) {
     return true;
   } catch {
     return false;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -218,6 +232,8 @@ async function main() {
   await ensureDirectory();
 
   const env = await loadEnv();
+  const fetchTimeoutMs = parsePositiveInteger(env.EQ_NPC_MODEL_FETCH_TIMEOUT_MS, defaultFetchTimeoutMs);
+  const progressInterval = parsePositiveInteger(env.EQ_NPC_MODEL_SYNC_PROGRESS_INTERVAL, defaultProgressInterval);
   const databaseAppearances = await getDatabaseAppearances(env);
   const expectedFiles = new Set(
     [...databaseAppearances, ...mockAppearances]
@@ -234,26 +250,54 @@ async function main() {
   let skipped = 0;
   let missing = 0;
   let upscaled = 0;
+  let processed = 0;
 
   const expectedList = [...expectedFiles];
 
-  await mapWithConcurrency(expectedList, 8, async (filename) => {
-    if (existingFiles.has(filename)) {
-      skipped += 1;
-      if (await upscaleAsset(filename)) {
-        upscaled += 1;
-      }
-      return;
-    }
+  console.log(
+    JSON.stringify({
+      phase: "npc-model-assets:start",
+      targetDir,
+      expected: expectedFiles.size,
+      existing: existingFiles.size,
+      fetchTimeoutMs
+    })
+  );
 
-    const ok = await fetchAsset(filename);
-    if (ok) {
-      downloaded += 1;
-      if (await upscaleAsset(filename)) {
-        upscaled += 1;
+  await mapWithConcurrency(expectedList, 8, async (filename) => {
+    try {
+      if (existingFiles.has(filename)) {
+        skipped += 1;
+        if (await upscaleAsset(filename)) {
+          upscaled += 1;
+        }
+        return;
       }
-    } else {
-      missing += 1;
+
+      const ok = await fetchAsset(filename, fetchTimeoutMs);
+      if (ok) {
+        downloaded += 1;
+        if (await upscaleAsset(filename)) {
+          upscaled += 1;
+        }
+      } else {
+        missing += 1;
+      }
+    } finally {
+      processed += 1;
+      if (processed % progressInterval === 0 || processed === expectedList.length) {
+        console.log(
+          JSON.stringify({
+            phase: "npc-model-assets:progress",
+            processed,
+            expected: expectedList.length,
+            downloaded,
+            skipped,
+            upscaled,
+            missing
+          })
+        );
+      }
     }
   });
 
