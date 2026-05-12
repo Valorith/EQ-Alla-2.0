@@ -508,13 +508,13 @@ export type PetSummary = {
 export type RecipeDetail = RecipeSummary & {
   container: string;
   notes: string;
-  containers: Array<{ id: number; name: string; href?: string; icon: string }>;
+  containers: Array<{ id: number; name: string; href?: string; icon: string; isDiscovered: boolean }>;
   requiredStations: RecipeStationRequirement[];
   availableZonesByStation: Array<RecipeStationRequirement & { zones: RecipeStationZone[] }>;
-  creates: Array<{ id: number; name: string; href: string; count: number; icon: string }>;
-  ingredients: Array<{ id: number; name: string; href: string; count: number; icon: string }>;
-  failureReturns: Array<{ id: number; name: string; href: string; count: number; icon: string }>;
-  salvageReturns: Array<{ id: number; name: string; href: string; count: number; icon: string }>;
+  creates: Array<{ id: number; name: string; href?: string; count: number; icon: string; isDiscovered: boolean }>;
+  ingredients: Array<{ id: number; name: string; href?: string; count: number; icon: string; isDiscovered: boolean }>;
+  failureReturns: Array<{ id: number; name: string; href?: string; count: number; icon: string; isDiscovered: boolean }>;
+  salvageReturns: Array<{ id: number; name: string; href?: string; count: number; icon: string; isDiscovered: boolean }>;
 };
 
 export type PetDetail = {

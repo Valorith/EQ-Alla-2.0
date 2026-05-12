@@ -30,19 +30,33 @@ function RecipeEntryRow({
   entry,
   quantityLabel
 }: {
-  entry: { id: number; name: string; href: string; count: number; icon: string };
+  entry: { id: number; name: string; href?: string; count: number; icon: string; isDiscovered: boolean };
   quantityLabel: string;
 }) {
-  return (
-    <Link
-      href={entry.href}
-      className="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-t border-white/8 py-3 first:border-t-0"
-    >
-      <ItemIcon icon={entry.icon} name={entry.name} size="sm" tooltipItemId={entry.id} />
+  const content = (
+    <>
+      <ItemIcon icon={entry.icon} name={entry.name} size="sm" tooltipItemId={entry.href ? entry.id : undefined} />
       <div className="min-w-0">
-        <p className="truncate text-[15px] font-semibold text-[#ede4d3] transition group-hover:text-white">{entry.name}</p>
+        <div className="flex min-w-0 items-center gap-2">
+          <p className={`truncate text-[15px] font-semibold text-[#ede4d3]${entry.href ? " transition group-hover:text-white" : ""}`}>{entry.name}</p>
+          {!entry.isDiscovered ? <UndiscoveredBadge /> : null}
+        </div>
         <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8d7f6b]">{quantityLabel}</p>
       </div>
+    </>
+  );
+
+  const className = `grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-t border-white/8 py-3 first:border-t-0${
+    entry.href ? " group" : ""
+  }`;
+
+  if (!entry.href) {
+    return <div className={className}>{content}</div>;
+  }
+
+  return (
+    <Link href={entry.href} className={className}>
+      {content}
       <ArrowRight className="size-4 shrink-0 text-[#7e7364] transition group-hover:translate-x-0.5 group-hover:text-[#dbc083]" />
     </Link>
   );
@@ -51,12 +65,13 @@ function RecipeEntryRow({
 function ContainerLink({
   entry
 }: {
-  entry: { id: number; name: string; href?: string; icon: string };
+  entry: { id: number; name: string; href?: string; icon: string; isDiscovered: boolean };
 }) {
   const content = (
     <>
-      {entry.icon ? <ItemIcon icon={entry.icon} name={entry.name} size="xs" tooltipItemId={entry.id} /> : null}
+      {entry.icon ? <ItemIcon icon={entry.icon} name={entry.name} size="xs" tooltipItemId={entry.href ? entry.id : undefined} /> : null}
       <span className="truncate text-[var(--muted-strong)]">{entry.name}</span>
+      {!entry.isDiscovered ? <UndiscoveredBadge /> : null}
     </>
   );
 
@@ -75,6 +90,14 @@ function ContainerLink({
     >
       {content}
     </Link>
+  );
+}
+
+function UndiscoveredBadge() {
+  return (
+    <span className="shrink-0 rounded-full border border-[#c5a869]/24 bg-[#c5a869]/8 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#cdb27a] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      Undiscovered
+    </span>
   );
 }
 
@@ -135,15 +158,22 @@ export default async function RecipeDetailPage({ params }: RecipeDetailPageProps
 
               {firstCreate ? (
                 <div className="mt-6 flex items-center gap-4 border-t border-white/10 pt-5">
-                  <ItemIcon icon={firstCreate.icon} name={firstCreate.name} size="lg" tooltipItemId={firstCreate.id} />
+                  <ItemIcon icon={firstCreate.icon} name={firstCreate.name} size="lg" tooltipItemId={firstCreate.href ? firstCreate.id : undefined} />
                   <div className="min-w-0">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">Primary Output</p>
-                    <Link
-                      href={firstCreate.href}
-                      className="mt-1 block truncate font-[var(--font-display)] text-[1.7rem] font-semibold tracking-[-0.04em]"
-                    >
-                      <span className="text-[#f4edde] transition group-hover:text-white">{firstCreate.name}</span>
-                    </Link>
+                    {firstCreate.href ? (
+                      <Link
+                        href={firstCreate.href}
+                        className="mt-1 block truncate font-[var(--font-display)] text-[1.7rem] font-semibold tracking-[-0.04em]"
+                      >
+                        <span className="text-[#f4edde] transition group-hover:text-white">{firstCreate.name}</span>
+                      </Link>
+                    ) : (
+                      <div className="mt-1 flex min-w-0 items-center gap-2">
+                        <p className="truncate font-[var(--font-display)] text-[1.7rem] font-semibold tracking-[-0.04em] text-[#f4edde]">{firstCreate.name}</p>
+                        {!firstCreate.isDiscovered ? <UndiscoveredBadge /> : null}
+                      </div>
+                    )}
                     <p className="mt-1 text-sm text-[var(--foreground)]/82">Yield: {firstCreate.count}</p>
                   </div>
                 </div>

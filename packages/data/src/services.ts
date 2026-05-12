@@ -4834,30 +4834,30 @@ export async function getRecipeDetail(id: number): Promise<RecipeDetail | undefi
         tre.componentcount,
         tre.salvagecount,
         tre.iscontainer,
-        coalesce(visible_items.Name, container_items.Name) as item_name,
-        coalesce(visible_items.icon, container_items.icon) as item_icon,
-        case when visible_items.id is null then 0 else 1 end as item_is_discovered
+        raw_items.Name as item_name,
+        raw_items.icon as item_icon,
+        case when raw_items.id is not null and ${discoveredItemClause("raw_items.id")} then 1 else 0 end as item_is_discovered
       from tradeskill_recipe_entries tre
-      left join items visible_items on visible_items.id = tre.item_id
-        and ${discoveredItemClause("visible_items.id")}
-      left join items container_items on container_items.id = tre.item_id
-        and coalesce(tre.iscontainer, 0) = 1
+      left join items raw_items on raw_items.id = tre.item_id
       where tre.recipe_id = ${id}
       order by tre.id asc
     `.execute(db!);
 
     const rawContainers = entryRows.rows
       .filter((entry) => Number(entry.iscontainer ?? 0) === 1)
-      .reduce<Array<{ id: number; name: string; href?: string; icon: string }>>((accumulator, entry) => {
+      .reduce<Array<{ id: number; name: string; href?: string; icon: string; isDiscovered: boolean }>>((accumulator, entry) => {
         if (accumulator.some((container) => container.id === entry.item_id)) {
           return accumulator;
         }
 
+        const isDiscovered = Number(entry.item_is_discovered ?? 0) !== 0;
+
         accumulator.push({
           id: entry.item_id,
           name: entry.item_name?.trim() || staticTradeskillContainers[entry.item_id]?.name || `Item ${entry.item_id}`,
-          href: Number(entry.item_is_discovered ?? 0) !== 0 ? `/items/${entry.item_id}` : undefined,
-          icon: String(entry.item_icon ?? staticTradeskillContainers[entry.item_id]?.icon ?? "")
+          href: isDiscovered ? `/items/${entry.item_id}` : undefined,
+          icon: String(entry.item_icon ?? staticTradeskillContainers[entry.item_id]?.icon ?? ""),
+          isDiscovered
         });
 
         return accumulator;
@@ -4866,45 +4866,30 @@ export async function getRecipeDetail(id: number): Promise<RecipeDetail | undefi
     const containers = resolvedContainers.length > 0 ? resolvedContainers : rawContainers;
     const requiredStations = resolveRecipeStationRequirements(row.tradeskill, containers);
 
+    const toRecipeEntry = (entry: (typeof entryRows.rows)[number], count: number) => ({
+      id: entry.item_id,
+      name: entry.item_name?.trim() || `Item ${entry.item_id}`,
+      href: Number(entry.item_is_discovered ?? 0) !== 0 ? `/items/${entry.item_id}` : undefined,
+      count,
+      icon: String(entry.item_icon ?? ""),
+      isDiscovered: Number(entry.item_is_discovered ?? 0) !== 0
+    });
+
     const creates = entryRows.rows
-      .filter((entry) => Number(entry.successcount ?? 0) > 0 && Boolean(entry.item_name))
-      .map((entry) => ({
-        id: entry.item_id,
-        name: entry.item_name?.trim() || `Item ${entry.item_id}`,
-        href: `/items/${entry.item_id}`,
-        count: Number(entry.successcount ?? 0),
-        icon: String(entry.item_icon ?? "")
-      }));
+      .filter((entry) => Number(entry.item_id ?? 0) > 0 && Number(entry.successcount ?? 0) > 0)
+      .map((entry) => toRecipeEntry(entry, Number(entry.successcount ?? 0)));
 
     const ingredients = entryRows.rows
-      .filter((entry) => Number(entry.componentcount ?? 0) > 0 && Boolean(entry.item_name))
-      .map((entry) => ({
-        id: entry.item_id,
-        name: entry.item_name?.trim() || `Item ${entry.item_id}`,
-        href: `/items/${entry.item_id}`,
-        count: Number(entry.componentcount ?? 0),
-        icon: String(entry.item_icon ?? "")
-      }));
+      .filter((entry) => Number(entry.item_id ?? 0) > 0 && Number(entry.componentcount ?? 0) > 0)
+      .map((entry) => toRecipeEntry(entry, Number(entry.componentcount ?? 0)));
 
     const failureReturns = entryRows.rows
-      .filter((entry) => Number(entry.failcount ?? 0) > 0 && Boolean(entry.item_name))
-      .map((entry) => ({
-        id: entry.item_id,
-        name: entry.item_name?.trim() || `Item ${entry.item_id}`,
-        href: `/items/${entry.item_id}`,
-        count: Number(entry.failcount ?? 0),
-        icon: String(entry.item_icon ?? "")
-      }));
+      .filter((entry) => Number(entry.item_id ?? 0) > 0 && Number(entry.failcount ?? 0) > 0)
+      .map((entry) => toRecipeEntry(entry, Number(entry.failcount ?? 0)));
 
     const salvageReturns = entryRows.rows
-      .filter((entry) => Number(entry.salvagecount ?? 0) > 0 && Boolean(entry.item_name))
-      .map((entry) => ({
-        id: entry.item_id,
-        name: entry.item_name?.trim() || `Item ${entry.item_id}`,
-        href: `/items/${entry.item_id}`,
-        count: Number(entry.salvagecount ?? 0),
-        icon: String(entry.item_icon ?? "")
-      }));
+      .filter((entry) => Number(entry.item_id ?? 0) > 0 && Number(entry.salvagecount ?? 0) > 0)
+      .map((entry) => toRecipeEntry(entry, Number(entry.salvagecount ?? 0)));
 
     let availableZonesByStation: Array<RecipeStationRequirement & { zones: RecipeStationZone[] }> = [];
 

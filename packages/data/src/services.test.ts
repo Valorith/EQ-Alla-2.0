@@ -1490,6 +1490,48 @@ describe("catalog services", () => {
     );
   }, 20_000);
 
+  it("keeps raw recipe-detail item rows visible even when their item pages are undiscovered", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const componentRows = await sql<{ item_id: number; name: string; componentcount: number; is_discovered: number }>`
+      select
+        tre.item_id,
+        i.Name as name,
+        tre.componentcount,
+        exists(
+          select 1
+          from discovered_items di
+          where di.item_id = tre.item_id
+            and coalesce(di.account_status, 0) <= 0
+        ) as is_discovered
+      from tradeskill_recipe_entries tre
+      join items i on i.id = tre.item_id
+      where tre.recipe_id = ${406}
+        and coalesce(tre.componentcount, 0) > 0
+      order by tre.id asc
+    `.execute(db!);
+
+    const recipe = await getRecipeDetail(406);
+
+    expect(recipe).toBeTruthy();
+    expect(recipe?.ingredients.map((entry) => entry.id)).toEqual(componentRows.rows.map((row) => row.item_id));
+    expect(recipe?.ingredients).toEqual(
+      expect.arrayContaining(
+        componentRows.rows.map((row) =>
+          expect.objectContaining({
+            id: row.item_id,
+            name: row.name,
+            count: Number(row.componentcount),
+            href: Number(row.is_discovered) !== 0 ? `/items/${row.item_id}` : undefined,
+            isDiscovered: Number(row.is_discovered) !== 0
+          })
+        )
+      )
+    );
+    expect(recipe?.ingredients.map((entry) => entry.id)).toEqual(expect.arrayContaining([9179, 16861]));
+  }, 20_000);
+
   it("includes Victoria crafted spell outputs in used in recipes for spell items", async () => {
     const item = await getItemDetail(150456);
 
