@@ -31,3 +31,24 @@ test("unknown legacy php routes fall back to the home page", async ({ page }) =>
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("searchbox", { name: "Search Items, NPCs, etc..." })).toBeVisible();
 });
+
+test("spell rows keep their applied class while draft class filters are pending", async ({ page }) => {
+  await page.goto("/spells?q=torrent");
+
+  const draughtRow = page.getByRole("row").filter({ hasText: "Draught of Fire" });
+  await expect(draughtRow).toContainText("Wizard");
+
+  await page.getByLabel("Class").selectOption("Shadow Knight");
+
+  await expect(page.getByText("Press Search to apply filters")).toBeVisible();
+  await expect(draughtRow).toContainText("Wizard");
+  await expect(draughtRow).not.toContainText("Shadow Knight");
+  await expect(page.getByText(/^Level 0$/)).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Search" }).click();
+
+  await expect(page.getByText("3 matching spells")).toBeVisible();
+  await expect(page.getByText(/^Level 0$/)).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Torrent of Hate" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Draught of Fire" })).toHaveCount(0);
+});

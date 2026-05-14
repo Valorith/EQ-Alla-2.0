@@ -350,13 +350,15 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
     })();
   }, [filters, pathname, submitCount]);
 
-  const totalPages = Math.max(1, Math.ceil(results.length / spellResultsPerPage));
-  const visiblePage = Math.min(page, totalPages);
-  const pagedResults = results.slice((visiblePage - 1) * spellResultsPerPage, visiblePage * spellResultsPerPage);
-  const groupedResults = filters.className ? groupSpellsByLevel(pagedResults) : [];
   const draftKey = buildSearchParams(filters).toString();
+  const appliedClassName = displayKey ? new URLSearchParams(displayKey).get("class") ?? "" : "";
+  const displayResults = appliedClassName ? results.filter((spell) => spell.level > 0) : results;
+  const totalPages = Math.max(1, Math.ceil(displayResults.length / spellResultsPerPage));
+  const visiblePage = Math.min(page, totalPages);
+  const pagedResults = displayResults.slice((visiblePage - 1) * spellResultsPerPage, visiblePage * spellResultsPerPage);
+  const groupedResults = appliedClassName ? groupSpellsByLevel(pagedResults) : [];
   const showResults = hasActiveFilters(filters) || isFetching || displayKey.length > 0;
-  const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading spells" : `${results.length} matching spells`) : "Results";
+  const resultTitle = showResults ? (isFetching && displayResults.length === 0 ? "Loading spells" : `${displayResults.length} matching spells`) : "Results";
   const statusLabel = error ? error : isFetching ? "Refreshing results..." : draftKey === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
   const resolvedTiming =
     resolutionMeta && resolutionMeta.key === displayKey && !isFetching
@@ -433,7 +435,7 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
                     <SpellTableHeaderRow />
                   </thead>
                   <tbody>
-                    {(filters.className ? groupedResults.flatMap((group) => [{ isLevelHeader: true as const, level: group.level }, ...group.spells]) : pagedResults).map(
+                    {(appliedClassName ? groupedResults.flatMap((group) => [{ isLevelHeader: true as const, level: group.level }, ...group.spells]) : pagedResults).map(
                       (entry, index) =>
                         "isLevelHeader" in entry ? (
                           <Fragment key={`level-${entry.level}-${index}`}>
@@ -457,7 +459,7 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
                                 </Link>
                               </div>
                             </td>
-                            <td className="px-4 py-3.5 align-top text-[#e8dfcf]">{filters.className || entry.className || "—"}</td>
+                            <td className="px-4 py-3.5 align-top text-[#e8dfcf]">{entry.className || "—"}</td>
                             <td className="px-4 py-3.5 align-top text-[#e8dfcf]">{normalizeDisplayEffect(entry.effect)}</td>
                             <td className="px-4 py-3.5 align-top text-[#e8dfcf]">{entry.mana || 0}</td>
                             <td className="px-4 py-3.5 align-top text-[#e8dfcf]">{normalizeDisplaySkill(entry.skill)}</td>
@@ -472,7 +474,7 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
               <PaginationControls
                 currentPage={visiblePage}
                 totalPages={totalPages}
-                totalItems={results.length}
+                totalItems={displayResults.length}
                 pageSize={spellResultsPerPage}
                 onPageChange={setPage}
               />

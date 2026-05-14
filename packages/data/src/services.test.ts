@@ -2173,6 +2173,15 @@ describe("catalog services", () => {
     expect(upperBand.some((spell) => spell.id === 3378)).toBe(false);
   });
 
+  it("filters spell name searches by the selected class before returning rows", async () => {
+    const shadowKnightTorrents = await listSpells({ q: "torrent", className: "Shadow Knight" });
+
+    expect(shadowKnightTorrents.map((spell) => spell.id)).toEqual([2577, 2578, 2579]);
+    expect(shadowKnightTorrents.every((spell) => spell.className === "Shadow Knight")).toBe(true);
+    expect(shadowKnightTorrents.every((spell) => spell.level > 0)).toBe(true);
+    expect(shadowKnightTorrents.some((spell) => spell.name === "Draught of Fire")).toBe(false);
+  });
+
   it("caps pet listings and pet detail routes at level 60", async () => {
     const magicianPets = await listPets({ className: "Magician" });
     const highLevelPet = await getPetDetail(40926);
