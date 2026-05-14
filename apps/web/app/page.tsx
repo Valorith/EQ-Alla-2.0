@@ -71,7 +71,7 @@ function HomePageBody({ query }: { query: string }) {
       </section>
 
       {hasResults ? (
-        <div className="xl:pl-[306px]">
+        <div>
           <SearchClient initialQuery={query} />
         </div>
       ) : null}

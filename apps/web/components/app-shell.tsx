@@ -238,7 +238,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const mainScrollRef = useRef<HTMLElement | null>(null);
 
   const mainShellClassName = isHome
-    ? "min-w-0 xl:col-[1/-1] xl:row-start-1 xl:self-start"
+    ? "min-w-0 xl:col-start-2 xl:row-start-1 xl:self-start"
     : "min-w-0 w-full rounded-[28px] border border-white/10 bg-black/20 p-3 backdrop-blur-sm xl:max-w-[1320px] xl:min-h-0 xl:justify-self-center xl:self-stretch xl:p-4";
   const desktopGridClassName = isHome
     ? "relative z-50 grid gap-4 xl:h-full xl:grid-cols-[290px_minmax(0,1fr)] xl:items-start xl:overflow-hidden"

@@ -6,6 +6,20 @@ test("home page renders the catalog shell", async ({ page }) => {
   await expect(page.getByRole("searchbox", { name: "Search Items, NPCs, etc..." })).toBeVisible();
 });
 
+test("home page search stays clear of the desktop sidebar at narrow desktop widths", async ({ page }) => {
+  for (const width of [1440, 1366, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+
+    const sidebarBox = await page.locator("aside").boundingBox();
+    const searchBox = await page.getByRole("searchbox", { name: "Search Items, NPCs, etc..." }).boundingBox();
+
+    expect(sidebarBox).toBeTruthy();
+    expect(searchBox).toBeTruthy();
+    expect(searchBox!.x).toBeGreaterThanOrEqual(sidebarBox!.x + sidebarBox!.width + 16);
+  }
+});
+
 test("legacy route redirects to clean routes", async ({ page }) => {
   await page.goto("/?a=item&id=1001");
   await expect(page).toHaveURL(/\/items\/1001$/);
