@@ -32,6 +32,23 @@ test("index.php legacy routes redirect to clean routes", async ({ page }) => {
   await expect(page.getByRole("link", { name: /Items/i })).toBeVisible();
 });
 
+test("missing routes show the branded archive not-found page", async ({ page }) => {
+  const response = await page.goto("/this-route-does-not-exist");
+
+  expect(response?.status()).toBe(404);
+  await expect(page.getByRole("heading", { name: /This record isn't in the archive/i })).toBeVisible();
+  await expect(page.getByRole("searchbox", { name: /Search items, NPCs, zones/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Items" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Return to home" })).toBeVisible();
+});
+
+test("missing entity detail routes show the branded archive not-found page", async ({ page }) => {
+  await page.goto("/npcs/999999999");
+
+  await expect(page.getByRole("heading", { name: /This record isn't in the archive/i })).toBeVisible();
+  await expect(page.getByRole("searchbox", { name: /Search items, NPCs, zones/i })).toBeVisible();
+});
+
 test("undiscovered item routes show a custom unavailable message", async ({ page }) => {
   const response = await page.goto("/items/150873");
 
