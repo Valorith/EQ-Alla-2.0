@@ -1,48 +1,456 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { NpcDetail } from "@eq-alla/data";
 import { Button } from "@eq-alla/ui";
+import { BarChart3, Calculator, Grid2X2, Info, List, Sparkles, Target } from "lucide-react";
 import { SectionCard } from "./catalog-shell";
 import { ItemIcon } from "./item-icon";
 
 type DropGroup = NpcDetail["drops"][number];
+type DropItem = DropGroup["items"][number];
+type DropView = "lab" | "list" | "cards";
 
-function formatPercent(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: value > 0 && value < 1 ? 3 : 2
-  }).format(value);
+type LabEntry = DropItem & {
+  group: DropGroup;
+  key: string;
+  rollAttempts: number;
+  normalizedChance: number;
+  overallChance: number;
+};
+
+const killTargets = [
+  { label: "50%", probability: 0.5 },
+  { label: "90%", probability: 0.9 },
+  { label: "95%", probability: 0.95 },
+  { label: "99%", probability: 0.99 }
+] as const;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
 }
 
-function DropGroupHeader({ group }: { group: DropGroup }) {
+function positiveInteger(value: number | null | undefined, fallback = 0) {
+  const normalized = Math.floor(Number(value ?? fallback));
+  return Number.isFinite(normalized) && normalized > 0 ? normalized : fallback;
+}
+
+function formatPercent(value: number) {
+  const safeValue = Number.isFinite(value) ? value : 0;
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: safeValue > 0 && safeValue < 1 ? 3 : 2
+  }).format(safeValue);
+}
+
+function formatCompactPercent(value: number) {
+  const safeValue = Number.isFinite(value) ? value : 0;
+  return `${formatPercent(safeValue)}%`;
+}
+
+function formatCount(value: number) {
+  return new Intl.NumberFormat("en-US").format(value);
+}
+
+function pluralize(value: number, singular: string, plural = `${singular}s`) {
+  return `${formatCount(value)} ${value === 1 ? singular : plural}`;
+}
+
+function groupRollAttempts(group: DropGroup) {
+  const multiplier = positiveInteger(group.multiplier, 1);
+  const minDrops = positiveInteger(group.minDrops, 0);
+  const dropLimit = positiveInteger(group.dropLimit, 0);
+  const unconstrainedAttempts = Math.max(1, multiplier, minDrops);
+
+  return dropLimit > 0 ? Math.max(1, Math.min(unconstrainedAttempts, dropLimit)) : unconstrainedAttempts;
+}
+
+function groupItemWeightTotal(group: DropGroup) {
+  return group.items.reduce((total, item) => total + Math.max(0, Number(item.chance ?? 0)), 0);
+}
+
+function normalizedItemChance(group: DropGroup, item: DropItem) {
+  const rawChance = clamp(Number(item.chance ?? 0), 0, 100);
+  const totalWeight = groupItemWeightTotal(group);
+
+  if (positiveInteger(group.minDrops, 0) > 0 && totalWeight > 0) {
+    return clamp((Math.max(0, Number(item.chance ?? 0)) / totalWeight) * 100, 0, 100);
+  }
+
+  return rawChance;
+}
+
+function estimateOverallChance(group: DropGroup, item: DropItem) {
+  const groupProbability = clamp(Number(group.probability ?? 0) / 100, 0, 1);
+  const rawItemProbability = clamp(Number(item.chance ?? 0) / 100, 0, 1);
+  const attempts = groupRollAttempts(group);
+  const minDrops = positiveInteger(group.minDrops, 0);
+
+  if (groupProbability <= 0 || rawItemProbability <= 0 || attempts <= 0) {
+    return 0;
+  }
+
+  if (minDrops > 0) {
+    const totalWeight = groupItemWeightTotal(group);
+    const weightedProbability = totalWeight > 0 ? clamp(Math.max(0, Number(item.chance ?? 0)) / totalWeight, 0, 1) : rawItemProbability;
+    const guaranteedAttempts = Math.min(minDrops, attempts);
+    const optionalAttempts = Math.max(0, attempts - guaranteedAttempts);
+    const guaranteedHit = 1 - Math.pow(1 - weightedProbability, guaranteedAttempts);
+    const optionalHit = 1 - Math.pow(1 - groupProbability * rawItemProbability, optionalAttempts);
+    const combinedHit = 1 - (1 - groupProbability * guaranteedHit) * (1 - optionalHit);
+
+    return clamp(combinedHit * 100, 0, 100);
+  }
+
+  return clamp((1 - Math.pow(1 - groupProbability * rawItemProbability, attempts)) * 100, 0, 100);
+}
+
+function killsForChance(chancePercent: number, targetProbability: number) {
+  const p = clamp(chancePercent / 100, 0, 1);
+
+  if (p <= 0) {
+    return null;
+  }
+
+  if (p >= 1) {
+    return 1;
+  }
+
+  return Math.max(1, Math.ceil(Math.log(1 - targetProbability) / Math.log(1 - p)));
+}
+
+function formatKills(value: number | null) {
+  return value === null ? "N/A" : formatCount(value);
+}
+
+function rollSummary(group: DropGroup) {
+  const attempts = groupRollAttempts(group);
+  const minDrops = positiveInteger(group.minDrops, 0);
+  const dropLimit = positiveInteger(group.dropLimit, 0);
+  const parts = [pluralize(attempts, "roll")];
+
+  if (minDrops > 0) {
+    parts.push(`${pluralize(minDrops, "guaranteed roll")} minimum`);
+  }
+
+  if (dropLimit > 0) {
+    parts.push(`${pluralize(dropLimit, "drop")} cap`);
+  }
+
+  return parts.join(" / ");
+}
+
+function buildLabEntries(drops: DropGroup[]) {
+  return drops.flatMap((group) =>
+    group.items.map((item) => ({
+      ...item,
+      group,
+      key: `${group.lootdropId}:${item.id}`,
+      rollAttempts: groupRollAttempts(group),
+      normalizedChance: normalizedItemChance(group, item),
+      overallChance: estimateOverallChance(group, item)
+    }))
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  detail,
+  tone = "neutral"
+}: {
+  label: string;
+  value: string;
+  detail?: string;
+  tone?: "neutral" | "gold" | "green";
+}) {
+  const toneClassName =
+    tone === "green"
+      ? "border-emerald-300/18 bg-emerald-300/[0.045] text-emerald-100"
+      : tone === "gold"
+        ? "border-[#d7b06c]/18 bg-[#d7b06c]/[0.06] text-[#f6e2b6]"
+        : "border-white/9 bg-white/[0.035] text-[#f1eadc]";
+
   return (
-    <p className="text-[13px] font-semibold uppercase tracking-[0.18em] text-[#c5a869]">
-      With a probability of {formatPercent(group.probability)}% (multiplier: {group.multiplier})
-    </p>
+    <div className={`min-w-0 rounded-[12px] border px-3 py-3 ${toneClassName}`}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#9f8e79]">{label}</p>
+      <p className="mt-1 text-[1.35rem] font-semibold leading-7 tracking-[-0.03em] text-inherit">{value}</p>
+      {detail ? <p className="mt-1 text-[11px] leading-4 text-[#8b96aa]">{detail}</p> : null}
+    </div>
+  );
+}
+
+function DropGroupMeta({ group }: { group: DropGroup }) {
+  const hasFloor = positiveInteger(group.minDrops, 0) > 0;
+  const hasLimit = positiveInteger(group.dropLimit, 0) > 0;
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      <span className="rounded-full border border-[#c5a869]/20 bg-[#c5a869]/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#e9d19b]">
+        {formatCompactPercent(group.probability)} roll
+      </span>
+      <span className="rounded-full border border-white/10 bg-white/[0.035] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c8bea9]">
+        x{positiveInteger(group.multiplier, 1)}
+      </span>
+      {hasFloor ? (
+        <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-200">
+          Min {positiveInteger(group.minDrops, 0)}
+        </span>
+      ) : null}
+      {hasLimit ? (
+        <span className="rounded-full border border-[#df8a58]/25 bg-[#df8a58]/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#ffd0b8]">
+          Cap {positiveInteger(group.dropLimit, 0)}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function ViewButton({
+  active,
+  onClick,
+  icon: Icon,
+  children
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: typeof BarChart3;
+  children: string;
+}) {
+  return (
+    <Button
+      type="button"
+      variant={active ? "default" : "ghost"}
+      className={`gap-2 px-3 py-2 text-xs uppercase tracking-[0.14em] ${active ? "" : "text-[#c8bea9] hover:text-white"}`.trim()}
+      onClick={onClick}
+    >
+      <Icon className="size-3.5" strokeWidth={2.2} />
+      {children}
+    </Button>
+  );
+}
+
+function LootGroupPicker({
+  drops,
+  selectedKey,
+  onSelect
+}: {
+  drops: DropGroup[];
+  selectedKey: string;
+  onSelect: (key: string) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      {drops.map((group, index) => (
+        <div key={group.lootdropId} className="overflow-hidden rounded-[14px] border border-white/10 bg-white/[0.025]">
+          <div className="space-y-2 border-b border-white/8 px-3 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#c5a869]">Lootdrop {index + 1}</p>
+              <span className="text-[11px] font-medium text-[#8d9aad]">{pluralize(group.items.length, "item")}</span>
+            </div>
+            <DropGroupMeta group={group} />
+          </div>
+
+          <div className="divide-y divide-white/7">
+            {group.items.map((item) => {
+              const key = `${group.lootdropId}:${item.id}`;
+              const selected = key === selectedKey;
+              const overallChance = estimateOverallChance(group, item);
+
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => onSelect(key)}
+                  className={`grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-3 py-3 text-left transition ${
+                    selected
+                      ? "bg-[#d7b06c]/12 shadow-[inset_3px_0_0_rgba(215,176,108,0.75)]"
+                      : "hover:bg-white/[0.035]"
+                  }`}
+                >
+                  <ItemIcon icon={item.icon} name={item.name} size="xs" tooltipItemId={item.id} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-[#f1eadc]">{item.name}</span>
+                    <span className="mt-0.5 block truncate text-[11px] uppercase tracking-[0.16em] text-[#8f7f68]">{item.type}</span>
+                  </span>
+                  <span className="rounded-full border border-white/10 bg-black/18 px-2.5 py-1 text-[11px] font-semibold text-[#d8ceb4]">
+                    {formatCompactPercent(overallChance)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SelectedItemPanel({ entry }: { entry: LabEntry }) {
+  const group = entry.group;
+  const averageKills = killsForChance(entry.overallChance, 0.6321205588);
+  const hasGuaranteedFloor = positiveInteger(group.minDrops, 0) > 0;
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-[16px] border border-[#d7b06c]/18 bg-[linear-gradient(180deg,rgba(215,176,108,0.08),rgba(255,255,255,0.025))] p-4">
+        <div className="flex items-start gap-4">
+          <ItemIcon icon={entry.icon} name={entry.name} size="md" tooltipItemId={entry.id} />
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#c5a869]">Selected Item</p>
+            <Link href={entry.href} className="mt-1 block truncate text-xl font-semibold tracking-[-0.03em] text-white hover:underline">
+              {entry.name}
+            </Link>
+            <p className="mt-1 text-sm leading-6 text-[#aeb8ca]">{entry.type}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <StatTile label="Within Roll" value={formatCompactPercent(entry.chance)} detail="Raw lootdrop entry chance" />
+        <StatTile
+          label={hasGuaranteedFloor ? "Weighted Floor" : "Roll Weight"}
+          value={formatCompactPercent(entry.normalizedChance)}
+          detail={hasGuaranteedFloor ? "Normalized against group weights" : "Used directly for rolls"}
+          tone={hasGuaranteedFloor ? "green" : "neutral"}
+        />
+        <StatTile label="Overall / Kill" value={formatCompactPercent(entry.overallChance)} detail={`${rollSummary(group)}`} tone="gold" />
+      </div>
+
+      <div className="rounded-[16px] border border-white/10 bg-black/18 p-4">
+        <div className="flex items-start gap-3">
+          <Calculator className="mt-0.5 size-4 shrink-0 text-[#d7b06c]" />
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-[#f1eadc]">Chance model</p>
+            <p className="text-sm leading-6 text-[#aeb8ca]">
+              {hasGuaranteedFloor
+                ? "This group has a guaranteed floor, so the lab treats item chance as a selection weight for those guaranteed rolls, then applies the lootdrop probability."
+                : "This estimate treats each configured group roll as an independent chance to pass the lootdrop probability and then the item chance."}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <StatTile label="Average" value={formatKills(averageKills)} detail="kills for one expected drop" tone="green" />
+        {killTargets.map((target) => (
+          <StatTile
+            key={target.label}
+            label={target.label}
+            value={formatKills(killsForChance(entry.overallChance, target.probability))}
+            detail="kills for this confidence"
+          />
+        ))}
+      </div>
+
+      <LootContextCards />
+    </div>
+  );
+}
+
+function LootContextCards() {
+  return (
+    <div className="grid gap-3">
+      <div className="rounded-[16px] border border-[#df8a58]/18 bg-[#df8a58]/[0.055] p-4">
+        <div className="flex items-start gap-3">
+          <Info className="mt-0.5 size-4 shrink-0 text-[#ffb48c]" />
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-[#ffe0cf]">About guaranteed floors</p>
+            <p className="text-sm leading-6 text-[#d9c4b8]">
+              When a loot group has a minimum drop count, raw item percentages work more like weights. The lab calls that out so players do not read every visible item chance as a final per-kill chance.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LootOddsLab({ drops }: { drops: DropGroup[] }) {
+  const entries = useMemo(() => buildLabEntries(drops), [drops]);
+  const [selectedKey, setSelectedKey] = useState(entries[0]?.key ?? "");
+  const selectedEntry = entries.find((entry) => entry.key === selectedKey) ?? entries[0];
+  const groupsWithFloor = drops.filter((group) => positiveInteger(group.minDrops, 0) > 0);
+  const rarestEntry = entries.reduce<LabEntry | null>((rarest, entry) => {
+    if (entry.overallChance <= 0) return rarest;
+    if (!rarest || entry.overallChance < rarest.overallChance) return entry;
+    return rarest;
+  }, null);
+
+  if (!selectedEntry) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-4 xl:grid-cols-[minmax(280px,0.82fr)_minmax(0,1.8fr)]">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b99a67]">Loot Groups</p>
+            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#8d9aad]">{pluralize(drops.length, "group")}</span>
+          </div>
+          <LootGroupPicker drops={drops} selectedKey={selectedEntry.key} onSelect={setSelectedKey} />
+        </div>
+
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <StatTile label="Items" value={formatCount(entries.length)} detail="visible discovered drops" />
+            <StatTile
+              label="Guaranteed Floor"
+              value={groupsWithFloor.length > 0 ? formatCount(groupsWithFloor.length) : "0"}
+              detail={groupsWithFloor.length > 0 ? "groups need weighted odds" : "no guaranteed groups"}
+              tone={groupsWithFloor.length > 0 ? "green" : "neutral"}
+            />
+            <StatTile
+              label="Rarest Visible"
+              value={rarestEntry ? formatCompactPercent(rarestEntry.overallChance) : "N/A"}
+              detail={rarestEntry?.name ?? "No nonzero odds"}
+              tone="gold"
+            />
+          </div>
+
+          <SelectedItemPanel entry={selectedEntry} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DropGroupHeader({ group, index }: { group: DropGroup; index: number }) {
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-[13px] font-semibold uppercase tracking-[0.18em] text-[#c5a869]">Lootdrop {index + 1}</p>
+      <DropGroupMeta group={group} />
+    </div>
   );
 }
 
 function DropListView({ drops }: { drops: DropGroup[] }) {
   return (
     <div className="space-y-5">
-      {drops.map((group) => (
+      {drops.map((group, index) => (
         <div key={group.lootdropId} className="space-y-3">
-          <DropGroupHeader group={group} />
+          <DropGroupHeader group={group} index={index} />
           <div className="space-y-3">
             {group.items.map((entry) => (
               <Link
                 key={`${group.lootdropId}-${entry.id}`}
                 href={entry.href}
-                className="group flex items-center gap-3 rounded-[12px] border border-white/10 bg-[linear-gradient(180deg,rgba(19,23,31,0.94),rgba(10,14,21,0.92))] px-3 py-3 transition hover:border-[#c5a869]/45 hover:bg-[linear-gradient(180deg,rgba(35,42,53,0.96),rgba(16,20,28,0.92))]"
+                className="group grid gap-3 rounded-[12px] border border-white/10 bg-[linear-gradient(180deg,rgba(19,23,31,0.94),rgba(10,14,21,0.92))] px-3 py-3 transition hover:border-[#c5a869]/45 hover:bg-[linear-gradient(180deg,rgba(35,42,53,0.96),rgba(16,20,28,0.92))] sm:grid-cols-[auto_minmax(0,1fr)_130px_140px] sm:items-center"
               >
                 <ItemIcon icon={entry.icon} name={entry.name} size="sm" tooltipItemId={entry.id} />
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0">
                   <p className="truncate text-[15px] font-semibold text-[#e6e0d2] transition group-hover:text-white">{entry.name}</p>
-                  <p className="text-[12px] uppercase tracking-[0.18em] text-[#9f8e79]">
-                    {entry.type} • {formatPercent(entry.chance)}% within roll • {formatPercent(entry.globalChance)}% overall per kill
-                  </p>
+                  <p className="text-[12px] uppercase tracking-[0.18em] text-[#9f8e79]">{entry.type}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8e7d68]">Within Roll</p>
+                  <p className="mt-0.5 text-sm font-semibold text-[#f1eadc]">{formatCompactPercent(entry.chance)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8e7d68]">Overall / Kill</p>
+                  <p className="mt-0.5 text-sm font-semibold text-[#d8ceb4]">{formatCompactPercent(estimateOverallChance(group, entry))}</p>
                 </div>
               </Link>
             ))}
@@ -56,35 +464,44 @@ function DropListView({ drops }: { drops: DropGroup[] }) {
 function DropCardView({ drops }: { drops: DropGroup[] }) {
   return (
     <div className="space-y-6">
-      {drops.map((group) => (
+      {drops.map((group, index) => (
         <div key={group.lootdropId} className="space-y-3">
-          <DropGroupHeader group={group} />
+          <DropGroupHeader group={group} index={index} />
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {group.items.map((entry) => (
-              <Link
-                key={`${group.lootdropId}-${entry.id}`}
-                href={entry.href}
-                className="group flex min-h-[158px] flex-col justify-between rounded-[14px] border border-white/10 bg-[linear-gradient(180deg,rgba(19,23,31,0.96),rgba(11,14,20,0.94))] p-4 transition hover:border-[#c5a869]/45 hover:bg-[linear-gradient(180deg,rgba(35,42,53,0.98),rgba(16,20,28,0.94))]"
-              >
-                <div className="flex items-start gap-3">
-                  <ItemIcon icon={entry.icon} name={entry.name} size="md" tooltipItemId={entry.id} />
-                  <div className="min-w-0">
-                    <p className="line-clamp-2 text-[15px] font-semibold leading-6 text-[#e6e0d2] transition group-hover:text-white">{entry.name}</p>
-                    <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9f8e79]">{entry.type}</p>
+            {group.items.map((entry) => {
+              const overallChance = estimateOverallChance(group, entry);
+              const expectedKills = killsForChance(overallChance, 0.6321205588);
+
+              return (
+                <Link
+                  key={`${group.lootdropId}-${entry.id}`}
+                  href={entry.href}
+                  className="group flex min-h-[172px] flex-col justify-between rounded-[14px] border border-white/10 bg-[linear-gradient(180deg,rgba(19,23,31,0.96),rgba(11,14,20,0.94))] p-4 transition hover:border-[#c5a869]/45 hover:bg-[linear-gradient(180deg,rgba(35,42,53,0.98),rgba(16,20,28,0.94))]"
+                >
+                  <div className="flex items-start gap-3">
+                    <ItemIcon icon={entry.icon} name={entry.name} size="md" tooltipItemId={entry.id} />
+                    <div className="min-w-0">
+                      <p className="line-clamp-2 text-[15px] font-semibold leading-6 text-[#e6e0d2] transition group-hover:text-white">{entry.name}</p>
+                      <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9f8e79]">{entry.type}</p>
+                    </div>
                   </div>
-                </div>
-                <div className="mt-5 flex items-end justify-between gap-4 border-t border-white/8 pt-3">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8e7d68]">Within roll</p>
-                    <p className="mt-1 text-[1.25rem] font-semibold tracking-[-0.03em] text-[#f1eadc]">{formatPercent(entry.chance)}%</p>
+                  <div className="mt-5 grid grid-cols-3 gap-3 border-t border-white/8 pt-3">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8e7d68]">Within</p>
+                      <p className="mt-1 text-sm font-semibold text-[#f1eadc]">{formatCompactPercent(entry.chance)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8e7d68]">Kill</p>
+                      <p className="mt-1 text-sm font-semibold text-[#d8ceb4]">{formatCompactPercent(overallChance)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8e7d68]">Avg</p>
+                      <p className="mt-1 text-sm font-semibold text-[#d8ceb4]">{formatKills(expectedKills)}</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8e7d68]">Overall per kill</p>
-                    <p className="mt-1 text-sm font-medium text-[#d8ceb4]">{formatPercent(entry.globalChance)}%</p>
-                  </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         </div>
       ))}
@@ -93,41 +510,47 @@ function DropCardView({ drops }: { drops: DropGroup[] }) {
 }
 
 export function NpcDropsSection({ drops }: { drops: DropGroup[] }) {
-  const [view, setView] = useState<"list" | "cards">("cards");
+  const [view, setView] = useState<DropView>("list");
 
   return (
     <SectionCard
-      title="When Killed, This NPC Drops"
+      title={
+        <span className="inline-flex items-center gap-2">
+          <Target className="size-5 text-[#d7b06c]" />
+          Loot Drops
+        </span>
+      }
       right={
         drops.length > 0 ? (
           <div className="inline-flex rounded-[12px] border border-white/10 bg-black/20 p-1">
-            <Button
-              type="button"
-              variant={view === "list" ? "default" : "ghost"}
-              className="px-3 py-2 text-xs uppercase tracking-[0.14em]"
-              onClick={() => setView("list")}
-            >
+            <ViewButton active={view === "list"} icon={List} onClick={() => setView("list")}>
               List
-            </Button>
-            <Button
-              type="button"
-              variant={view === "cards" ? "default" : "ghost"}
-              className="px-3 py-2 text-xs uppercase tracking-[0.14em]"
-              onClick={() => setView("cards")}
-            >
+            </ViewButton>
+            <ViewButton active={view === "lab"} icon={BarChart3} onClick={() => setView("lab")}>
+              Lab
+            </ViewButton>
+            <ViewButton active={view === "cards"} icon={Grid2X2} onClick={() => setView("cards")}>
               Cards
-            </Button>
+            </ViewButton>
           </div>
         ) : null
       }
     >
       {drops.length > 0 ? (
         <div className="space-y-5">
-          <p className="text-sm leading-6 text-[#aeb8ca]">
-            “Overall per kill” is the effective drop chance after the lootdrop roll probability is applied. “Within roll” is the item&apos;s
-            chance inside that lootdrop once the roll happens.
-          </p>
-          {view === "list" ? <DropListView drops={drops} /> : <DropCardView drops={drops} />}
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+            <p className="text-sm leading-6 text-[#aeb8ca]">
+              Compare raw within-roll odds, estimated per-kill odds, expected-kill targets, and guaranteed-floor behavior for this NPC&apos;s loot groups.
+            </p>
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#d7b06c]/18 bg-[#d7b06c]/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#f1d69d]">
+              <Sparkles className="size-3.5" strokeWidth={2.2} />
+              Browser-only math
+            </div>
+          </div>
+
+          {view === "lab" ? <LootOddsLab drops={drops} /> : null}
+          {view === "list" ? <DropListView drops={drops} /> : null}
+          {view === "cards" ? <DropCardView drops={drops} /> : null}
         </div>
       ) : (
         <p className="text-[15px] leading-6 text-[#aeb8ca]">No loot entries were found for this NPC.</p>

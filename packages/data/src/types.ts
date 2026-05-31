@@ -273,6 +273,8 @@ export type NpcDetail = NpcSummary & {
     lootdropId: number;
     probability: number;
     multiplier: number;
+    minDrops: number;
+    dropLimit: number;
     items: Array<{ id: number; name: string; href: string; type: string; icon: string; chance: number; globalChance: number }>;
   }>;
   sells: Array<{

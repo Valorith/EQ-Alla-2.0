@@ -3784,13 +3784,15 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
           lootdrop_id: number;
           probability: number;
           multiplier: number;
+          mindrop: number;
+          droplimit: number;
           item_id: number;
           chance: number;
           name: string;
           itemtype: number;
           icon: number;
         }>`
-          select lte.lootdrop_id, lte.probability, lte.multiplier, lde.item_id, lde.chance,
+          select lte.lootdrop_id, lte.probability, lte.multiplier, lte.mindrop, lte.droplimit, lde.item_id, lde.chance,
                  i.Name as name, i.itemtype, i.icon
           from loottable_entries lte
           join lootdrop_entries lde on lde.lootdrop_id = lte.lootdrop_id
@@ -3804,6 +3806,8 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
             lootdrop_id: number;
             probability: number;
             multiplier: number;
+            mindrop: number;
+            droplimit: number;
             item_id: number;
             chance: number;
             name: string;
@@ -3832,6 +3836,8 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
         lootdropId: number;
         probability: number;
         multiplier: number;
+        minDrops: number;
+        dropLimit: number;
         items: Array<{ id: number; name: string; href: string; type: string; icon: string; chance: number; globalChance: number }>;
       }
     >();
@@ -3842,6 +3848,8 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
           lootdropId: entry.lootdrop_id,
           probability: Number(entry.probability ?? 0),
           multiplier: Number(entry.multiplier ?? 1),
+          minDrops: Number(entry.mindrop ?? 0),
+          dropLimit: Number(entry.droplimit ?? 0),
           items: []
         });
       }

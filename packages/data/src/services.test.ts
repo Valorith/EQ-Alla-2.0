@@ -612,6 +612,61 @@ describe("catalog services", () => {
     }
   }, 120_000);
 
+  it("includes loot group floor and cap metadata on NPC detail drops", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{
+      npc_id: number;
+      lootdrop_id: number;
+      mindrop: number;
+      droplimit: number;
+    }>`
+      select distinct
+        nt.id as npc_id,
+        lte.lootdrop_id,
+        coalesce(lte.mindrop, 0) as mindrop,
+        coalesce(lte.droplimit, 0) as droplimit
+      from npc_types nt
+      join spawnentry se on se.npcID = nt.id
+      join spawngroup sg on sg.id = se.spawngroupID
+      join spawn2 s2 on s2.spawngroupID = sg.id
+      left join spawn2_disabled s2d on s2d.spawn2_id = s2.id and coalesce(s2d.disabled, 0) <> 0
+      join zone z on z.short_name = s2.zone and coalesce(z.version, 0) = coalesce(s2.version, 0)
+      join loottable_entries lte on lte.loottable_id = nt.loottable_id
+      join lootdrop_entries lde on lde.lootdrop_id = lte.lootdrop_id
+      where coalesce(nt.trackable, 0) = 1
+        and nt.class not in (40, 41, 59, 61, 67, 68, 70)
+        and nt.race not in (127, 240)
+        and lower(trim(coalesce(nt.name, ''))) <> 'bazaar'
+        and s2d.spawn2_id is null
+        and coalesce(s2.version, 0) in (0, -1)
+        and coalesce(z.min_status, 0) <= 1
+        and coalesce(z.version, 0) = 0
+        and exists (
+          select 1
+          from discovered_items di
+          where di.item_id = lde.item_id
+            and coalesce(di.account_status, 0) <= 0
+        )
+      order by coalesce(lte.mindrop, 0) desc, coalesce(lte.droplimit, 0) desc, nt.id asc
+      limit 1
+    `.execute(db!);
+
+    if (!rows.rows[0]) {
+      expect(rows.rows).toEqual([]);
+      return;
+    }
+
+    const sample = rows.rows[0];
+    const npc = await getNpcDetail(sample.npc_id);
+    const group = npc?.drops.find((entry) => entry.lootdropId === sample.lootdrop_id);
+
+    expect(group).toBeTruthy();
+    expect(group?.minDrops).toBe(Number(sample.mindrop ?? 0));
+    expect(group?.dropLimit).toBe(Number(sample.droplimit ?? 0));
+  }, 20_000);
+
   it("attributes mapped loot chest drops to the source NPC outside the content database", async () => {
     const db = getDb();
     expect(db).toBeTruthy();
