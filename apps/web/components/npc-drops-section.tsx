@@ -44,6 +44,12 @@ function positiveInteger(value: number | null | undefined, fallback = 0) {
   return Number.isFinite(normalized) && normalized > 0 ? normalized : fallback;
 }
 
+function nonNegativeInteger(value: number | null | undefined, fallback = 0) {
+  const normalized = Math.floor(Number(value ?? fallback));
+
+  return Number.isFinite(normalized) ? Math.max(0, normalized) : fallback;
+}
+
 function probability(value: number | null | undefined) {
   return clamp(Number(value ?? 0) / 100, 0, 1);
 }
@@ -103,7 +109,7 @@ function lootdropPassLimit(group: DropGroup) {
 }
 
 function groupRollAttempts(group: DropGroup) {
-  const multiplier = positiveInteger(group.multiplier, 1);
+  const multiplier = nonNegativeInteger(group.multiplier, 1);
   const passLimit = lootdropPassLimit(group);
   const passAttempts = passLimit > 0 ? passLimit : 1;
 
@@ -149,7 +155,7 @@ function lootdropPassItemChance(group: DropGroup, item: DropItem) {
 function estimateOverallChance(group: DropGroup, item: DropItem) {
   const groupProbability = probability(group.probability);
   const passItemProbability = lootdropPassItemChance(group, item);
-  const multiplier = positiveInteger(group.multiplier, 1);
+  const multiplier = nonNegativeInteger(group.multiplier, 1);
 
   if (groupProbability <= 0 || passItemProbability <= 0 || multiplier <= 0) {
     return 0;
@@ -178,7 +184,7 @@ function formatKills(value: number | null) {
 
 function rollSummary(group: DropGroup) {
   const attempts = groupRollAttempts(group);
-  const multiplier = positiveInteger(group.multiplier, 1);
+  const multiplier = nonNegativeInteger(group.multiplier, 1);
   const minDrops = positiveInteger(group.minDrops, 0);
   const dropLimit = positiveInteger(group.dropLimit, 0);
   const parts = [pluralize(attempts, "roll"), `${pluralize(multiplier, "pass")} total`];
@@ -244,7 +250,7 @@ function DropGroupMeta({ group }: { group: DropGroup }) {
         {formatCompactPercent(group.probability)} roll
       </span>
       <span className="rounded-full border border-white/10 bg-white/[0.035] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c8bea9]">
-        x{positiveInteger(group.multiplier, 1)}
+        x{nonNegativeInteger(group.multiplier, 1)}
       </span>
       {hasFloor ? (
         <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-200">
