@@ -102,10 +102,18 @@ function lootdropPassStats(group: DropGroup) {
 
 function lootdropPassLimit(group: DropGroup) {
   const minDrops = positiveInteger(group.minDrops, 0);
+  const passCap = lootdropPassCap(group);
+
+  return Math.max(minDrops, passCap);
+}
+
+function lootdropPassCap(group: DropGroup) {
+  const minDrops = positiveInteger(group.minDrops, 0);
   const dropLimit = positiveInteger(group.dropLimit, 0);
   const defaultLargeLootdropLimit = minDrops > 0 && dropLimit === 0 && group.items.length > 100 ? 10 : 0;
+  const configuredOrDefaultLimit = Math.max(dropLimit, defaultLargeLootdropLimit);
 
-  return Math.max(minDrops, dropLimit, defaultLargeLootdropLimit);
+  return configuredOrDefaultLimit > 0 ? Math.max(minDrops, configuredOrDefaultLimit) : 0;
 }
 
 function groupRollAttempts(group: DropGroup) {
@@ -186,7 +194,7 @@ function rollSummary(group: DropGroup) {
   const attempts = groupRollAttempts(group);
   const multiplier = nonNegativeInteger(group.multiplier, 1);
   const minDrops = positiveInteger(group.minDrops, 0);
-  const dropLimit = positiveInteger(group.dropLimit, 0);
+  const dropLimit = lootdropPassCap(group);
   const parts = [pluralize(attempts, "roll"), `${pluralize(multiplier, "pass")} total`];
 
   if (minDrops > 0) {
@@ -242,7 +250,8 @@ function StatTile({
 
 function DropGroupMeta({ group }: { group: DropGroup }) {
   const hasFloor = positiveInteger(group.minDrops, 0) > 0;
-  const hasLimit = positiveInteger(group.dropLimit, 0) > 0;
+  const dropLimit = lootdropPassCap(group);
+  const hasLimit = dropLimit > 0;
 
   return (
     <div className="flex flex-wrap gap-1.5">
@@ -259,7 +268,7 @@ function DropGroupMeta({ group }: { group: DropGroup }) {
       ) : null}
       {hasLimit ? (
         <span className="rounded-full border border-[#df8a58]/25 bg-[#df8a58]/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#ffd0b8]">
-          Cap {positiveInteger(group.dropLimit, 0)}
+          Cap {dropLimit}
         </span>
       ) : null}
     </div>
