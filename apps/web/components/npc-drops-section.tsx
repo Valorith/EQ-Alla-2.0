@@ -20,12 +20,20 @@ type LabEntry = DropItem & {
   overallChance: number;
 };
 
+type LootdropPassStats = {
+  totalWeight: number;
+  noLootProbability: number;
+  rollTableChanceBypass: boolean;
+};
+
 const killTargets = [
   { label: "50%", probability: 0.5 },
   { label: "90%", probability: 0.9 },
   { label: "95%", probability: 0.95 },
   { label: "99%", probability: 0.99 }
 ] as const;
+const EXPECTED_DROP_PROBABILITY = 1 - 1 / Math.E;
+const lootdropPassStatsCache = new WeakMap<DropGroup, LootdropPassStats>();
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -34,6 +42,10 @@ function clamp(value: number, min: number, max: number) {
 function positiveInteger(value: number | null | undefined, fallback = 0) {
   const normalized = Math.floor(Number(value ?? fallback));
   return Number.isFinite(normalized) && normalized > 0 ? normalized : fallback;
+}
+
+function probability(value: number | null | undefined) {
+  return clamp(Number(value ?? 0) / 100, 0, 1);
 }
 
 function formatPercent(value: number) {
@@ -57,53 +69,93 @@ function pluralize(value: number, singular: string, plural = `${singular}s`) {
   return `${formatCount(value)} ${value === 1 ? singular : plural}`;
 }
 
-function groupRollAttempts(group: DropGroup) {
-  const multiplier = positiveInteger(group.multiplier, 1);
-  const minDrops = positiveInteger(group.minDrops, 0);
-  const dropLimit = positiveInteger(group.dropLimit, 0);
-  const unconstrainedAttempts = Math.max(1, multiplier, minDrops);
+function lootdropPassStats(group: DropGroup) {
+  const cached = lootdropPassStatsCache.get(group);
 
-  return dropLimit > 0 ? Math.max(1, Math.min(unconstrainedAttempts, dropLimit)) : unconstrainedAttempts;
+  if (cached) {
+    return cached;
+  }
+
+  const stats = group.items.reduce<LootdropPassStats>(
+    (nextStats, item) => {
+      const itemProbability = probability(item.chance);
+
+      return {
+        totalWeight: nextStats.totalWeight + Math.max(0, Number(item.chance ?? 0)),
+        noLootProbability: itemProbability >= 1 ? nextStats.noLootProbability : nextStats.noLootProbability * (1 - itemProbability),
+        rollTableChanceBypass: nextStats.rollTableChanceBypass || itemProbability >= 1
+      };
+    },
+    { totalWeight: 0, noLootProbability: 1, rollTableChanceBypass: false }
+  );
+
+  lootdropPassStatsCache.set(group, stats);
+
+  return stats;
 }
 
-function groupItemWeightTotal(group: DropGroup) {
-  return group.items.reduce((total, item) => total + Math.max(0, Number(item.chance ?? 0)), 0);
+function lootdropPassLimit(group: DropGroup) {
+  const minDrops = positiveInteger(group.minDrops, 0);
+  const dropLimit = positiveInteger(group.dropLimit, 0);
+  const defaultLargeLootdropLimit = minDrops > 0 && dropLimit === 0 && group.items.length > 100 ? 10 : 0;
+
+  return Math.max(minDrops, dropLimit, defaultLargeLootdropLimit);
+}
+
+function groupRollAttempts(group: DropGroup) {
+  const multiplier = positiveInteger(group.multiplier, 1);
+  const passLimit = lootdropPassLimit(group);
+  const passAttempts = passLimit > 0 ? passLimit : 1;
+
+  return multiplier * passAttempts;
 }
 
 function normalizedItemChance(group: DropGroup, item: DropItem) {
   const rawChance = clamp(Number(item.chance ?? 0), 0, 100);
-  const totalWeight = groupItemWeightTotal(group);
 
-  if (positiveInteger(group.minDrops, 0) > 0 && totalWeight > 0) {
+  if (positiveInteger(group.minDrops, 0) > 0) {
+    const { totalWeight } = lootdropPassStats(group);
+
+    if (totalWeight <= 0) {
+      return rawChance;
+    }
+
     return clamp((Math.max(0, Number(item.chance ?? 0)) / totalWeight) * 100, 0, 100);
   }
 
   return rawChance;
 }
 
-function estimateOverallChance(group: DropGroup, item: DropItem) {
-  const groupProbability = clamp(Number(group.probability ?? 0) / 100, 0, 1);
-  const rawItemProbability = clamp(Number(item.chance ?? 0) / 100, 0, 1);
-  const attempts = groupRollAttempts(group);
+function lootdropPassItemChance(group: DropGroup, item: DropItem) {
   const minDrops = positiveInteger(group.minDrops, 0);
+  const dropLimit = lootdropPassLimit(group);
+  const rawItemProbability = probability(item.chance);
 
-  if (groupProbability <= 0 || rawItemProbability <= 0 || attempts <= 0) {
+  if (dropLimit <= 0) {
+    return rawItemProbability;
+  }
+
+  const { noLootProbability, rollTableChanceBypass, totalWeight } = lootdropPassStats(group);
+  const weightedProbability = totalWeight > 0 ? clamp(Math.max(0, Number(item.chance ?? 0)) / totalWeight, 0, 1) : rawItemProbability;
+  const optionalRollProbability = rollTableChanceBypass ? 1 : 1 - noLootProbability;
+  const guaranteedAttempts = Math.min(minDrops, dropLimit);
+  const optionalAttempts = Math.max(0, dropLimit - guaranteedAttempts);
+  const guaranteedMiss = Math.pow(1 - weightedProbability, guaranteedAttempts);
+  const optionalMiss = Math.pow(1 - optionalRollProbability * weightedProbability, optionalAttempts);
+
+  return clamp(1 - guaranteedMiss * optionalMiss, 0, 1);
+}
+
+function estimateOverallChance(group: DropGroup, item: DropItem) {
+  const groupProbability = probability(group.probability);
+  const passItemProbability = lootdropPassItemChance(group, item);
+  const multiplier = positiveInteger(group.multiplier, 1);
+
+  if (groupProbability <= 0 || passItemProbability <= 0 || multiplier <= 0) {
     return 0;
   }
 
-  if (minDrops > 0) {
-    const totalWeight = groupItemWeightTotal(group);
-    const weightedProbability = totalWeight > 0 ? clamp(Math.max(0, Number(item.chance ?? 0)) / totalWeight, 0, 1) : rawItemProbability;
-    const guaranteedAttempts = Math.min(minDrops, attempts);
-    const optionalAttempts = Math.max(0, attempts - guaranteedAttempts);
-    const guaranteedHit = 1 - Math.pow(1 - weightedProbability, guaranteedAttempts);
-    const optionalHit = 1 - Math.pow(1 - groupProbability * rawItemProbability, optionalAttempts);
-    const combinedHit = 1 - (1 - groupProbability * guaranteedHit) * (1 - optionalHit);
-
-    return clamp(combinedHit * 100, 0, 100);
-  }
-
-  return clamp((1 - Math.pow(1 - groupProbability * rawItemProbability, attempts)) * 100, 0, 100);
+  return clamp((1 - Math.pow(1 - groupProbability * passItemProbability, multiplier)) * 100, 0, 100);
 }
 
 function killsForChance(chancePercent: number, targetProbability: number) {
@@ -126,16 +178,17 @@ function formatKills(value: number | null) {
 
 function rollSummary(group: DropGroup) {
   const attempts = groupRollAttempts(group);
+  const multiplier = positiveInteger(group.multiplier, 1);
   const minDrops = positiveInteger(group.minDrops, 0);
   const dropLimit = positiveInteger(group.dropLimit, 0);
-  const parts = [pluralize(attempts, "roll")];
+  const parts = [pluralize(attempts, "roll"), `${pluralize(multiplier, "pass")} total`];
 
   if (minDrops > 0) {
-    parts.push(`${pluralize(minDrops, "guaranteed roll")} minimum`);
+    parts.push(`${pluralize(minDrops, "guaranteed roll")} minimum per pass`);
   }
 
   if (dropLimit > 0) {
-    parts.push(`${pluralize(dropLimit, "drop")} cap`);
+    parts.push(`${pluralize(dropLimit, "drop")} cap per pass`);
   }
 
   return parts.join(" / ");
@@ -289,7 +342,7 @@ function LootGroupPicker({
 
 function SelectedItemPanel({ entry }: { entry: LabEntry }) {
   const group = entry.group;
-  const averageKills = killsForChance(entry.overallChance, 0.6321205588);
+  const averageKills = killsForChance(entry.overallChance, EXPECTED_DROP_PROBABILITY);
   const hasGuaranteedFloor = positiveInteger(group.minDrops, 0) > 0;
 
   return (
@@ -470,7 +523,7 @@ function DropCardView({ drops }: { drops: DropGroup[] }) {
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {group.items.map((entry) => {
               const overallChance = estimateOverallChance(group, entry);
-              const expectedKills = killsForChance(overallChance, 0.6321205588);
+              const expectedKills = killsForChance(overallChance, EXPECTED_DROP_PROBABILITY);
 
               return (
                 <Link
