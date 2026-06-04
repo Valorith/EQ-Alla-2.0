@@ -19,3 +19,11 @@ test("item detail page fits viewport", async ({ page }) => {
   await expect(page.getByRole("link", { name: /Items/i })).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
+
+test("npc loot drops section fits viewport", async ({ page }) => {
+  await page.goto("/npcs/113457");
+  await expect(page.getByRole("heading", { name: /The Avatar of War/i })).toBeVisible();
+  await expect(page.getByText("Loot Drops")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Lab/i })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
