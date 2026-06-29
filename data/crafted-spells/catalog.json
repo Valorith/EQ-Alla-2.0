@@ -3,9 +3,9 @@
     "repositoryUrl": "https://github.com/Isaaru/cw-quests.git",
     "repositoryRef": "main",
     "scriptPath": "tutorial/Victoria.pl",
-    "fetchedAt": "2026-04-24T21:31:47.434Z",
+    "fetchedAt": "2026-06-29T23:23:34.821Z",
     "cacheTtlSeconds": 21600,
-    "fetchStrategy": "source-parse"
+    "fetchStrategy": "github-contents-api"
   },
   "glossary": [
     {
@@ -557,6 +557,130 @@
       "searchText": "bard 57 - 58 song: song of twilight song: dreams of ayonae stabilizer combine scribestone greater scribestone  91pp energy focus depleted energy focus i  31pp catalyst power stabilizer  50pp required spell/tome song: song of twilight  "
     },
     {
+      "key": 247,
+      "className": "Bard",
+      "classSlug": "bard",
+      "levelCode": 5758,
+      "levelLabel": "57 - 58",
+      "levelMin": 57,
+      "levelMax": 58,
+      "recipeKind": "stabilizer",
+      "recipeKindLabel": "Stabilizer Combine",
+      "requiredSpell": {
+        "id": 7704,
+        "name": "Song: Katta's Sword Dancing",
+        "icon": "504",
+        "href": "/items/7704"
+      },
+      "reward": {
+        "id": 32250,
+        "name": "Tome of Blade Dance",
+        "icon": "1357",
+        "href": "/items/32250"
+      },
+      "components": [
+        {
+          "id": 150111,
+          "name": "Greater Scribestone",
+          "icon": "1716",
+          "href": "/items/150111",
+          "slot": "scribestone",
+          "label": "Scribestone",
+          "levelRange": "57-58",
+          "price": "91pp"
+        },
+        {
+          "id": 150119,
+          "name": "Depleted Energy Focus VII",
+          "icon": "1877",
+          "href": "/items/150119",
+          "slot": "focus",
+          "label": "Energy Focus",
+          "price": "79pp"
+        },
+        {
+          "id": 150248,
+          "name": "Power Stabilizer",
+          "icon": "2187",
+          "href": "/items/150248",
+          "slot": "catalyst",
+          "label": "Catalyst",
+          "price": "50pp"
+        },
+        {
+          "id": 7704,
+          "name": "Song: Katta's Sword Dancing",
+          "icon": "504",
+          "href": "/items/7704",
+          "slot": "required-spell",
+          "label": "Required Spell/Tome"
+        }
+      ],
+      "searchText": "bard 57 - 58 song: katta's sword dancing tome of blade dance stabilizer combine scribestone greater scribestone  91pp energy focus depleted energy focus vii  79pp catalyst power stabilizer  50pp required spell/tome song: katta's sword dancing  "
+    },
+    {
+      "key": 248,
+      "className": "Bard",
+      "classSlug": "bard",
+      "levelCode": 5758,
+      "levelLabel": "57 - 58",
+      "levelMin": 57,
+      "levelMax": 58,
+      "recipeKind": "stabilizer",
+      "recipeKindLabel": "Stabilizer Combine",
+      "requiredSpell": {
+        "id": 19452,
+        "name": "Song: Nillipuss' March of the Wee",
+        "icon": "504",
+        "href": "/items/19452"
+      },
+      "reward": {
+        "id": 31712,
+        "name": "Tome of Maestro Stance",
+        "icon": "1357",
+        "href": "/items/31712"
+      },
+      "components": [
+        {
+          "id": 150111,
+          "name": "Greater Scribestone",
+          "icon": "1716",
+          "href": "/items/150111",
+          "slot": "scribestone",
+          "label": "Scribestone",
+          "levelRange": "57-58",
+          "price": "91pp"
+        },
+        {
+          "id": 150119,
+          "name": "Depleted Energy Focus VII",
+          "icon": "1877",
+          "href": "/items/150119",
+          "slot": "focus",
+          "label": "Energy Focus",
+          "price": "79pp"
+        },
+        {
+          "id": 150248,
+          "name": "Power Stabilizer",
+          "icon": "2187",
+          "href": "/items/150248",
+          "slot": "catalyst",
+          "label": "Catalyst",
+          "price": "50pp"
+        },
+        {
+          "id": 19452,
+          "name": "Song: Nillipuss' March of the Wee",
+          "icon": "504",
+          "href": "/items/19452",
+          "slot": "required-spell",
+          "label": "Required Spell/Tome"
+        }
+      ],
+      "searchText": "bard 57 - 58 song: nillipuss' march of the wee tome of maestro stance stabilizer combine scribestone greater scribestone  91pp energy focus depleted energy focus vii  79pp catalyst power stabilizer  50pp required spell/tome song: nillipuss' march of the wee  "
+    },
+    {
       "key": 159,
       "className": "Bard",
       "classSlug": "bard",
@@ -925,6 +1049,68 @@
         }
       ],
       "searchText": "bard 59 - 60 song: battlecry of the vah shir song: warsong of the vah shir amplifier combine scribestone major scribestone  120pp energy focus depleted energy focus x  244pp catalyst power amplifier  249pp required spell/tome song: battlecry of the vah shir  "
+    },
+    {
+      "key": 249,
+      "className": "Bard",
+      "classSlug": "bard",
+      "levelCode": 5960,
+      "levelLabel": "59 - 60",
+      "levelMin": 59,
+      "levelMax": 60,
+      "recipeKind": "stabilizer",
+      "recipeKindLabel": "Stabilizer Combine",
+      "requiredSpell": {
+        "id": 30450,
+        "name": "Song: Shield of Song",
+        "icon": "504",
+        "href": "/items/30450"
+      },
+      "reward": {
+        "id": 32251,
+        "name": "Tome of Blade Song",
+        "icon": "1357",
+        "href": "/items/32251"
+      },
+      "components": [
+        {
+          "id": 150112,
+          "name": "Major Scribestone",
+          "icon": "1716",
+          "href": "/items/150112",
+          "slot": "scribestone",
+          "label": "Scribestone",
+          "levelRange": "59-60",
+          "price": "120pp"
+        },
+        {
+          "id": 150120,
+          "name": "Depleted Energy Focus VIII",
+          "icon": "1877",
+          "href": "/items/150120",
+          "slot": "focus",
+          "label": "Energy Focus",
+          "price": "105pp"
+        },
+        {
+          "id": 150248,
+          "name": "Power Stabilizer",
+          "icon": "2187",
+          "href": "/items/150248",
+          "slot": "catalyst",
+          "label": "Catalyst",
+          "price": "50pp"
+        },
+        {
+          "id": 30450,
+          "name": "Song: Shield of Song",
+          "icon": "504",
+          "href": "/items/30450",
+          "slot": "required-spell",
+          "label": "Required Spell/Tome"
+        }
+      ],
+      "searchText": "bard 59 - 60 song: shield of song tome of blade song stabilizer combine scribestone major scribestone  120pp energy focus depleted energy focus viii  105pp catalyst power stabilizer  50pp required spell/tome song: shield of song  "
     },
     {
       "key": 4,
@@ -1299,6 +1485,68 @@
       "searchText": "beastlord 53 - 54 spell: spirit of the blizzard spell: spirit of snow stabilizer combine scribestone lesser scribestone  44pp energy focus depleted energy focus i  31pp catalyst power stabilizer  50pp required spell/tome spell: spirit of the blizzard  "
     },
     {
+      "key": 243,
+      "className": "Beastlord",
+      "classSlug": "beastlord",
+      "levelCode": 5354,
+      "levelLabel": "53 - 54",
+      "levelMin": 53,
+      "levelMax": 54,
+      "recipeKind": "stabilizer",
+      "recipeKindLabel": "Stabilizer Combine",
+      "requiredSpell": {
+        "id": 15308,
+        "name": "Spell: Frenzy",
+        "icon": "504",
+        "href": "/items/15308"
+      },
+      "reward": {
+        "id": 31711,
+        "name": "Tome of Halcyon Stance",
+        "icon": "1357",
+        "href": "/items/31711"
+      },
+      "components": [
+        {
+          "id": 150109,
+          "name": "Lesser Scribestone",
+          "icon": "1716",
+          "href": "/items/150109",
+          "slot": "scribestone",
+          "label": "Scribestone",
+          "levelRange": "53-54",
+          "price": "44pp"
+        },
+        {
+          "id": 150117,
+          "name": "Depleted Energy Focus V",
+          "icon": "1877",
+          "href": "/items/150117",
+          "slot": "focus",
+          "label": "Energy Focus",
+          "price": "31pp"
+        },
+        {
+          "id": 150248,
+          "name": "Power Stabilizer",
+          "icon": "2187",
+          "href": "/items/150248",
+          "slot": "catalyst",
+          "label": "Catalyst",
+          "price": "50pp"
+        },
+        {
+          "id": 15308,
+          "name": "Spell: Frenzy",
+          "icon": "504",
+          "href": "/items/15308",
+          "slot": "required-spell",
+          "label": "Required Spell/Tome"
+        }
+      ],
+      "searchText": "beastlord 53 - 54 spell: frenzy tome of halcyon stance stabilizer combine scribestone lesser scribestone  44pp energy focus depleted energy focus v  31pp catalyst power stabilizer  50pp required spell/tome spell: frenzy  "
+    },
+    {
       "key": 73,
       "className": "Beastlord",
       "classSlug": "beastlord",
@@ -1671,6 +1919,130 @@
       "searchText": "beastlord 57 - 58 spell: spirit of zehkes spell: spirit of khurenz stabilizer combine scribestone greater scribestone  91pp energy focus depleted energy focus i  31pp catalyst power stabilizer  50pp required spell/tome spell: spirit of zehkes  "
     },
     {
+      "key": 245,
+      "className": "Beastlord",
+      "classSlug": "beastlord",
+      "levelCode": 5758,
+      "levelLabel": "57 - 58",
+      "levelMin": 57,
+      "levelMax": 58,
+      "recipeKind": "stabilizer",
+      "recipeKindLabel": "Stabilizer Combine",
+      "requiredSpell": {
+        "id": 15435,
+        "name": "Spell: Venom of the Snake",
+        "icon": "504",
+        "href": "/items/15435"
+      },
+      "reward": {
+        "id": 151032,
+        "name": "Tome of Rabid Bite",
+        "icon": "1357",
+        "href": "/items/151032"
+      },
+      "components": [
+        {
+          "id": 150111,
+          "name": "Greater Scribestone",
+          "icon": "1716",
+          "href": "/items/150111",
+          "slot": "scribestone",
+          "label": "Scribestone",
+          "levelRange": "57-58",
+          "price": "91pp"
+        },
+        {
+          "id": 150119,
+          "name": "Depleted Energy Focus VII",
+          "icon": "1877",
+          "href": "/items/150119",
+          "slot": "focus",
+          "label": "Energy Focus",
+          "price": "79pp"
+        },
+        {
+          "id": 150248,
+          "name": "Power Stabilizer",
+          "icon": "2187",
+          "href": "/items/150248",
+          "slot": "catalyst",
+          "label": "Catalyst",
+          "price": "50pp"
+        },
+        {
+          "id": 15435,
+          "name": "Spell: Venom of the Snake",
+          "icon": "504",
+          "href": "/items/15435",
+          "slot": "required-spell",
+          "label": "Required Spell/Tome"
+        }
+      ],
+      "searchText": "beastlord 57 - 58 spell: venom of the snake tome of rabid bite stabilizer combine scribestone greater scribestone  91pp energy focus depleted energy focus vii  79pp catalyst power stabilizer  50pp required spell/tome spell: venom of the snake  "
+    },
+    {
+      "key": 244,
+      "className": "Beastlord",
+      "classSlug": "beastlord",
+      "levelCode": 5758,
+      "levelLabel": "57 - 58",
+      "levelMin": 57,
+      "levelMax": 58,
+      "recipeKind": "stabilizer",
+      "recipeKindLabel": "Stabilizer Combine",
+      "requiredSpell": {
+        "id": 15431,
+        "name": "Spell: Shifting Shield",
+        "icon": "504",
+        "href": "/items/15431"
+      },
+      "reward": {
+        "id": 151031,
+        "name": "Tome of Responsive Stance",
+        "icon": "1357",
+        "href": "/items/151031"
+      },
+      "components": [
+        {
+          "id": 150111,
+          "name": "Greater Scribestone",
+          "icon": "1716",
+          "href": "/items/150111",
+          "slot": "scribestone",
+          "label": "Scribestone",
+          "levelRange": "57-58",
+          "price": "91pp"
+        },
+        {
+          "id": 150118,
+          "name": "Depleted Energy Focus VI",
+          "icon": "1877",
+          "href": "/items/150118",
+          "slot": "focus",
+          "label": "Energy Focus",
+          "price": "52pp"
+        },
+        {
+          "id": 150248,
+          "name": "Power Stabilizer",
+          "icon": "2187",
+          "href": "/items/150248",
+          "slot": "catalyst",
+          "label": "Catalyst",
+          "price": "50pp"
+        },
+        {
+          "id": 15431,
+          "name": "Spell: Shifting Shield",
+          "icon": "504",
+          "href": "/items/15431",
+          "slot": "required-spell",
+          "label": "Required Spell/Tome"
+        }
+      ],
+      "searchText": "beastlord 57 - 58 spell: shifting shield tome of responsive stance stabilizer combine scribestone greater scribestone  91pp energy focus depleted energy focus vi  52pp catalyst power stabilizer  50pp required spell/tome spell: shifting shield  "
+    },
+    {
       "key": 163,
       "className": "Beastlord",
       "classSlug": "beastlord",
@@ -2041,6 +2413,68 @@
         }
       ],
       "searchText": "beastlord 59 - 60 spell: spiritual brawn spell: spiritual strength stabilizer combine scribestone major scribestone  120pp energy focus depleted energy focus i  31pp catalyst power stabilizer  50pp required spell/tome spell: spiritual brawn  "
+    },
+    {
+      "key": 246,
+      "className": "Beastlord",
+      "classSlug": "beastlord",
+      "levelCode": 5960,
+      "levelLabel": "59 - 60",
+      "levelMin": 59,
+      "levelMax": 60,
+      "recipeKind": "stabilizer",
+      "recipeKindLabel": "Stabilizer Combine",
+      "requiredSpell": {
+        "id": 15510,
+        "name": "Spell: Blizzard Blast",
+        "icon": "504",
+        "href": "/items/15510"
+      },
+      "reward": {
+        "id": 151033,
+        "name": "Tome of Ferocious Stance",
+        "icon": "1357",
+        "href": "/items/151033"
+      },
+      "components": [
+        {
+          "id": 150112,
+          "name": "Major Scribestone",
+          "icon": "1716",
+          "href": "/items/150112",
+          "slot": "scribestone",
+          "label": "Scribestone",
+          "levelRange": "59-60",
+          "price": "120pp"
+        },
+        {
+          "id": 150120,
+          "name": "Depleted Energy Focus VIII",
+          "icon": "1877",
+          "href": "/items/150120",
+          "slot": "focus",
+          "label": "Energy Focus",
+          "price": "105pp"
+        },
+        {
+          "id": 150248,
+          "name": "Power Stabilizer",
+          "icon": "2187",
+          "href": "/items/150248",
+          "slot": "catalyst",
+          "label": "Catalyst",
+          "price": "50pp"
+        },
+        {
+          "id": 15510,
+          "name": "Spell: Blizzard Blast",
+          "icon": "504",
+          "href": "/items/15510",
+          "slot": "required-spell",
+          "label": "Required Spell/Tome"
+        }
+      ],
+      "searchText": "beastlord 59 - 60 spell: blizzard blast tome of ferocious stance stabilizer combine scribestone major scribestone  120pp energy focus depleted energy focus viii  105pp catalyst power stabilizer  50pp required spell/tome spell: blizzard blast  "
     },
     {
       "key": 37,
@@ -4642,6 +5076,68 @@
         }
       ],
       "searchText": "druid 57 - 58 spell: chloroblast spell: tunare's renewal stabilizer combine scribestone greater scribestone  91pp energy focus depleted energy focus i  31pp catalyst power stabilizer  50pp required spell/tome spell: chloroblast  "
+    },
+    {
+      "key": 236,
+      "className": "Druid",
+      "classSlug": "druid",
+      "levelCode": 5758,
+      "levelLabel": "57 - 58",
+      "levelMin": 57,
+      "levelMax": 58,
+      "recipeKind": "stabilizer",
+      "recipeKindLabel": "Stabilizer Combine",
+      "requiredSpell": {
+        "id": 151017,
+        "name": "Spell: Ward of Stone",
+        "icon": "504",
+        "href": "/items/151017"
+      },
+      "reward": {
+        "id": 151018,
+        "name": "Spell: Ward of Steel",
+        "icon": "504",
+        "href": "/items/151018"
+      },
+      "components": [
+        {
+          "id": 150111,
+          "name": "Greater Scribestone",
+          "icon": "1716",
+          "href": "/items/150111",
+          "slot": "scribestone",
+          "label": "Scribestone",
+          "levelRange": "57-58",
+          "price": "91pp"
+        },
+        {
+          "id": 150122,
+          "name": "Depleted Energy Focus X",
+          "icon": "1877",
+          "href": "/items/150122",
+          "slot": "focus",
+          "label": "Energy Focus",
+          "price": "244pp"
+        },
+        {
+          "id": 150248,
+          "name": "Power Stabilizer",
+          "icon": "2187",
+          "href": "/items/150248",
+          "slot": "catalyst",
+          "label": "Catalyst",
+          "price": "50pp"
+        },
+        {
+          "id": 151017,
+          "name": "Spell: Ward of Stone",
+          "icon": "504",
+          "href": "/items/151017",
+          "slot": "required-spell",
+          "label": "Required Spell/Tome"
+        }
+      ],
+      "searchText": "druid 57 - 58 spell: ward of stone spell: ward of steel stabilizer combine scribestone greater scribestone  91pp energy focus depleted energy focus x  244pp catalyst power stabilizer  50pp required spell/tome spell: ward of stone  "
     },
     {
       "key": 185,
@@ -8236,6 +8732,68 @@
       "searchText": "necromancer 55 - 56 spell: dread of night spell: eidolon voice stabilizer combine scribestone scribestone  65pp energy focus depleted energy focus i  31pp catalyst power stabilizer  50pp required spell/tome spell: dread of night  "
     },
     {
+      "key": 238,
+      "className": "Necromancer",
+      "classSlug": "necromancer",
+      "levelCode": 5556,
+      "levelLabel": "55 - 56",
+      "levelMin": 55,
+      "levelMax": 56,
+      "recipeKind": "stabilizer",
+      "recipeKindLabel": "Stabilizer Combine",
+      "requiredSpell": {
+        "id": 30413,
+        "name": "Spell: Corporeal Empathy",
+        "icon": "504",
+        "href": "/items/30413"
+      },
+      "reward": {
+        "id": 151025,
+        "name": "Spell: Gloom Empathy",
+        "icon": "504",
+        "href": "/items/151025"
+      },
+      "components": [
+        {
+          "id": 150110,
+          "name": "Scribestone",
+          "icon": "1716",
+          "href": "/items/150110",
+          "slot": "scribestone",
+          "label": "Scribestone",
+          "levelRange": "55-56",
+          "price": "65pp"
+        },
+        {
+          "id": 150120,
+          "name": "Depleted Energy Focus VIII",
+          "icon": "1877",
+          "href": "/items/150120",
+          "slot": "focus",
+          "label": "Energy Focus",
+          "price": "105pp"
+        },
+        {
+          "id": 150248,
+          "name": "Power Stabilizer",
+          "icon": "2187",
+          "href": "/items/150248",
+          "slot": "catalyst",
+          "label": "Catalyst",
+          "price": "50pp"
+        },
+        {
+          "id": 30413,
+          "name": "Spell: Corporeal Empathy",
+          "icon": "504",
+          "href": "/items/30413",
+          "slot": "required-spell",
+          "label": "Required Spell/Tome"
+        }
+      ],
+      "searchText": "necromancer 55 - 56 spell: corporeal empathy spell: gloom empathy stabilizer combine scribestone scribestone  65pp energy focus depleted energy focus viii  105pp catalyst power stabilizer  50pp required spell/tome spell: corporeal empathy  "
+    },
+    {
       "key": 138,
       "className": "Necromancer",
       "classSlug": "necromancer",
@@ -9863,7 +10421,7 @@
       },
       "reward": {
         "id": 4644,
-        "name": "Tome of Blessed Stance",
+        "name": "Tome of Blessed Stance Discipline",
         "icon": "1357",
         "href": "/items/4644"
       },
@@ -9905,7 +10463,7 @@
           "label": "Required Spell/Tome"
         }
       ],
-      "searchText": "paladin 59 - 60 tome of holyforge discipline tome of blessed stance stabilizer combine scribestone major scribestone  120pp energy focus depleted energy focus x  244pp catalyst power stabilizer  50pp required spell/tome tome of holyforge discipline  "
+      "searchText": "paladin 59 - 60 tome of holyforge discipline tome of blessed stance discipline stabilizer combine scribestone major scribestone  120pp energy focus depleted energy focus x  244pp catalyst power stabilizer  50pp required spell/tome tome of holyforge discipline  "
     },
     {
       "key": 208,
@@ -10156,6 +10714,68 @@
       "searchText": "ranger 53 - 54 spell: jolt spell: jolting blades stabilizer combine scribestone lesser scribestone  44pp energy focus depleted energy focus i  31pp catalyst power stabilizer  50pp required spell/tome spell: jolt  "
     },
     {
+      "key": 239,
+      "className": "Ranger",
+      "classSlug": "ranger",
+      "levelCode": 5354,
+      "levelLabel": "53 - 54",
+      "levelMin": 53,
+      "levelMax": 54,
+      "recipeKind": "stabilizer",
+      "recipeKindLabel": "Stabilizer Combine",
+      "requiredSpell": {
+        "id": 7696,
+        "name": "Spell: Falcon Eye",
+        "icon": "504",
+        "href": "/items/7696"
+      },
+      "reward": {
+        "id": 151027,
+        "name": "Tome of Harmonic Stance",
+        "icon": "1357",
+        "href": "/items/151027"
+      },
+      "components": [
+        {
+          "id": 150109,
+          "name": "Lesser Scribestone",
+          "icon": "1716",
+          "href": "/items/150109",
+          "slot": "scribestone",
+          "label": "Scribestone",
+          "levelRange": "53-54",
+          "price": "44pp"
+        },
+        {
+          "id": 150117,
+          "name": "Depleted Energy Focus V",
+          "icon": "1877",
+          "href": "/items/150117",
+          "slot": "focus",
+          "label": "Energy Focus",
+          "price": "31pp"
+        },
+        {
+          "id": 150248,
+          "name": "Power Stabilizer",
+          "icon": "2187",
+          "href": "/items/150248",
+          "slot": "catalyst",
+          "label": "Catalyst",
+          "price": "50pp"
+        },
+        {
+          "id": 7696,
+          "name": "Spell: Falcon Eye",
+          "icon": "504",
+          "href": "/items/7696",
+          "slot": "required-spell",
+          "label": "Required Spell/Tome"
+        }
+      ],
+      "searchText": "ranger 53 - 54 spell: falcon eye tome of harmonic stance stabilizer combine scribestone lesser scribestone  44pp energy focus depleted energy focus v  31pp catalyst power stabilizer  50pp required spell/tome spell: falcon eye  "
+    },
+    {
       "key": 102,
       "className": "Ranger",
       "classSlug": "ranger",
@@ -10342,6 +10962,68 @@
       "searchText": "ranger 55 - 56 spell: nature's precision spell: mark of the predator amplifier combine scribestone scribestone  65pp energy focus depleted energy focus i  31pp catalyst power amplifier  249pp required spell/tome spell: nature's precision  "
     },
     {
+      "key": 240,
+      "className": "Ranger",
+      "classSlug": "ranger",
+      "levelCode": 5556,
+      "levelLabel": "55 - 56",
+      "levelMin": 55,
+      "levelMax": 56,
+      "recipeKind": "stabilizer",
+      "recipeKindLabel": "Stabilizer Combine",
+      "requiredSpell": {
+        "id": 30463,
+        "name": "Spell: Call of Fire",
+        "icon": "504",
+        "href": "/items/30463"
+      },
+      "reward": {
+        "id": 151028,
+        "name": "Tome of Flash of Steel",
+        "icon": "1357",
+        "href": "/items/151028"
+      },
+      "components": [
+        {
+          "id": 150110,
+          "name": "Scribestone",
+          "icon": "1716",
+          "href": "/items/150110",
+          "slot": "scribestone",
+          "label": "Scribestone",
+          "levelRange": "55-56",
+          "price": "65pp"
+        },
+        {
+          "id": 150118,
+          "name": "Depleted Energy Focus VI",
+          "icon": "1877",
+          "href": "/items/150118",
+          "slot": "focus",
+          "label": "Energy Focus",
+          "price": "52pp"
+        },
+        {
+          "id": 150248,
+          "name": "Power Stabilizer",
+          "icon": "2187",
+          "href": "/items/150248",
+          "slot": "catalyst",
+          "label": "Catalyst",
+          "price": "50pp"
+        },
+        {
+          "id": 30463,
+          "name": "Spell: Call of Fire",
+          "icon": "504",
+          "href": "/items/30463",
+          "slot": "required-spell",
+          "label": "Required Spell/Tome"
+        }
+      ],
+      "searchText": "ranger 55 - 56 spell: call of fire tome of flash of steel stabilizer combine scribestone scribestone  65pp energy focus depleted energy focus vi  52pp catalyst power stabilizer  50pp required spell/tome spell: call of fire  "
+    },
+    {
       "key": 143,
       "className": "Ranger",
       "classSlug": "ranger",
@@ -10466,6 +11148,68 @@
       "searchText": "ranger 57 - 58 spell: falcon eye spell: eagle eye stabilizer combine scribestone greater scribestone  91pp energy focus depleted energy focus i  31pp catalyst power stabilizer  50pp required spell/tome spell: falcon eye  "
     },
     {
+      "key": 241,
+      "className": "Ranger",
+      "classSlug": "ranger",
+      "levelCode": 5758,
+      "levelLabel": "57 - 58",
+      "levelMin": 57,
+      "levelMax": 58,
+      "recipeKind": "stabilizer",
+      "recipeKindLabel": "Stabilizer Combine",
+      "requiredSpell": {
+        "id": 15423,
+        "name": "Spell: Skin like Nature",
+        "icon": "504",
+        "href": "/items/15423"
+      },
+      "reward": {
+        "id": 151029,
+        "name": "Tome of Guardian Stance",
+        "icon": "1357",
+        "href": "/items/151029"
+      },
+      "components": [
+        {
+          "id": 150111,
+          "name": "Greater Scribestone",
+          "icon": "1716",
+          "href": "/items/150111",
+          "slot": "scribestone",
+          "label": "Scribestone",
+          "levelRange": "57-58",
+          "price": "91pp"
+        },
+        {
+          "id": 150119,
+          "name": "Depleted Energy Focus VII",
+          "icon": "1877",
+          "href": "/items/150119",
+          "slot": "focus",
+          "label": "Energy Focus",
+          "price": "79pp"
+        },
+        {
+          "id": 150248,
+          "name": "Power Stabilizer",
+          "icon": "2187",
+          "href": "/items/150248",
+          "slot": "catalyst",
+          "label": "Catalyst",
+          "price": "50pp"
+        },
+        {
+          "id": 15423,
+          "name": "Spell: Skin like Nature",
+          "icon": "504",
+          "href": "/items/15423",
+          "slot": "required-spell",
+          "label": "Required Spell/Tome"
+        }
+      ],
+      "searchText": "ranger 57 - 58 spell: skin like nature tome of guardian stance stabilizer combine scribestone greater scribestone  91pp energy focus depleted energy focus vii  79pp catalyst power stabilizer  50pp required spell/tome spell: skin like nature  "
+    },
+    {
       "key": 210,
       "className": "Ranger",
       "classSlug": "ranger",
@@ -10588,6 +11332,68 @@
         }
       ],
       "searchText": "ranger 59 - 60 spell: spikecoat spell: warder's protection stabilizer combine scribestone major scribestone  120pp energy focus depleted energy focus ix  183pp catalyst power stabilizer  50pp required spell/tome spell: spikecoat  "
+    },
+    {
+      "key": 242,
+      "className": "Ranger",
+      "classSlug": "ranger",
+      "levelCode": 5960,
+      "levelLabel": "59 - 60",
+      "levelMin": 59,
+      "levelMax": 60,
+      "recipeKind": "stabilizer",
+      "recipeKindLabel": "Stabilizer Combine",
+      "requiredSpell": {
+        "id": 7699,
+        "name": "Spell: Eagle Eye",
+        "icon": "504",
+        "href": "/items/7699"
+      },
+      "reward": {
+        "id": 151030,
+        "name": "Tome of Stalker's Stance",
+        "icon": "1357",
+        "href": "/items/151030"
+      },
+      "components": [
+        {
+          "id": 150112,
+          "name": "Major Scribestone",
+          "icon": "1716",
+          "href": "/items/150112",
+          "slot": "scribestone",
+          "label": "Scribestone",
+          "levelRange": "59-60",
+          "price": "120pp"
+        },
+        {
+          "id": 150120,
+          "name": "Depleted Energy Focus VIII",
+          "icon": "1877",
+          "href": "/items/150120",
+          "slot": "focus",
+          "label": "Energy Focus",
+          "price": "105pp"
+        },
+        {
+          "id": 150248,
+          "name": "Power Stabilizer",
+          "icon": "2187",
+          "href": "/items/150248",
+          "slot": "catalyst",
+          "label": "Catalyst",
+          "price": "50pp"
+        },
+        {
+          "id": 7699,
+          "name": "Spell: Eagle Eye",
+          "icon": "504",
+          "href": "/items/7699",
+          "slot": "required-spell",
+          "label": "Required Spell/Tome"
+        }
+      ],
+      "searchText": "ranger 59 - 60 spell: eagle eye tome of stalker's stance stabilizer combine scribestone major scribestone  120pp energy focus depleted energy focus viii  105pp catalyst power stabilizer  50pp required spell/tome spell: eagle eye  "
     },
     {
       "key": 24,
@@ -12095,7 +12901,7 @@
       },
       "reward": {
         "id": 4079,
-        "name": "Tome of Vampiric Stance",
+        "name": "Tome of Vampiric Stance Discipline",
         "icon": "1357",
         "href": "/items/4079"
       },
@@ -12137,7 +12943,7 @@
           "label": "Required Spell/Tome"
         }
       ],
-      "searchText": "shadow knight 59 - 60 tome of unholy aura discipline tome of vampiric stance stabilizer combine scribestone major scribestone  120pp energy focus depleted energy focus x  244pp catalyst power stabilizer  50pp required spell/tome tome of unholy aura discipline  "
+      "searchText": "shadow knight 59 - 60 tome of unholy aura discipline tome of vampiric stance discipline stabilizer combine scribestone major scribestone  120pp energy focus depleted energy focus x  244pp catalyst power stabilizer  50pp required spell/tome tome of unholy aura discipline  "
     },
     {
       "key": 31,
@@ -12882,6 +13688,68 @@
         }
       ],
       "searchText": "shaman 57 - 58 spell: acumen spell: acumen of dar khura amplifier combine scribestone greater scribestone  91pp energy focus depleted energy focus i  31pp catalyst power amplifier  249pp required spell/tome spell: acumen  "
+    },
+    {
+      "key": 237,
+      "className": "Shaman",
+      "classSlug": "shaman",
+      "levelCode": 5758,
+      "levelLabel": "57 - 58",
+      "levelMin": 57,
+      "levelMax": 58,
+      "recipeKind": "stabilizer",
+      "recipeKindLabel": "Stabilizer Combine",
+      "requiredSpell": {
+        "id": 151021,
+        "name": "Spell: Ancestral Guard",
+        "icon": "504",
+        "href": "/items/151021"
+      },
+      "reward": {
+        "id": 151022,
+        "name": "Spell: Ancestral Bulwark",
+        "icon": "504",
+        "href": "/items/151022"
+      },
+      "components": [
+        {
+          "id": 150111,
+          "name": "Greater Scribestone",
+          "icon": "1716",
+          "href": "/items/150111",
+          "slot": "scribestone",
+          "label": "Scribestone",
+          "levelRange": "57-58",
+          "price": "91pp"
+        },
+        {
+          "id": 150122,
+          "name": "Depleted Energy Focus X",
+          "icon": "1877",
+          "href": "/items/150122",
+          "slot": "focus",
+          "label": "Energy Focus",
+          "price": "244pp"
+        },
+        {
+          "id": 150248,
+          "name": "Power Stabilizer",
+          "icon": "2187",
+          "href": "/items/150248",
+          "slot": "catalyst",
+          "label": "Catalyst",
+          "price": "50pp"
+        },
+        {
+          "id": 151021,
+          "name": "Spell: Ancestral Guard",
+          "icon": "504",
+          "href": "/items/151021",
+          "slot": "required-spell",
+          "label": "Required Spell/Tome"
+        }
+      ],
+      "searchText": "shaman 57 - 58 spell: ancestral guard spell: ancestral bulwark stabilizer combine scribestone greater scribestone  91pp energy focus depleted energy focus x  244pp catalyst power stabilizer  50pp required spell/tome spell: ancestral guard  "
     },
     {
       "key": 151,
@@ -14703,11 +15571,11 @@
     "59 - 60"
   ],
   "summary": {
-    "totalRecipes": 235,
+    "totalRecipes": 249,
     "totalClasses": 16,
     "totalLevelBands": 5,
     "ancientCount": 16,
     "amplifierCount": 38,
-    "stabilizerCount": 181
+    "stabilizerCount": 195
   }
 }

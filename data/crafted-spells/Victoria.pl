@@ -274,6 +274,20 @@ $whisper = 315;  # Tan
 	233 => { "item1" => 150112, "item2" => 150120, "item3" => 150248, "item4" => 66335, "class" => "Rogue", "level" => 5960, "reward" => 151003 }, # Tome of Pernicious Stance
 	234 => { "item1" => 150109, "item2" => 150120, "item3" => 150123, "item4" => 77866, "class" => "Shaman", "level" => 5354, "reward" => 151004 }, # Talisman of the Puma
 	235 => { "item1" => 150112, "item2" => 150122, "item3" => 150123, "item4" => 77867, "class" => "Shaman", "level" => 5960, "reward" => 151005 }, # Talisman of the Jaguar
+	236 => { "item1" => 150111, "item2" => 150122, "item3" => 150248, "item4" => 151017, "class" => "Druid", "level" => 5758, "reward" => 151018 }, # Ward of Steel
+	237 => { "item1" => 150111, "item2" => 150122, "item3" => 150248, "item4" => 151021, "class" => "Shaman", "level" => 5758, "reward" => 151022 }, # Ancestral Bulwark
+	238 => { "item1" => 150110, "item2" => 150120, "item3" => 150248, "item4" => 30413, "class" => "Necromancer", "level" => 5556, "reward" => 151025 }, # Gloom Empathy
+	239 => { "item1" => 150109, "item2" => 150117, "item3" => 150248, "item4" => 7696, "class" => "Ranger", "level" => 5354, "reward" => 151027 }, # Tome of Harmonic Stance
+	240 => { "item1" => 150110, "item2" => 150118, "item3" => 150248, "item4" => 30463, "class" => "Ranger", "level" => 5556, "reward" => 151028 }, # Tome of Flash of Steel
+	241 => { "item1" => 150111, "item2" => 150119, "item3" => 150248, "item4" => 15423, "class" => "Ranger", "level" => 5758, "reward" => 151029 }, # Tome of Guardian Stance
+	242 => { "item1" => 150112, "item2" => 150120, "item3" => 150248, "item4" => 7699, "class" => "Ranger", "level" => 5960, "reward" => 151030 }, # Tome of Stalker's Stance
+	243 => { "item1" => 150109, "item2" => 150117, "item3" => 150248, "item4" => 15308, "class" => "Beastlord", "level" => 5354, "reward" => 31711 }, # Tome of Halcyon Stance
+	244 => { "item1" => 150111, "item2" => 150118, "item3" => 150248, "item4" => 15431, "class" => "Beastlord", "level" => 5758, "reward" => 151031 }, # Tome of Responsive Stance
+	245 => { "item1" => 150111, "item2" => 150119, "item3" => 150248, "item4" => 15435, "class" => "Beastlord", "level" => 5758, "reward" => 151032 }, # Tome of Rabid Bite
+	246 => { "item1" => 150112, "item2" => 150120, "item3" => 150248, "item4" => 15510, "class" => "Beastlord", "level" => 5960, "reward" => 151033 }, # Tome of Ferocious Stance
+	247 => { "item1" => 150111, "item2" => 150119, "item3" => 150248, "item4" => 7704, "class" => "Bard", "level" => 5758, "reward" => 32250 }, # Tome of Blade Dance
+	248 => { "item1" => 150111, "item2" => 150119, "item3" => 150248, "item4" => 19452, "class" => "Bard", "level" => 5758, "reward" => 31712 }, # Tome of Maestro Stance
+	249 => { "item1" => 150112, "item2" => 150120, "item3" => 150248, "item4" => 30450, "class" => "Bard", "level" => 5960, "reward" => 32251 }, # Tome of Blade Song
 );
 
 sub EVENT_SAY {
@@ -296,7 +310,7 @@ sub EVENT_SAY {
 	}
 	#:: 51 to 52
 	elsif ($text =~/^51 52$/i) {
-		$client->Message($whisper, "....::::::::: | 51 - 52 | Spells & Tomes | :::::::::....");
+		$client->Message($whisper, "...::: | 51 - 52 | Spells & Tomes | :::...");
 		my $level = 5152;
 		foreach (sort keys %combines) {
 			if (($combines{$_}->{class} eq $class) && ($combines{$_}->{level} == $level)) {
@@ -311,7 +325,7 @@ sub EVENT_SAY {
  	}
  	#:: 53 to 54
 	elsif ($text =~/^53 54$/i) {
-		$client->Message($whisper, "....::::::::: | 53 - 54 | Spells & Tomes | :::::::::....");
+		$client->Message($whisper, "...::: | 53 - 54 | Spells & Tomes | :::...");
 		my $level = 5354;
 	    foreach (sort keys %combines) {
 			if (($combines{$_}->{class} eq $class) && ($combines{$_}->{level} == $level)) {
@@ -326,7 +340,7 @@ sub EVENT_SAY {
 	}
  	#:: 55 to 56
 	elsif ($text =~/^55 56$/i) {
-		$client->Message($whisper, "....::::::::: | 55 - 56 | Spells & Tomes | :::::::::....");
+		$client->Message($whisper, "...::: | 55 - 56 | Spells & Tomes | :::...");
 		my $level = 5556;
 		foreach (sort keys %combines) {
 			if (($combines{$_}->{class} eq $class) && ($combines{$_}->{level} == $level)) {
@@ -341,7 +355,7 @@ sub EVENT_SAY {
 	}
  	#:: 57 to 58
 	elsif ($text =~/^57 58$/i) {
-		$client->Message($whisper, "....::::::::: | 57 - 58 | Spells & Tomes | :::::::::....");
+		$client->Message($whisper, "...::: | 57 - 58 | Spells & Tomes | :::...");
 		my $level = 5758;
 	    foreach (sort keys %combines) {
 			if (($combines{$_}->{class} eq $class) && ($combines{$_}->{level} == $level)) {
@@ -356,7 +370,7 @@ sub EVENT_SAY {
 	}
  	#:: 59 to 60
 	elsif ($text =~/^59 60$/i) {
-		$client->Message($whisper, "....::::::::: | 59 - 60 | Spells & Tomes | :::::::::....");
+		$client->Message($whisper, "...::: | 59 - 60 | Spells & Tomes | :::...");
 		my $level = 5960;
 	    foreach (sort keys %combines) {
 			if (($combines{$_}->{class} eq $class) && ($combines{$_}->{level} == $level)) {
