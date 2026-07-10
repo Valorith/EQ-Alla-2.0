@@ -6,9 +6,14 @@ import { usePathname, useRouter } from "next/navigation";
 import type { SpellSummary } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
-import { PaginationControls, SearchPrompt, SectionCard, SelectField } from "../../components/catalog-shell";
+import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTableHeaderRow } from "../../components/catalog-shell";
 import { waitForLoadingIndicator } from "../../components/loading-state";
 import { SpellIcon } from "../../components/spell-icon";
+import {
+  useTableSort,
+  type TableSortColumn,
+  type TableSortControl
+} from "../../components/table-sorting";
 
 type LevelMode = "exact" | "min" | "max";
 
@@ -169,21 +174,25 @@ function groupSpellsByLevel(results: SpellSummary[]) {
   return groups;
 }
 
-const spellTableColumns = ["Name", "Class", "Effect(s)", "Mana", "Skill", "Target Type", "Spell ID"] as const;
+const spellTableColumns: TableSortColumn<SpellSummary>[] = [
+  { label: "Name", getSortValue: (spell) => spell.name },
+  { label: "Class", getSortValue: (spell) => spell.className || spell.classLevel },
+  { label: "Effect(s)", getSortValue: (spell) => normalizeDisplayEffect(spell.effect) },
+  { label: "Mana", getSortValue: (spell) => spell.mana },
+  { label: "Skill", getSortValue: (spell) => normalizeDisplaySkill(spell.skill) },
+  { label: "Target Type", getSortValue: (spell) => spell.target },
+  { label: "Spell ID", getSortValue: (spell) => spell.id }
+];
+const spellTableColumnLabels = spellTableColumns.map((column) => column.label);
+const groupSpellByLevel = (spell: SpellSummary) => spell.level;
 
-function SpellTableHeaderRow({ repeated = false }: { repeated?: boolean }) {
+function SpellTableHeaderRow({ repeated = false, sort }: { repeated?: boolean; sort: TableSortControl }) {
   return (
-    <tr className={repeated ? "border-t border-white/10 bg-[linear-gradient(180deg,rgba(215,164,95,0.05),rgba(255,255,255,0.015))] text-[#ccb594]" : undefined}>
-      {spellTableColumns.map((label) => (
-        <th
-          key={label}
-          scope="col"
-          className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.22em]"
-        >
-          {label}
-        </th>
-      ))}
-    </tr>
+    <SimpleTableHeaderRow
+      columns={spellTableColumnLabels}
+      sort={sort}
+      className={repeated ? "border-t border-white/10 bg-[linear-gradient(180deg,rgba(215,164,95,0.05),rgba(255,255,255,0.015))] text-[#ccb594]" : undefined}
+    />
   );
 }
 
@@ -353,9 +362,13 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
   const draftKey = buildSearchParams(filters).toString();
   const appliedClassName = displayKey ? new URLSearchParams(displayKey).get("class") ?? "" : "";
   const displayResults = appliedClassName ? results.filter((spell) => spell.level > 0) : results;
-  const totalPages = Math.max(1, Math.ceil(displayResults.length / spellResultsPerPage));
+  const { sortedRows: sortedDisplayResults, sort: tableSort } = useTableSort(displayResults, spellTableColumns, {
+    groupBy: appliedClassName ? groupSpellByLevel : undefined,
+    onSortChange: () => setPage(1)
+  });
+  const totalPages = Math.max(1, Math.ceil(sortedDisplayResults.length / spellResultsPerPage));
   const visiblePage = Math.min(page, totalPages);
-  const pagedResults = displayResults.slice((visiblePage - 1) * spellResultsPerPage, visiblePage * spellResultsPerPage);
+  const pagedResults = sortedDisplayResults.slice((visiblePage - 1) * spellResultsPerPage, visiblePage * spellResultsPerPage);
   const groupedResults = appliedClassName ? groupSpellsByLevel(pagedResults) : [];
   const showResults = hasActiveFilters(filters) || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && displayResults.length === 0 ? "Loading spells" : `${displayResults.length} matching spells`) : "Results";
@@ -432,7 +445,7 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
               <div className="overflow-x-auto rounded-2xl border border-[#7b603b]/20 bg-[linear-gradient(180deg,rgba(35,30,27,0.86),rgba(18,20,24,0.84))] shadow-[0_18px_44px_rgba(0,0,0,0.24)] backdrop-blur-md">
                 <table className="min-w-full border-collapse text-left text-sm">
                   <thead className="bg-[linear-gradient(180deg,rgba(215,164,95,0.08),rgba(255,255,255,0.02))] text-[#ccb594]">
-                    <SpellTableHeaderRow />
+                    <SpellTableHeaderRow sort={tableSort} />
                   </thead>
                   <tbody>
                     {(appliedClassName ? groupedResults.flatMap((group) => [{ isLevelHeader: true as const, level: group.level }, ...group.spells]) : pagedResults).map(
@@ -444,7 +457,7 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
                                 Level {entry.level}
                               </td>
                             </tr>
-                            <SpellTableHeaderRow repeated />
+                            <SpellTableHeaderRow repeated sort={tableSort} />
                           </Fragment>
                         ) : (
                           <tr

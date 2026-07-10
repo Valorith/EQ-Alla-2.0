@@ -8,6 +8,7 @@ import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../components/catalog-shell";
 import { waitForLoadingIndicator } from "../../components/loading-state";
+import { useTableSort, type TableSortColumn } from "../../components/table-sorting";
 
 type ZoneSearchClientProps = {
   initialQuery: string;
@@ -36,6 +37,13 @@ const zoneResultsPerPage = 20;
 const zoneSearchCacheTtlMs = 180_000;
 const zoneSearchCacheMaxEntries = 12;
 const zoneSearchSessionStorageKey = "eq-zone-search-cache";
+const zoneTableColumns: TableSortColumn<ZoneSummary>[] = [
+  { label: "Name", getSortValue: (zone) => zone.longName },
+  { label: "Short name", getSortValue: (zone) => zone.shortName },
+  { label: "ID", getSortValue: (zone) => zone.id },
+  { label: "Spawn points", getSortValue: (zone) => zone.spawns }
+];
+const zoneTableColumnLabels = zoneTableColumns.map((column) => column.label);
 
 const zoneResultCache = new Map<string, ZoneCacheEntry>();
 let zoneCacheHydrated = false;
@@ -267,9 +275,12 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
     })();
   }, [filters, pathname, submitCount]);
 
-  const totalPages = Math.max(1, Math.ceil(results.length / zoneResultsPerPage));
+  const { sortedRows: sortedResults, sort: tableSort } = useTableSort(results, zoneTableColumns, {
+    onSortChange: () => setPage(1)
+  });
+  const totalPages = Math.max(1, Math.ceil(sortedResults.length / zoneResultsPerPage));
   const visiblePage = Math.min(page, totalPages);
-  const pagedResults = results.slice((visiblePage - 1) * zoneResultsPerPage, visiblePage * zoneResultsPerPage);
+  const pagedResults = sortedResults.slice((visiblePage - 1) * zoneResultsPerPage, visiblePage * zoneResultsPerPage);
   const draftKey = buildSearchParams(filters).toString();
   const showResults = hasActiveFilters(filters) || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading zones" : `${results.length} zones`) : "Results";
@@ -335,7 +346,8 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
           {showResults && results.length > 0 ? (
             <div className={isFetching ? "transition duration-200 opacity-40 blur-[2px]" : undefined}>
               <SimpleTable
-                columns={["Name", "Short name", "ID", "Spawn points"]}
+                columns={zoneTableColumnLabels}
+                sort={tableSort}
                 rows={pagedResults.map((zone) => [
                   <Link key={zone.shortName} href={`/zones/${zone.shortName}`} className="font-medium hover:underline">
                     {zone.longName}

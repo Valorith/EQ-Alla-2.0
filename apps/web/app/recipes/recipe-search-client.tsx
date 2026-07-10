@@ -8,6 +8,7 @@ import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../components/catalog-shell";
 import { waitForLoadingIndicator } from "../../components/loading-state";
+import { useTableSort, type TableSortColumn } from "../../components/table-sorting";
 
 type RecipeSearchClientProps = {
   initialQuery: string;
@@ -39,6 +40,13 @@ const recipeResultsPerPage = 25;
 const recipeSearchCacheTtlMs = 180_000;
 const recipeSearchCacheMaxEntries = 12;
 const recipeSearchSessionStorageKey = "eq-recipe-search-cache";
+const recipeTableColumns: TableSortColumn<RecipeSummary>[] = [
+  { label: "Recipe", getSortValue: (recipe) => recipe.name },
+  { label: "Recipe ID", getSortValue: (recipe) => recipe.id },
+  { label: "Tradeskill", getSortValue: (recipe) => recipe.tradeskill },
+  { label: "Trivial at skill level", getSortValue: (recipe) => recipe.trivial }
+];
+const recipeTableColumnLabels = recipeTableColumns.map((column) => column.label);
 
 const recipeResultCache = new Map<string, RecipeCacheEntry>();
 let recipeCacheHydrated = false;
@@ -290,9 +298,12 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
     })();
   }, [filters, pathname, submitCount]);
 
-  const totalPages = Math.max(1, Math.ceil(results.length / recipeResultsPerPage));
+  const { sortedRows: sortedResults, sort: tableSort } = useTableSort(results, recipeTableColumns, {
+    onSortChange: () => setPage(1)
+  });
+  const totalPages = Math.max(1, Math.ceil(sortedResults.length / recipeResultsPerPage));
   const visiblePage = Math.min(page, totalPages);
-  const pagedResults = results.slice((visiblePage - 1) * recipeResultsPerPage, visiblePage * recipeResultsPerPage);
+  const pagedResults = sortedResults.slice((visiblePage - 1) * recipeResultsPerPage, visiblePage * recipeResultsPerPage);
   const showResults = hasQuery(filters) || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading recipes" : `${results.length} recipes`) : "Results";
   const statusLabel = error ? error : isFetching ? "Refreshing results..." : buildSearchParams(filters).toString() === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
@@ -361,7 +372,8 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
           {showResults && results.length > 0 ? (
             <div className={isFetching ? "transition duration-200 opacity-40 blur-[2px]" : undefined}>
               <SimpleTable
-                columns={["Recipe", "Recipe ID", "Tradeskill", "Trivial at skill level"]}
+                columns={recipeTableColumnLabels}
+                sort={tableSort}
                 rows={pagedResults.map((recipe) => [
                   <Link key={recipe.id} href={`/recipes/${recipe.id}`} className="font-medium hover:underline">
                     {recipe.name}

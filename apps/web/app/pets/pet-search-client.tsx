@@ -9,6 +9,7 @@ import { ClassLoadingIndicator } from "../../components/class-loading-indicator"
 import { PaginationControls, SearchPrompt, SectionCard, SimpleTable } from "../../components/catalog-shell";
 import { waitForLoadingIndicator } from "../../components/loading-state";
 import { SpellIcon } from "../../components/spell-icon";
+import { useTableSort, type TableSortColumn } from "../../components/table-sorting";
 
 type PetSearchClientProps = {
   initialClasses: string[];
@@ -35,6 +36,22 @@ const petResultsPerPage = 20;
 const petSearchCacheTtlMs = 180_000;
 const petSearchCacheMaxEntries = 12;
 const petSearchSessionStorageKey = "eq-pet-search-cache";
+const petTableColumns: TableSortColumn<PetSummary>[] = [
+  { label: "Class", getSortValue: (pet) => pet.ownerClass },
+  { label: "Level", getSortValue: (pet) => pet.spellLevel || null },
+  { label: "Icon", getSortValue: (pet) => Number(pet.spellIcon) || null },
+  { label: "Spell name", getSortValue: (pet) => pet.spellName },
+  { label: "Details" },
+  { label: "Race", getSortValue: (pet) => pet.race },
+  { label: "Pet level", getSortValue: (pet) => pet.petLevel || null },
+  { label: "Pet class", getSortValue: (pet) => pet.petClass },
+  { label: "HP", getSortValue: (pet) => pet.hp || null },
+  { label: "Mana", getSortValue: (pet) => pet.mana || null },
+  { label: "AC", getSortValue: (pet) => pet.ac || null },
+  { label: "Min damage", getSortValue: (pet) => pet.minDamage || null },
+  { label: "Max damage", getSortValue: (pet) => pet.maxDamage || null }
+];
+const petTableColumnLabels = petTableColumns.map((column) => column.label);
 const petClassOptions: PetClassOption[] = [
   { name: "Beastlord", iconSrc: "/assets/icons/beastlord.gif" },
   { name: "Cleric", iconSrc: "/assets/icons/cleric.gif" },
@@ -335,9 +352,12 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
   }, [pathname, selectedClasses, submitCount]);
 
   const showResults = hasQuery(selectedClasses) || isFetching || displayKey.length > 0;
-  const totalPages = Math.max(1, Math.ceil(results.length / petResultsPerPage));
+  const { sortedRows: sortedResults, sort: tableSort } = useTableSort(results, petTableColumns, {
+    onSortChange: () => setPage(1)
+  });
+  const totalPages = Math.max(1, Math.ceil(sortedResults.length / petResultsPerPage));
   const visiblePage = Math.min(page, totalPages);
-  const pagedResults = results.slice((visiblePage - 1) * petResultsPerPage, visiblePage * petResultsPerPage);
+  const pagedResults = sortedResults.slice((visiblePage - 1) * petResultsPerPage, visiblePage * petResultsPerPage);
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading pets" : `${results.length} pets`) : "Results";
   const statusLabel = error
     ? error
@@ -394,7 +414,8 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
           {showResults && results.length > 0 ? (
             <div className={isFetching ? "transition duration-200 opacity-40 blur-[2px]" : undefined}>
               <SimpleTable
-                columns={["Class", "Level", "Icon", "Spell name", "Details", "Race", "Pet level", "Pet class", "HP", "Mana", "AC", "Min damage", "Max damage"]}
+                columns={petTableColumnLabels}
+                sort={tableSort}
                 rows={pagedResults.map((pet) => [
                   pet.ownerClass,
                   pet.spellLevel,

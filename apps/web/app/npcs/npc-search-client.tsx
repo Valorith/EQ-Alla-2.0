@@ -8,6 +8,7 @@ import { Input, Button } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../components/catalog-shell";
 import { waitForLoadingIndicator } from "../../components/loading-state";
+import { getLeadingSortNumber, useTableSort, type TableSortColumn } from "../../components/table-sorting";
 
 type NpcSearchClientProps = {
   mode: "basic" | "advanced";
@@ -43,6 +44,18 @@ type NpcCacheEntry = {
   results: NpcSummary[];
   touchedAt: number;
 };
+
+const npcBasicTableColumns: TableSortColumn<NpcSummary>[] = [
+  { label: "Name", getSortValue: (npc) => npc.name },
+  { label: "NPC ID", getSortValue: (npc) => npc.id }
+];
+const npcAdvancedTableColumns: TableSortColumn<NpcSummary>[] = [
+  { label: "Name", getSortValue: (npc) => npc.name }
+];
+const npcAdvancedLevelTableColumns: TableSortColumn<NpcSummary>[] = [
+  { label: "Name", getSortValue: (npc) => npc.name },
+  { label: "Level", getSortValue: (npc) => getLeadingSortNumber(npc.level) }
+];
 
 const npcResultsPerPage = 25;
 const npcSearchCacheTtlMs = 180_000;
@@ -301,9 +314,19 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
     })();
   }, [filters, mode, pathname, submitCount]);
 
-  const totalPages = Math.max(1, Math.ceil(results.length / npcResultsPerPage));
+  const npcTableColumns =
+    mode === "advanced" && filters.showLevel
+      ? npcAdvancedLevelTableColumns
+      : mode === "advanced"
+        ? npcAdvancedTableColumns
+        : npcBasicTableColumns;
+  const npcTableColumnLabels = npcTableColumns.map((column) => column.label);
+  const { sortedRows: sortedResults, sort: tableSort } = useTableSort(results, npcTableColumns, {
+    onSortChange: () => setPage(1)
+  });
+  const totalPages = Math.max(1, Math.ceil(sortedResults.length / npcResultsPerPage));
   const visiblePage = Math.min(page, totalPages);
-  const pagedResults = results.slice((visiblePage - 1) * npcResultsPerPage, visiblePage * npcResultsPerPage);
+  const pagedResults = sortedResults.slice((visiblePage - 1) * npcResultsPerPage, visiblePage * npcResultsPerPage);
   const draftKey = buildSearchParams(filters, mode).toString();
   const showResults = hasActiveFilters(filters) || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading NPCs" : `${results.length} ${mode === "advanced" ? "matches" : "matching NPCs"}`) : "Results";
@@ -372,7 +395,8 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
           {showResults && results.length > 0 ? (
             <div className={isFetching ? "transition duration-200 opacity-40 blur-[2px]" : undefined}>
               <SimpleTable
-                columns={mode === "advanced" && filters.showLevel ? ["Name", "Level"] : mode === "advanced" ? ["Name"] : ["Name", "NPC ID"]}
+                columns={npcTableColumnLabels}
+                sort={tableSort}
                 rows={pagedResults.map((npc) =>
                   mode === "advanced"
                     ? [

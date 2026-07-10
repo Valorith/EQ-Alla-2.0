@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getZonesByEra, resolveZoneEraLabel } from "@eq-alla/data";
-import { PageHero, SectionCard, SimpleTable } from "../../../../components/catalog-shell";
+import { PageHero, SectionCard } from "../../../../components/catalog-shell";
+import { ZonesByEraTable } from "./zones-by-era-table";
 
 export const dynamic = "force-dynamic";
 
@@ -27,15 +27,7 @@ export default async function ZonesByEraDetailPage({ params }: ZonesByEraDetailP
     <>
       <PageHero eyebrow="Zones" title={`${normalizedEra} Zones`} description="All zones mapped to this expansion value in the current catalog." />
       <SectionCard title={`${zones.length} zones`}>
-        <SimpleTable
-          columns={["Zone", "Level range"]}
-          rows={zones.map((zone) => [
-            <Link key={zone.shortName} href={`/zones/${zone.shortName}`} className="font-medium hover:underline">
-              {zone.longName}
-            </Link>,
-            zone.levelRange
-          ])}
-        />
+        <ZonesByEraTable zones={zones} />
       </SectionCard>
     </>
   );

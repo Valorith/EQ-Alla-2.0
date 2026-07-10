@@ -8,6 +8,7 @@ import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { PaginationControls, SearchPrompt, SectionCard, SimpleTable } from "../../components/catalog-shell";
 import { waitForLoadingIndicator } from "../../components/loading-state";
+import { getLeadingSortNumber, useTableSort, type TableSortColumn } from "../../components/table-sorting";
 
 type TaskSearchClientProps = {
   initialQuery: string;
@@ -29,6 +30,13 @@ const taskResultsPerPage = 20;
 const taskSearchCacheTtlMs = 180_000;
 const taskSearchCacheMaxEntries = 12;
 const taskSearchSessionStorageKey = "eq-task-search-cache";
+const taskTableColumns: TableSortColumn<TaskDetail>[] = [
+  { label: "Task", getSortValue: (task) => task.title },
+  { label: "Zone", getSortValue: (task) => task.zone.longName },
+  { label: "Levels", getSortValue: (task) => getLeadingSortNumber(task.levelRange) },
+  { label: "Reward", getSortValue: (task) => task.reward }
+];
+const taskTableColumnLabels = taskTableColumns.map((column) => column.label);
 
 const taskResultCache = new Map<string, TaskCacheEntry>();
 let taskCacheHydrated = false;
@@ -237,9 +245,12 @@ export function TaskSearchClient({ initialQuery }: TaskSearchClientProps) {
   }, [pathname, query, submitCount]);
 
   const activeQuery = buildSearchKey(query);
-  const totalPages = Math.max(1, Math.ceil(results.length / taskResultsPerPage));
+  const { sortedRows: sortedResults, sort: tableSort } = useTableSort(results, taskTableColumns, {
+    onSortChange: () => setPage(1)
+  });
+  const totalPages = Math.max(1, Math.ceil(sortedResults.length / taskResultsPerPage));
   const visiblePage = Math.min(page, totalPages);
-  const pagedResults = results.slice((visiblePage - 1) * taskResultsPerPage, visiblePage * taskResultsPerPage);
+  const pagedResults = sortedResults.slice((visiblePage - 1) * taskResultsPerPage, visiblePage * taskResultsPerPage);
   const showResults = activeQuery.length > 0 || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading tasks" : `${results.length} tasks`) : "Results";
   const statusLabel = error ? error : isFetching ? "Refreshing results..." : activeQuery === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
@@ -285,7 +296,8 @@ export function TaskSearchClient({ initialQuery }: TaskSearchClientProps) {
           {showResults && results.length > 0 ? (
             <div className={isFetching ? "transition duration-200 opacity-40 blur-[2px]" : undefined}>
               <SimpleTable
-                columns={["Task", "Zone", "Levels", "Reward"]}
+                columns={taskTableColumnLabels}
+                sort={tableSort}
                 rows={pagedResults.map((task) => [
                   <Link key={task.id} href={`/tasks/${task.id}`} className="font-medium hover:underline">
                     {task.title}

@@ -11,6 +11,7 @@ import { PaginationControls, SearchPrompt, SectionCard, SimpleTable } from "../.
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { waitForLoadingIndicator } from "../../components/loading-state";
 import { ItemIcon } from "../../components/item-icon";
+import { useTableSort, type TableSortColumn } from "../../components/table-sorting";
 
 type ItemSearchFilters = {
   q: string;
@@ -33,6 +34,20 @@ type SearchResolutionMeta = {
   durationMs: number;
   source: "network" | "cache";
 };
+
+const itemTableColumns: TableSortColumn<ItemSummary>[] = [
+  { label: "Icon", getSortValue: (item) => Number(item.icon) || null },
+  { label: "Item", getSortValue: (item) => item.name },
+  { label: "Type", getSortValue: (item) => item.type },
+  { label: "AC", getSortValue: (item) => item.ac || null },
+  { label: "HP", getSortValue: (item) => item.hp || null },
+  { label: "Mana", getSortValue: (item) => item.mana || null },
+  { label: "Damage", getSortValue: (item) => item.damage || null },
+  { label: "Delay", getSortValue: (item) => item.delay || null },
+  { label: "Item ID", getSortValue: (item) => item.id }
+];
+
+const itemTableColumnLabels = itemTableColumns.map((column) => column.label);
 
 const itemResultsPerPage = 25;
 
@@ -553,9 +568,12 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
     })();
   }, [filters, pathname, submitCount]);
 
-  const totalPages = Math.max(1, Math.ceil(items.length / itemResultsPerPage));
+  const { sortedRows: sortedItems, sort: tableSort } = useTableSort(items, itemTableColumns, {
+    onSortChange: () => setPage(1)
+  });
+  const totalPages = Math.max(1, Math.ceil(sortedItems.length / itemResultsPerPage));
   const visiblePage = Math.min(page, totalPages);
-  const pagedItems = items.slice((visiblePage - 1) * itemResultsPerPage, visiblePage * itemResultsPerPage);
+  const pagedItems = sortedItems.slice((visiblePage - 1) * itemResultsPerPage, visiblePage * itemResultsPerPage);
   const draftKey = buildSearchParams(filters).toString();
   const showResults = hasActiveFilters(filters) || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && items.length === 0 ? "Loading items" : `${items.length} matching items`) : "Results";
@@ -651,7 +669,8 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
           {showResults && items.length > 0 ? (
             <div className={isFetching ? "transition duration-200 opacity-40 blur-[2px]" : undefined}>
               <SimpleTable
-                columns={["Icon", "Item", "Type", "AC", "HP", "Mana", "Damage", "Delay", "Item ID"]}
+                columns={itemTableColumnLabels}
+                sort={tableSort}
                 rows={pagedItems.map((item) => [
                   <ItemIcon key={`${item.id}-icon`} icon={item.icon} name={item.name} size="sm" tooltipItemId={item.id} />,
                   <Link

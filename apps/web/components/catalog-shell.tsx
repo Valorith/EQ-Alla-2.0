@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Badge, Button, Card, CardContent } from "@eq-alla/ui";
-import { ArrowRight } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUp, ChevronsUpDown } from "lucide-react";
+import type { TableSortControl } from "./table-sorting";
 
 export function PageHero({
   eyebrow,
@@ -115,24 +116,74 @@ export function LinkList({
   );
 }
 
+export function SimpleTableHeaderRow({
+  columns,
+  sort,
+  className
+}: {
+  columns: readonly string[];
+  sort?: TableSortControl;
+  className?: string;
+}) {
+  return (
+    <tr className={className}>
+      {columns.map((column, columnIndex) => {
+        const isSortable = Boolean(sort?.sortableColumnIndexes.includes(columnIndex));
+        const isActiveSort = isSortable && sort?.columnIndex === columnIndex;
+        const nextDirection = isActiveSort && sort.direction === "ascending" ? "descending" : "ascending";
+
+        return (
+          <th
+            key={column}
+            scope="col"
+            aria-sort={isSortable ? (isActiveSort ? sort.direction : "none") : undefined}
+            className={`${isSortable ? "p-0" : "px-4 py-3"} text-[11px] font-semibold uppercase tracking-[0.22em]`}
+          >
+            {isSortable ? (
+              <button
+                type="button"
+                onClick={() => sort?.onColumnChange(columnIndex)}
+                aria-label={`Sort by ${column} ${nextDirection}`}
+                title={`Sort by ${column} ${nextDirection}`}
+                className={`group flex w-full items-center gap-1.5 px-4 py-3 text-left transition hover:bg-white/5 hover:text-[#f2c984] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#d7a45f] ${
+                  isActiveSort ? "text-[#f2c984]" : ""
+                }`}
+              >
+                <span>{column}</span>
+                {isActiveSort ? (
+                  sort.direction === "ascending" ? (
+                    <ArrowUp aria-hidden="true" className="size-3.5 shrink-0" />
+                  ) : (
+                    <ArrowDown aria-hidden="true" className="size-3.5 shrink-0" />
+                  )
+                ) : (
+                  <ChevronsUpDown aria-hidden="true" className="size-3.5 shrink-0 opacity-45 transition group-hover:opacity-90" />
+                )}
+              </button>
+            ) : (
+              column
+            )}
+          </th>
+        );
+      })}
+    </tr>
+  );
+}
+
 export function SimpleTable({
   columns,
-  rows
+  rows,
+  sort
 }: {
-  columns: string[];
+  columns: readonly string[];
   rows: ReactNode[][];
+  sort?: TableSortControl;
 }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-[#7b603b]/20 bg-[linear-gradient(180deg,rgba(35,30,27,0.86),rgba(18,20,24,0.84))] shadow-[0_18px_44px_rgba(0,0,0,0.24)] backdrop-blur-md">
       <table className="min-w-full border-collapse text-left text-sm">
         <thead className="bg-[linear-gradient(180deg,rgba(215,164,95,0.08),rgba(255,255,255,0.02))] text-[#ccb594]">
-          <tr>
-            {columns.map((column) => (
-              <th key={column} className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.22em]">
-                {column}
-              </th>
-            ))}
-          </tr>
+          <SimpleTableHeaderRow columns={columns} sort={sort} />
         </thead>
         <tbody>
           {rows.map((row, index) => (

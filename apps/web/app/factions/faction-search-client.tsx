@@ -8,6 +8,7 @@ import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../components/catalog-shell";
 import { waitForLoadingIndicator } from "../../components/loading-state";
+import { useTableSort, type TableSortColumn } from "../../components/table-sorting";
 
 type FactionSearchClientProps = {
   initialQuery: string;
@@ -40,6 +41,13 @@ const factionSearchCacheTtlMs = 180_000;
 const factionSearchCacheMaxEntries = 12;
 const factionSearchSessionStorageKey = "eq-faction-search-cache";
 const factionRelationshipOptions = ["Raises", "Lowers", "Both", "No NPC Modifiers"];
+const factionTableColumns: TableSortColumn<FactionSummary>[] = [
+  { label: "Name", getSortValue: (faction) => faction.name },
+  { label: "Aligned Zone", getSortValue: (faction) => faction.alignedZone },
+  { label: "NPC Relationship", getSortValue: (faction) => faction.raisedByCount + faction.loweredByCount },
+  { label: "Faction ID", getSortValue: (faction) => faction.id }
+];
+const factionTableColumnLabels = factionTableColumns.map((column) => column.label);
 
 const factionResultCache = new Map<string, FactionCacheEntry>();
 let factionCacheHydrated = false;
@@ -393,9 +401,12 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
   }, [filters, pathname, submitCount]);
 
   const activeQuery = buildSearchKey(filters);
-  const totalPages = Math.max(1, Math.ceil(results.length / factionResultsPerPage));
+  const { sortedRows: sortedResults, sort: tableSort } = useTableSort(results, factionTableColumns, {
+    onSortChange: () => setPage(1)
+  });
+  const totalPages = Math.max(1, Math.ceil(sortedResults.length / factionResultsPerPage));
   const visiblePage = Math.min(page, totalPages);
-  const pagedResults = results.slice((visiblePage - 1) * factionResultsPerPage, visiblePage * factionResultsPerPage);
+  const pagedResults = sortedResults.slice((visiblePage - 1) * factionResultsPerPage, visiblePage * factionResultsPerPage);
   const showResults = activeQuery.length > 0 || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading factions" : `${results.length} factions`) : "Results";
   const statusLabel = error ? error : isFetching ? "Refreshing results..." : activeQuery === displayKey && displayKey ? "Filters applied" : "Press Search or View all to apply filters";
@@ -475,7 +486,8 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
           {showResults && results.length > 0 ? (
             <div className={isFetching ? "transition duration-200 opacity-40 blur-[2px]" : undefined}>
               <SimpleTable
-                columns={["Name", "Aligned Zone", "NPC Relationship", "Faction ID"]}
+                columns={factionTableColumnLabels}
+                sort={tableSort}
                 rows={pagedResults.map((faction) => [
                   <Link key={faction.id} href={`/factions/${faction.id}`} className="font-medium hover:underline">
                     {faction.name}
