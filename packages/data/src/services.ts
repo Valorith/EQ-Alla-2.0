@@ -1247,51 +1247,69 @@ function formatCompactNumber(value: number) {
 }
 
 function calculateBuffDuration(level: number, formula: number, duration: number) {
+  let calculatedDuration: number;
+
   switch (formula) {
     case 0:
       return 0;
     case 1:
-    case 6: {
-      const value = Math.ceil(level / 2);
-      return Math.min(Math.max(value, 1), duration);
-    }
-    case 2: {
-      const value = Math.ceil((duration / 5) * 3);
-      return Math.min(Math.max(value, 1), duration);
-    }
-    case 3: {
-      const value = level * 30;
-      return Math.min(Math.max(value, 1), duration);
-    }
+      calculatedDuration = level > 3 ? Math.floor(level / 2) : 1;
+      break;
+    case 2:
+      calculatedDuration = level > 3 ? Math.floor(level / 2) + 5 : 6;
+      break;
+    case 3:
+      calculatedDuration = level * 30;
+      break;
     case 4:
-    case 11:
-    case 12:
-      return duration;
+      calculatedDuration = 50;
+      break;
     case 5:
-      return Math.min(Math.max(duration, 1), 3);
-    case 7: {
-      const value = level;
-      return Math.min(Math.max(value, 1), duration);
-    }
-    case 8: {
-      const value = level + 10;
-      return Math.min(Math.max(value, 1), duration);
-    }
-    case 9: {
-      const value = level * 2 + 10;
-      return Math.min(Math.max(value, 1), duration);
-    }
-    case 10: {
-      const value = level * 3 + 10;
-      return Math.min(Math.max(value, 1), duration);
-    }
+      calculatedDuration = 2;
+      break;
+    case 6:
+      calculatedDuration = Math.floor(level / 2) + 2;
+      break;
+    case 7:
+      calculatedDuration = level;
+      break;
+    case 8:
+      calculatedDuration = level + 10;
+      break;
+    case 9:
+      calculatedDuration = level * 2 + 10;
+      break;
+    case 10:
+      calculatedDuration = level * 3 + 10;
+      break;
+    case 11:
+      calculatedDuration = 30 * (level + 3);
+      break;
+    case 12:
+      calculatedDuration = level > 7 ? Math.floor(level / 4) : 1;
+      break;
+    case 13:
+      calculatedDuration = 4 * level + 10;
+      break;
+    case 14:
+      calculatedDuration = 5 * (level + 2);
+      break;
+    case 15:
+      calculatedDuration = 10 * (level + 10);
+      break;
     case 50:
-      return 72000;
-    case 3600:
-      return duration || 3600;
+      return -1;
+    case 51:
+      return -4;
     default:
-      return duration;
+      if (formula < 200) {
+        return 0;
+      }
+      calculatedDuration = formula;
+      break;
   }
+
+  return duration > 0 && duration < calculatedDuration ? duration : calculatedDuration;
 }
 
 function formatSpellDuration(row: Record<string, unknown>, minimumLevel: number) {
@@ -1303,6 +1321,14 @@ function formatSpellDuration(row: Record<string, unknown>, minimumLevel: number)
 
   if (duration === 0) {
     return "Instant";
+  }
+
+  if (duration === -1) {
+    return "Permanent";
+  }
+
+  if (duration === -4) {
+    return "Permanent (while in aura range)";
   }
 
   return `${formatSeconds(duration * 6)} (${duration} ticks)`;
@@ -1331,6 +1357,21 @@ function formatNumericEffectLevelRangeLabel(
   const nextLabel = resolveSpellEffectDirection(label, maximumValue, effectId);
 
   return `${nextLabel} by ${Math.abs(minimumValue)} (lvl 1) to ${Math.abs(maximumValue)} (lvl 60)`;
+}
+
+function formatInverseSignedEffectLevelRangeLabel(noun: string, minimumValue: number, maximumValue: number) {
+  const minimumDirection = minimumValue < 0 ? "Increase" : "Reduce";
+  const maximumDirection = maximumValue < 0 ? "Increase" : "Reduce";
+
+  if (minimumValue === maximumValue) {
+    return `${maximumDirection} ${noun} by ${Math.abs(maximumValue)}`;
+  }
+
+  if (minimumDirection === maximumDirection) {
+    return `${maximumDirection} ${noun} by ${Math.abs(minimumValue)} (lvl 1) to ${Math.abs(maximumValue)} (lvl 60)`;
+  }
+
+  return `${minimumDirection} ${noun} by ${Math.abs(minimumValue)} (lvl 1), then ${maximumDirection} ${noun} by ${Math.abs(maximumValue)} (lvl 60)`;
 }
 
 function formatPercentEffectLevelRangeLabel(
@@ -1410,14 +1451,14 @@ const percentEffectMetadataById: Record<number, PercentEffectMetadata> = {
 
 const labelOnlySpellEffectIds = new Set([
   14, 18, 20, 34, 40, 41, 43, 52, 53, 54, 56, 61, 65, 66, 67, 68, 73, 75, 76, 77, 82, 90, 93, 94,
-  95, 96, 99, 102, 103, 105, 115, 117, 123, 146, 164, 165, 191, 202, 203, 204, 207, 265, 307, 308, 312, 338,
-  332, 342, 351, 354, 355, 359, 366, 376, 381, 388, 425, 436, 437, 438, 445
+  95, 96, 99, 102, 103, 105, 115, 117, 123, 146, 164, 165, 191, 202, 203, 207, 307, 308, 312, 338,
+  332, 342, 351, 354, 355, 359, 366, 376, 381, 388, 425, 436, 437, 438
 ]);
 
 const simplePercentSpellEffectIds = new Set([
-  63, 74, 98, 114, 118, 119, 155, 168, 170, 171, 172, 173, 174, 175, 176, 177, 178, 180, 181, 188, 195,
+  63, 74, 114, 118, 119, 155, 170, 171, 172, 173, 174, 175, 176, 177, 178, 180, 181, 188, 195,
   196, 200, 213, 221, 222, 224, 233, 243, 244, 246, 250, 258, 270, 271, 273, 275, 279, 280, 292, 298,
-  320, 324, 331, 335, 337, 343, 357, 364, 375, 399
+  320, 331, 335, 337, 343, 357, 364, 375, 399
 ]);
 
 const spellEffectDisplayMinimumLevel = 1;
@@ -1581,7 +1622,7 @@ function calculateSpellEffectValue(formula: number, base: number, max: number, t
       if (level > 30) change = (3 * (level - 30)) / 2;
       break;
     case 142:
-      if (level > 30) change = 2 * (level - 60);
+      if (level > 30) change = 2 * level - 60;
       break;
     case 143:
       change = (3 * level) / 4;
@@ -1595,11 +1636,11 @@ function calculateSpellEffectValue(formula: number, base: number, max: number, t
     case 3000:
       return base;
     default:
-      if (formula > 0 && formula < 1000) {
+      if (formula > 0 && formula < 100) {
         change = level * formula;
       }
 
-      if (formula >= 1000 && formula < 2000) {
+      if (formula > 1000 && formula < 1999) {
         change = tick * (formula - 1000) * -1;
       }
 
@@ -1640,10 +1681,79 @@ function spellEffectValueRange(row: Record<string, unknown>, slot: number) {
   };
 }
 
+function spellEffectTickProgression(row: Record<string, unknown>, slot: number) {
+  const formula = Number(row[`formula${slot}`] ?? 100);
+  if (![107, 108, 120, 122].includes(formula) && !(formula > 1000 && formula < 1999)) {
+    return undefined;
+  }
+
+  const classes = spellClassesFromRow(row);
+  const castingLevel = classes.length > 0 ? Math.min(...classes.map((entry) => entry.level)) : 70;
+  const tickCount = calculateBuffDuration(
+    castingLevel,
+    Number(row.buffdurationformula ?? 0),
+    Number(row.buffduration ?? 0)
+  );
+  if (tickCount <= 1) {
+    return undefined;
+  }
+
+  const base = Number(row[`effect_base_value${slot}`] ?? 0);
+  const max = Number(row[`max${slot}`] ?? 0);
+  return {
+    finalValue: calculateSpellEffectValue(formula, base, max, tickCount, castingLevel),
+    initialValue: calculateSpellEffectValue(formula, base, max, 1, castingLevel)
+  };
+}
+
+function formatNumericTickProgression(label: string, initialValue: number, finalValue: number, effectId: number) {
+  const initialLabel = resolveSpellEffectDirection(label, initialValue, effectId);
+  const finalLabel = resolveSpellEffectDirection(label, finalValue, effectId);
+
+  if (finalValue === 0) {
+    return `${initialLabel} by ${Math.abs(initialValue)} on first tick, fading to 0 on final tick`;
+  }
+
+  if (initialValue === 0) {
+    return `No effect on first tick, then ${finalLabel} by ${Math.abs(finalValue)} on final tick`;
+  }
+
+  if (initialLabel === finalLabel) {
+    return `${initialLabel} by ${Math.abs(initialValue)} on first tick to ${Math.abs(finalValue)} on final tick`;
+  }
+
+  return `${initialLabel} by ${Math.abs(initialValue)} on first tick, then ${finalLabel} by ${Math.abs(finalValue)} on final tick`;
+}
+
+function formatLegacyPercentTickProgression(label: string, initialValue: number, finalValue: number, effectId: number) {
+  const initialLabel = resolveSpellEffectDirection(label, initialValue, effectId);
+  const finalLabel = resolveSpellEffectDirection(label, finalValue, effectId);
+  const initialAmount = Math.abs(initialValue - 100);
+  const finalAmount = Math.abs(finalValue - 100);
+
+  if (finalAmount === 0) {
+    return `${initialLabel} by ${initialAmount}% on first tick, fading to 0% on final tick`;
+  }
+
+  if (initialAmount === 0) {
+    return `No modifier on first tick, then ${finalLabel} by ${finalAmount}% on final tick`;
+  }
+
+  if (initialLabel === finalLabel) {
+    return `${initialLabel} by ${initialAmount}% on first tick to ${finalAmount}% on final tick`;
+  }
+
+  return `${initialLabel} by ${initialAmount}% on first tick, then ${finalLabel} by ${finalAmount}% on final tick`;
+}
+
 function formatScaledNumericSpellEffectLabel(row: Record<string, unknown>, slot: number, label: string, effectId?: number) {
   const formula = Number(row[`formula${slot}`] ?? 100);
   const base = Number(row[`effect_base_value${slot}`] ?? 0);
   const max = Number(row[`max${slot}`] ?? 0);
+  const tickProgression = spellEffectTickProgression(row, slot);
+  if (tickProgression && effectId !== undefined) {
+    return formatNumericTickProgression(label, tickProgression.initialValue, tickProgression.finalValue, effectId);
+  }
   if (formula === 123 && max !== 0) {
     return `${resolveSpellEffectDirection(label, base, effectId)} by ${Math.abs(base)} to ${Math.abs(max)}`;
   }
@@ -1657,6 +1767,9 @@ function formatScaledPercentSpellEffectLabel(row: Record<string, unknown>, slot:
   const formula = Number(row[`formula${slot}`] ?? 100);
   const base = Number(row[`effect_base_value${slot}`] ?? 0);
   const max = Number(row[`max${slot}`] ?? 0);
+  if (formula === 137) {
+    return `${resolveSpellEffectDirection(label, base, effectId)} by up to ${Math.abs(base)}% as HP decreases`;
+  }
   if (formula === 123 && max !== 0) {
     return `${resolveSpellEffectDirection(label, base, effectId)} by ${Math.abs(base)}% to ${Math.abs(max)}%`;
   }
@@ -1819,6 +1932,7 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, ref
   const slotSkillName = formatEffectSkillName(limit);
   const spellSkillName = formatEffectSkillName(Number(row.skill ?? 0));
   const percentRangeText = formatPercentRangeEffect(effectId, base, limit);
+  const aoeRange = Number(row.aoerange ?? 0);
 
   if (labelOnlySpellEffectIds.has(effectId)) {
     return label;
@@ -1837,6 +1951,18 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, ref
     }
     case 11:
     case 89: {
+      const tickProgression = spellEffectTickProgression(row, slot);
+      if (tickProgression) {
+        return formatLegacyPercentTickProgression(label, tickProgression.initialValue, tickProgression.finalValue, effectId);
+      }
+      const { minimumValue, maximumValue } = spellEffectValueRange(row, slot);
+      return formatLegacyPercentDeltaEffectLevelRange(label, minimumValue, maximumValue, effectId);
+    }
+    case 98: {
+      const tickProgression = spellEffectTickProgression(row, slot);
+      if (tickProgression) {
+        return formatLegacyPercentTickProgression(label, tickProgression.initialValue, tickProgression.finalValue, effectId);
+      }
       const { minimumValue, maximumValue } = spellEffectValueRange(row, slot);
       return formatLegacyPercentDeltaEffectLevelRange(label, minimumValue, maximumValue, effectId);
     }
@@ -1863,14 +1989,18 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, ref
       return Math.abs(base) > 0 ? `Bind Affinity (Bind Point ${Math.abs(base)})` : label;
     case 26:
       return `Gate${base > 0 ? ` (${Math.abs(base)}% success chance)` : ""}${limit > 0 ? ` to Bind Point ${Math.abs(limit)}` : ""}`;
+    case 24: {
+      const { minimumValue, maximumValue } = spellEffectValueRange(row, slot);
+      return formatInverseSignedEffectLevelRangeLabel("Endurance Upkeep", minimumValue, maximumValue);
+    }
     case 30:
-      return `Set Frenzy Radius to ${Math.abs(base)}${max > 0 ? ` up to level ${Math.abs(max)}` : ""}`;
+      return formatScaledNumericSpellEffectLabel(row, slot, "Increase Frenzy Radius", effectId);
     case 27:
       return `Cancel Magic${base !== 0 ? ` (Level Modifier ${Math.abs(base)})` : ""}`;
     case 42:
       return `Shadowstep${base !== 0 ? ` (Distance ${Math.abs(base)})` : ""}`;
     case 44:
-      return `Lycanthropy${base !== 0 ? ` (Stacking Value ${Math.abs(base)})` : ""}`;
+      return `Delayed Heal / Lycanthropy Marker${base !== 0 ? ` (Value ${Math.abs(base)})` : ""}`;
     case 32:
     case 109:
       return itemId > 0 ? `${label} ${referencedItem}${max > 1 ? ` (Stacks: ${max})` : ""}` : label;
@@ -1930,6 +2060,12 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, ref
       return percentRangeText ?? label;
     case 120:
       return `${base < 0 ? "Decrease" : "Increase"} Healing Effectiveness by ${Math.abs(base)}%`;
+    case 121:
+      return base < 0
+        ? formatScaledNumericSpellEffectLabel(row, slot, "Damage Attacker with Reverse Damage Shield", effectId)
+        : formatScaledNumericSpellEffectLabel(row, slot, label, effectId);
+    case 122:
+      return `Reduce ${formatEffectSkillName(base) ?? `Skill ${Math.abs(base)}`} Skill by ${Math.min(Math.abs(formula), 100)}%`;
     case 101: {
       const { minimumValue, maximumValue } = spellEffectValueRange(row, slot);
       const minimumHeal = Math.abs(minimumValue) * 7500;
@@ -1939,7 +2075,9 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, ref
         : `Complete Heal for ${minimumHeal} (lvl 1) to ${maximumHeal} (lvl 60)`;
     }
     case 104:
-      return teleportZone ? `Translocate Target to ${teleportZone}` : "Translocate Target to Bind Point";
+      return teleportZone
+        ? `Translocate Target to ${teleportZone}`
+        : `Translocate Target to Bind Point${base > 0 ? ` ${Math.abs(base)}` : ""}`;
     case 134:
       return `Limit: Max Level ${Math.abs(base)}${Math.abs(limit) > 0 ? ` (lose ${Math.abs(limit)}% per level)` : ""}`;
     case 135:
@@ -1947,10 +2085,7 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, ref
     case 333:
       return spellId > 0 ? `${label} ${referencedSpell}` : label;
     case 334: {
-      const { minimumValue, maximumValue } = spellEffectValueRange(row, slot);
-      return minimumValue === maximumValue
-        ? `Decrease Current HP by ${Math.abs(maximumValue)}% (If Target Not Moving)`
-        : `Decrease Current HP by ${Math.abs(minimumValue)}% (lvl 1) to ${Math.abs(maximumValue)}% (lvl 60) (If Target Not Moving)`;
+      return `${formatScaledNumericSpellEffectLabel(row, slot, "Increase Current HP", effectId)} (If Target Not Moving)`;
     }
     case 137:
       return `Limit: Effect (${base < 0 ? "Exclude " : ""}${getReferenceSpellEffectName(Math.abs(base))})`;
@@ -2018,6 +2153,10 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, ref
       return `Mitigate Melee Damage by ${Math.abs(base)}%${limit > 0 ? `, Max Per Hit ${Math.abs(limit)}` : ""}${max > 0 ? `, Total ${Math.abs(max)}` : ""}`;
     case 163:
       return `Absorb ${Math.abs(base)} ${Math.abs(base) === 1 ? "Hit or Spell" : "Hits or Spells"}${max > 0 ? `, Max Per Hit ${Math.abs(max)}` : ""}`;
+    case 157:
+      return formatScaledNumericSpellEffectLabel(row, slot, "Damage Spell Caster", effectId);
+    case 168:
+      return `${base < 0 ? "Increase" : "Decrease"} Melee Mitigation by ${Math.abs(base)}%`;
     case 182:
       return `${base < 0 ? "Decrease" : "Increase"} Weapon Delay by ${Math.abs(base)} (Hundred Hands Effect)`;
     case 179:
@@ -2029,7 +2168,7 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, ref
     case 199:
       return `Taunt with ${Math.abs(base)}% Success Chance${limit !== 0 ? ` and ${Math.abs(limit)} Added Hate` : ""}`;
     case 204:
-      return base > 0 ? `Group Fear Immunity (Duration ${Math.abs(base)})` : label;
+      return base > 0 ? `Group Fear Immunity for ${formatSeconds(Math.abs(base) * 10)}` : label;
     case 209:
       return `Dispel Beneficial (${formatCompactNumber(Math.abs(base) / 10)}% chance)`;
     case 219:
@@ -2079,13 +2218,13 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, ref
       }
       return spellSkillName ? `${spellSkillName} Attack` : label;
     case 227:
-      return slotSkillName ? `${label} for ${slotSkillName} by ${formatMilliseconds(Math.abs(base))}` : `${label} by ${formatMilliseconds(Math.abs(base))}`;
+      return slotSkillName ? `${label} for ${slotSkillName} by ${formatSeconds(Math.abs(base))}` : `${label} by ${formatSeconds(Math.abs(base))}`;
     case 194:
       return `Fade: ${Math.abs(base)}% Success Chance${Math.abs(limit || max) > 0 ? ` up to level ${Math.abs(limit || max)}` : ""}`;
     case 205:
-      return `Rampage for ${Math.abs(base)} Attack ${Math.abs(base) === 1 ? "Round" : "Rounds"}${limit > 0 ? ` against ${Math.abs(limit)} Targets per Round` : ""}${max > 0 ? ` within ${Math.abs(max)} Range` : ""}`;
+      return `Rampage for ${Math.abs(base)} Attack ${Math.abs(base) === 1 ? "Round" : "Rounds"}${limit > 0 ? ` against ${Math.abs(limit)} Targets per Round` : ""} within ${Math.abs(aoeRange || max || 40)} Range`;
     case 206:
-      return `Area Taunt with ${Math.abs(base)} Added Hate${max > 0 ? ` within ${Math.abs(max)} Range` : ""}`;
+      return `Area Taunt with ${Math.abs(base)} Added Hate within ${Math.abs(max || 40)} Range`;
     case 247:
       return slotSkillName
         ? `${formatScaledNumericSpellEffectLabel(row, slot, label, effectId)} for ${slotSkillName}`
@@ -2104,10 +2243,12 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, ref
         : formatScaledNumericSpellEffectLabel(row, slot, label, effectId);
     case 259:
       return `${base < 0 ? "Decrease" : "Increase"} AC Soft Cap by ${Math.abs(base)}%`;
+    case 265:
+      return base > 0 ? `No Fizzle for Spells Below Level ${Math.abs(base)}` : label;
     case 272:
       return formatScaledNumericSpellEffectLabel(row, slot, label, effectId);
     case 278:
-      return `Finishing Blow: ${Math.abs(base)}% Chance${limit > 0 ? ` for ${Math.abs(limit)} Damage` : ""}`;
+      return `Finishing Blow: ${formatCompactNumber(Math.abs(base) / 10)}% Chance${limit > 0 ? ` for ${Math.abs(limit)} Damage` : ""}`;
     case 287:
       return `Focus: Increase Buff Duration by ${Math.abs(base)} ${Math.abs(base) === 1 ? "Tick" : "Ticks"}`;
     case 274:
@@ -2124,8 +2265,8 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, ref
     case 294:
       return `Increase Spell Critical Chance by ${Math.abs(base)}%${limit !== 0 ? ` and Critical Damage by ${Math.abs(limit)}%` : ""}`;
     case 302:
-      return max !== 0
-        ? `${base < 0 ? "Decrease" : "Increase"} Spell Damage Before Critical by ${Math.abs(base)}% to ${Math.abs(max)}%`
+      return limit !== 0 && limit !== base
+        ? `${base < 0 ? "Decrease" : "Increase"} Spell Damage Before Critical by ${Math.abs(base)}% to ${Math.abs(limit)}%`
         : `${base < 0 ? "Decrease" : "Increase"} Spell Damage Before Critical by ${Math.abs(base)}%`;
     case 286:
     case 303:
@@ -2133,7 +2274,11 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, ref
     case 297:
       return formatScaledNumericSpellEffectLabel(row, slot, "Increase Incoming Spell Damage", effectId);
     case 305:
-      return `${base < 0 ? "Decrease" : "Increase"} Offhand Damage Shield Taken by ${Math.abs(base)}%`;
+      return `${base < 0 && max <= 0 ? "Decrease" : "Increase"} Offhand Damage Shield Mitigation by ${Math.abs(base < 0 && max > 0 ? max : base)}%`;
+    case 321: {
+      const { minimumValue, maximumValue } = spellEffectValueRange(row, slot);
+      return formatInverseSignedEffectLevelRangeLabel("Target Hate", minimumValue, maximumValue);
+    }
     case 306:
       return teleportZone
         ? `Wake the Dead: ${teleportZone} x ${Math.abs(base)}${max > 0 ? ` for ${Math.abs(max)} sec` : ""}`
@@ -2146,6 +2291,8 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, ref
       return `Reduce Reuse Timer by ${formatMilliseconds(Math.abs(base))}`;
     case 329:
       return `Absorb Damage using Mana: ${Math.abs(base)}%`;
+    case 324:
+      return `Use HP Instead of Mana at ${Math.abs(base)}% Conversion Rate`;
     case 330:
       return `${base < 0 ? "Decrease" : "Increase"} Critical Damage for ${formatEffectSkillName(limit) ?? "All Skills"} by ${Math.abs(base)}%`;
     case 348:
@@ -2225,7 +2372,7 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, ref
     case 414:
       return `Limit: Casting Skill (${formatEffectSkillName(base) ?? `Skill ${Math.abs(base)}`})`;
     case 417:
-      return `${base < 0 ? "Decrease" : "Increase"} Current Mana by ${Math.abs(base)}`;
+      return formatScaledNumericSpellEffectLabel(row, slot, "Increase Mana Regeneration", effectId);
     case 418:
       return `${slotSkillName ? `Increase ${slotSkillName} Damage Bonus` : "Increase Damage Bonus"} by ${Math.abs(base)}`;
     case 419:
@@ -2253,11 +2400,13 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, ref
     case 449:
       return `${label}${base !== 0 ? ` (Stacking Value ${Math.abs(base)})` : ""}`;
     case 442:
-      return spellId > 0 ? `Cast ${referencedSpell} once if target restriction ${Math.abs(limit)}` : label;
+      return spellId > 0 ? `Cast ${referencedSpell} once if target is ${formatTarget(Math.abs(limit))}` : label;
     case 443:
-      return spellId > 0 ? `Cast ${referencedSpell} once if caster restriction ${Math.abs(limit)}` : label;
+      return spellId > 0 ? `Cast ${referencedSpell} once if caster is ${formatTarget(Math.abs(limit))}` : label;
     case 444:
       return `Lock Aggro on Caster and ${limit < 100 ? "Decrease" : "Increase"} Other Aggro by ${Math.abs(limit - 100)}%${base > 0 ? ` up to level ${Math.abs(base)}` : ""}`;
+    case 445:
+      return `Add ${Math.abs(base)} Mercenary ${Math.abs(base) === 1 ? "Slot" : "Slots"}`;
     case 450:
       return `Absorb DoT Damage: ${Math.abs(base)}%${limit > 0 ? ` Max Per Hit ${Math.abs(limit)}` : ""}${max > 0 ? ` Total ${Math.abs(max)}` : ""}`;
     case 455:
@@ -2303,7 +2452,7 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, ref
       return `${label} if slot ${checkedSlot} is ${checkedEffect}${max !== 0 ? ` and less than ${Math.abs(max)}` : ""}`;
     }
     case 211:
-      return base !== 0 ? `${label} for ${formatSeconds(Math.abs(base) * 12)}` : label;
+      return base !== 0 ? `${label} for ${formatSeconds(Math.abs(base) * 10)}` : label;
     default:
       if (base !== 0) {
         return formatScaledNumericSpellEffectLabel(row, slot, label, effectId);

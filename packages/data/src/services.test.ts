@@ -1933,6 +1933,11 @@ describe("catalog services", () => {
     expect(resolveSpellEffectDirection("In/Decrease Attack Speed", 85, 11)).toBe("Decrease Attack Speed");
     expect(resolveSpellEffectDirection("Increase Damage Shield", -3, 59)).toBe("Increase Damage Shield");
     expect(resolveSpellEffectDirection("Increase Player Size", 66, 89)).toBe("Decrease Player Size");
+    expect(resolveSpellEffectDirection("Increase Haste v2", 95, 98)).toBe("Decrease Haste v2");
+    expect(resolveSpellEffectDirection("Increase Melee Mitigation", 50, 168)).toBe("Decrease Melee Mitigation");
+    expect(resolveSpellEffectDirection("Increase Melee Mitigation", -50, 168)).toBe("Increase Melee Mitigation");
+    expect(resolveSpellEffectDirection("Reduce Endurance Upkeep", -10, 24)).toBe("Increase Endurance Upkeep");
+    expect(resolveSpellEffectDirection("Reduce Target Hate", -5000, 321)).toBe("Increase Target Hate");
     expect(resolveSpellEffectDirection("Decrease Spell Mana Cost", 10)).toBe("Decrease Spell Mana Cost");
     expect(resolveSpellEffectDirection("In/Decrease Movement", -45)).toBe("Decrease Movement");
   });
@@ -1950,6 +1955,9 @@ describe("catalog services", () => {
     });
 
     expect(summary).toBe("Decrease Player Size • Decrease Attack Speed • Increase Damage Shield • Decrease Spell Mana Cost");
+    expect(summarizeSpellEffects({ effectid1: 305, effect_base_value1: -57, max1: 57 })).toBe(
+      "Increase Offhand Damage Shield Mitigation"
+    );
   });
 
   it("renders legacy encoded percent effects the way classic Alla-style text expects", async () => {
@@ -1996,6 +2004,125 @@ describe("catalog services", () => {
     expect(multiplicative?.effects.map((entry) => entry.text)).toContain("Increase Hitpoints by 2 (lvl 1) to 61 (lvl 60)");
   });
 
+  it("matches EQEmu duration formulas and permanent-buff sentinels", async () => {
+    const [roots, terrorize, tepidDeeds, skinLikeWood, claritySong, permanent, aura] = await Promise.all([
+      getSpellDetail(76),
+      getSpellDetail(514),
+      getSpellDetail(185),
+      getSpellDetail(26),
+      getSpellDetail(723),
+      getSpellDetail(775),
+      getSpellDetail(927)
+    ]);
+
+    expect(roots?.duration).toBe("1 min 30 sec (15 ticks)");
+    expect(terrorize?.duration).toBe("42 sec (7 ticks)");
+    expect(tepidDeeds?.duration).toBe("1 min 18 sec (13 ticks)");
+    expect(skinLikeWood?.duration).toBe("12 min (120 ticks)");
+    expect(claritySong?.duration).toBe("12 sec (2 ticks)");
+    expect(permanent?.duration).toBe("Permanent");
+    expect(aura?.duration).toBe("Permanent (while in aura range)");
+  });
+
+  it("shows first-to-final tick progression for degenerating spell formulas", async () => {
+    const [strength, potion, bond, splurt, fading] = await Promise.all([
+      getSpellDetail(215),
+      getSpellDetail(883),
+      getSpellDetail(833),
+      getSpellDetail(11776),
+      getSpellDetail(7648)
+    ]);
+
+    expect(strength?.effects.map((entry) => entry.text)).toContain(
+      "Increase STR by 19 on first tick, then Decrease STR by 10 on final tick"
+    );
+    expect(potion?.effects.map((entry) => entry.text)).toContain(
+      "Increase Attack Speed by 28% on first tick, then Decrease Attack Speed by 10% on final tick"
+    );
+    expect(bond?.effects.map((entry) => entry.text)).toContain(
+      "Decrease Hitpoints by 11 on first tick to 239 on final tick"
+    );
+    expect(splurt?.effects.map((entry) => entry.text)).toContain(
+      "Decrease Hitpoints by 687 on first tick to 591 on final tick"
+    );
+    expect(fading?.effects.map((entry) => entry.text)).toContain(
+      "Decrease Hitpoints by 1500 on first tick, fading to 0 on final tick"
+    );
+  });
+
+  it("renders field-aware semantics for the second-pass spell effect audit", async () => {
+    const [
+      hasteV2,
+      desperation,
+      skillReduction,
+      meleeMitigation,
+      fearImmunity,
+      skillTimer,
+      preCriticalDamage,
+      petMitigation,
+      bardMitigation,
+      stationaryDot,
+      hpManaConversion,
+      manaRegeneration,
+      mercenarySlot,
+      aeMelee,
+      enduranceUpkeep,
+      reverseDamageShield,
+      spellDamageShield,
+      negativeHateReduction,
+      allStats,
+      trapCount
+    ] = await Promise.all([
+      getSpellDetail(1452),
+      getSpellDetail(5853),
+      getSpellDetail(39671),
+      getSpellDetail(4498),
+      getSpellDetail(5229),
+      getSpellDetail(6194),
+      getSpellDetail(27536),
+      getSpellDetail(12776),
+      getSpellDetail(35170),
+      getSpellDetail(703),
+      getSpellDetail(5932),
+      getSpellDetail(780),
+      getSpellDetail(32780),
+      getSpellDetail(5240),
+      getSpellDetail(962),
+      getSpellDetail(2507),
+      getSpellDetail(3907),
+      getSpellDetail(22720),
+      getSpellDetail(11537),
+      getSpellDetail(8755)
+    ]);
+
+    expect(hasteV2?.effects.map((entry) => entry.text)).toContain("Increase Haste v2 by 10%");
+    expect(desperation?.effects.map((entry) => entry.text)).toContain("Increase Haste v3 by up to 30% as HP decreases");
+    expect(skillReduction?.effects.map((entry) => entry.text)).toContain("Reduce Abjuration Skill by 38%");
+    expect(meleeMitigation?.effects.map((entry) => entry.text)).toContain("Decrease Melee Mitigation by 50%");
+    expect(fearImmunity?.effects.map((entry) => entry.text)).toContain("Group Fear Immunity for 10 sec");
+    expect(skillTimer?.effects.map((entry) => entry.text)).toContain("Reduce Skill Timer for Flying Kick by 7 sec");
+    expect(preCriticalDamage?.effects.map((entry) => entry.text)).toContain("Increase Spell Damage Before Critical by 30%");
+    expect(petMitigation?.effects.map((entry) => entry.text)).toContain("Increase Offhand Damage Shield Mitigation by 20%");
+    expect(bardMitigation?.effects.map((entry) => entry.text)).toContain("Increase Offhand Damage Shield Mitigation by 92%");
+    expect(stationaryDot?.effects.map((entry) => entry.text)).toContain(
+      "Decrease Current HP by 2 (lvl 1) to 17 (lvl 60) (If Target Not Moving)"
+    );
+    expect(hpManaConversion?.effects.map((entry) => entry.text)).toContain("Use HP Instead of Mana at 180% Conversion Rate");
+    expect(manaRegeneration?.effects.map((entry) => entry.text)).toContain("Increase Mana Regeneration by 1500");
+    expect(mercenarySlot?.effects.map((entry) => entry.text)).toContain("Add 1 Mercenary Slot");
+    expect(aeMelee?.effects.map((entry) => entry.text)).toContain("AE Melee for 10 sec");
+    expect(enduranceUpkeep?.effects.map((entry) => entry.text)).toContain(
+      "Reduce Endurance Upkeep by 4 (lvl 1) to 181 (lvl 60)"
+    );
+    expect(reverseDamageShield?.effects.map((entry) => entry.text)).toContain(
+      "Damage Attacker with Reverse Damage Shield by 15"
+    );
+    expect(spellDamageShield?.effects.map((entry) => entry.text)).toContain("Damage Spell Caster by 250");
+    expect(negativeHateReduction?.effects.map((entry) => entry.text)).toContain("Increase Target Hate by 5000");
+    expect(allStats?.effects.map((entry) => entry.text)).toContain("Increase All Stats by 5");
+    expect(trapCount?.effects.map((entry) => entry.text)).toContain("Increase Trap Count by 1");
+  });
+
   it("finds spells by exact spell id in the shared spell search query", async () => {
     const spells = await listSpells({ q: "1275" });
 
@@ -2007,7 +2134,7 @@ describe("catalog services", () => {
     const spell = await getSpellDetail(38106);
     const effects = spell?.effects.map((entry) => entry.text) ?? [];
 
-    expect(effects).toContain("AE Melee for 1 min");
+    expect(effects).toContain("AE Melee for 50 sec");
     expect(effects.some((entry) => entry.includes("Effect 211"))).toBe(false);
   });
 
@@ -2264,14 +2391,14 @@ describe("catalog services", () => {
     );
     expect(softCap?.effects.map((entry) => entry.text)).toContain("Increase AC Soft Cap by 25%");
     expect(factionMod?.effects.map((entry) => entry.text)).toContain("Modify Faction 1838 by 99");
-    expect(currentMana?.effects.map((entry) => entry.text)).toContain("Increase Current Mana by 125");
+    expect(currentMana?.effects.map((entry) => entry.text)).toContain("Increase Mana Regeneration by 125");
     expect(manaDrain?.effects.map((entry) => entry.text)).toContain(
       "Decrease Current HP by up to 15000 and Drain up to 10000 mana (1.5 HP per 1 Target Mana Drained)"
     );
     expect(dotRune?.effects.map((entry) => entry.text)).toContain("Absorb DoT Damage: 25% Total 100000000");
     expect(endurancePct?.effects.map((entry) => entry.text)).toContain("Decrease Current Endurance by 0.6% up to 90");
     expect(wakeTheDead?.effects.map((entry) => entry.text)).toContain("Wake the Dead: animateDead6 x 5 for 90 sec");
-    expect(offhandDs?.effects.map((entry) => entry.text)).toContain("Decrease Offhand Damage Shield Taken by 57%");
+    expect(offhandDs?.effects.map((entry) => entry.text)).toContain("Increase Offhand Damage Shield Mitigation by 57%");
     expect(auraCount?.effects.map((entry) => entry.text)).toContain("Increase Aura Count by 1");
     expect(
       [
@@ -2297,15 +2424,15 @@ describe("catalog services", () => {
     ).toBe(false);
   });
 
-  it("renders bard AE dot percent damage effects without raw fallback ids", async () => {
+  it("renders bard AE dot damage effects without treating flat damage as a percentage", async () => {
     const chords = await getSpellDetail(703);
     const denon = await getSpellDetail(730);
 
     const chordsEffects = chords?.effects.map((entry) => entry.text) ?? [];
     const denonEffects = denon?.effects.map((entry) => entry.text) ?? [];
 
-    expect(chordsEffects).toContain("Decrease Current HP by 2% (lvl 1) to 17% (lvl 60) (If Target Not Moving)");
-    expect(denonEffects).toContain("Decrease Current HP by 4% (lvl 1) to 19% (lvl 60) (If Target Not Moving)");
+    expect(chordsEffects).toContain("Decrease Current HP by 2 (lvl 1) to 17 (lvl 60) (If Target Not Moving)");
+    expect(denonEffects).toContain("Decrease Current HP by 4 (lvl 1) to 19 (lvl 60) (If Target Not Moving)");
     expect([...chordsEffects, ...denonEffects].some((entry) => /^Effect 334\b/.test(entry))).toBe(false);
   });
 

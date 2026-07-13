@@ -71,7 +71,7 @@ const spireSpellEffectFallbackNames: Record<number, string> = {
   300: "Summon Doppelganger",
   302: "Focus: Spell Damage Before Critical",
   303: "Focus: Spell Damage Amount",
-  305: "Offhand Damage Shield Taken",
+  305: "Increase Offhand Damage Shield Mitigation",
   306: "Wake the Dead",
   307: "Appraisal",
   308: "Zone Suspend Minion",
@@ -84,7 +84,7 @@ const spireSpellEffectFallbackNames: Record<number, string> = {
   319: "Increase Chance to Critical HoT",
   320: "Increase Shield Block Chance",
   321: "Reduce Target Hate",
-  324: "Convert HP to Mana",
+  324: "Use HP Instead of Mana",
   328: "Max Negative HP",
   329: "Mana Shield Absorb Damage",
   334: "Bard AE Dot",
@@ -96,7 +96,7 @@ const spireSpellEffectFallbackNames: Record<number, string> = {
   348: "Limit: Min Mana Cost",
   350: "Manaburn",
   351: "Aura Effect",
-  352: "Trap Count",
+  352: "Increase Trap Count",
   353: "Aura Count",
   354: "Deactivate All Traps",
   355: "Learn Trap",
@@ -136,7 +136,7 @@ const spireSpellEffectFallbackNames: Record<number, string> = {
   413: "Focus: Base Spell Value",
   414: "Limit: Casting Skill",
   416: "Increase AC",
-  417: "Current Mana",
+  417: "Increase Mana Regeneration",
   418: "Skill Damage Bonus",
   419: "Add Melee Proc",
   424: "Gravitate",
@@ -204,7 +204,7 @@ const spellEffectNames: Record<number, string> = {
   21: "Stun",
   22: "Charm",
   23: "Fear",
-  24: "Increase Stamina",
+  24: "Reduce Endurance Upkeep",
   25: "Bind Affinity",
   26: "Gate",
   27: "Cancel Magic",
@@ -219,7 +219,7 @@ const spellEffectNames: Record<number, string> = {
   40: "Invulnerability",
   41: "Destroy Target",
   42: "Shadowstep",
-  44: "Lycanthropy",
+  44: "Delayed Heal / Lycanthropy Marker",
   46: "Increase Fire Resist",
   47: "Increase Cold Resist",
   48: "Increase Poison Resist",
@@ -316,9 +316,9 @@ const spellEffectNames: Record<number, string> = {
   153: "Balance Party Health",
   154: "Remove Detrimental",
   156: "Illusion: Target",
-  157: "Spell-Damage Shield",
+  157: "Damage Spell Caster",
   158: "Increase Chance to Reflect Spell",
-  159: "Decrease Stats",
+  159: "Increase All Stats",
   167: "Pet Power Increase",
   168: "Increase Melee Mitigation",
   169: "Increase Chance to Critical Hit",
@@ -412,8 +412,16 @@ export function resolveSpellEffectDirection(label: string, value: number, effect
   switch (effectId) {
     case 11:
       return value < 100 ? "Decrease Attack Speed" : "Increase Attack Speed";
+    case 24:
+      return value < 0 ? "Increase Endurance Upkeep" : "Reduce Endurance Upkeep";
     case 89:
       return value < 100 ? "Decrease Player Size" : "Increase Player Size";
+    case 98:
+      return value < 100 ? "Decrease Haste v2" : "Increase Haste v2";
+    case 168:
+      return value < 0 ? "Increase Melee Mitigation" : "Decrease Melee Mitigation";
+    case 321:
+      return value < 0 ? "Increase Target Hate" : "Reduce Target Hate";
   }
 
   if (label.includes("In/Decrease")) {
@@ -451,7 +459,10 @@ export function summarizeSpellEffects(row: Record<string, unknown>) {
       continue;
     }
 
-    const label = resolveSpellEffectDirection(getSpellEffectName(effectId), base, effectId);
+    const max = Number(row[`max${slot}`] ?? 0);
+    const label = effectId === 305
+      ? `${base < 0 && max <= 0 ? "Decrease" : "Increase"} Offhand Damage Shield Mitigation`
+      : resolveSpellEffectDirection(getSpellEffectName(effectId), base, effectId);
 
     if (label && !labels.includes(label)) {
       labels.push(label);
