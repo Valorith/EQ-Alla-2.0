@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Badge, Button, Card, CardContent } from "@eq-alla/ui";
-import { ArrowDown, ArrowRight, ArrowUp, ChevronsUpDown } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import type { TableSortControl } from "./table-sorting";
 
 export function PageHero({
@@ -150,15 +150,14 @@ export function SimpleTableHeaderRow({
                 }`}
               >
                 <span>{column}</span>
-                {isActiveSort ? (
-                  sort.direction === "ascending" ? (
-                    <ArrowUp aria-hidden="true" className="size-3.5 shrink-0" />
-                  ) : (
-                    <ArrowDown aria-hidden="true" className="size-3.5 shrink-0" />
-                  )
-                ) : (
-                  <ChevronsUpDown aria-hidden="true" className="size-3.5 shrink-0 opacity-45 transition group-hover:opacity-90" />
-                )}
+                <span
+                  aria-hidden="true"
+                  className={`inline-flex w-3.5 shrink-0 justify-center text-sm leading-none ${
+                    isActiveSort ? "" : "opacity-45 transition group-hover:opacity-90"
+                  }`}
+                >
+                  {isActiveSort ? (sort.direction === "ascending" ? "↑" : "↓") : "↕"}
+                </span>
               </button>
             ) : (
               column
