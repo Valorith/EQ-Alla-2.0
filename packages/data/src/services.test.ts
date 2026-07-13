@@ -1984,6 +1984,18 @@ describe("catalog services", () => {
     expect(burnoutEffects).toContain("Increase Attack Speed by 16% (lvl 1) to 60% (lvl 60)");
   });
 
+  it("matches EQEmu formula semantics for divided, random-range, and multiplicative effects", async () => {
+    const [divided, randomRange, multiplicative] = await Promise.all([
+      getSpellDetail(32002),
+      getSpellDetail(2173),
+      getSpellDetail(27788)
+    ]);
+
+    expect(divided?.effects.map((entry) => entry.text)).toContain("Decrease Hitpoints by 50");
+    expect(randomRange?.effects.map((entry) => entry.text)).toContain("Decrease Hitpoints by 75 to 150");
+    expect(multiplicative?.effects.map((entry) => entry.text)).toContain("Increase Hitpoints by 2 (lvl 1) to 61 (lvl 60)");
+  });
+
   it("finds spells by exact spell id in the shared spell search query", async () => {
     const spells = await listSpells({ q: "1275" });
 
@@ -2008,6 +2020,37 @@ describe("catalog services", () => {
     expect(getSpellEffectName(385)).toBe("Limit: Spell Group");
   });
 
+  it("maps every spell effect used by the database to a readable name", async () => {
+    const db = getDb();
+    expect(db).toBeTruthy();
+
+    const rows = await sql<{ effect_id: number }>`
+      select distinct effect_id
+      from (
+        select effectid1 as effect_id from spells_new union all
+        select effectid2 from spells_new union all
+        select effectid3 from spells_new union all
+        select effectid4 from spells_new union all
+        select effectid5 from spells_new union all
+        select effectid6 from spells_new union all
+        select effectid7 from spells_new union all
+        select effectid8 from spells_new union all
+        select effectid9 from spells_new union all
+        select effectid10 from spells_new union all
+        select effectid11 from spells_new union all
+        select effectid12 from spells_new
+      ) spell_effects
+      where effect_id >= 0 and effect_id <> 254
+      order by effect_id
+    `.execute(db!);
+
+    const unresolved = rows.rows
+      .map((row) => Number(row.effect_id))
+      .filter((effectId) => getSpellEffectName(effectId) === `Effect ${effectId}`);
+
+    expect(unresolved).toEqual([]);
+  });
+
   it("renders spell and melee mitigation runes using percent, per-hit cap, and total pool semantics", async () => {
     const spellGuard = await getSpellDetail(4388);
     const guard = await getSpellDetail(4384);
@@ -2028,6 +2071,40 @@ describe("catalog services", () => {
         "Mitigate Melee Damage by 50%, Max Per Hit 1000, Total 10000"
       ])
     );
+  });
+
+  it("renders field-aware descriptions for legacy runes, chances, limits, resources, and identifiers", async () => {
+    const [shieldskin, manasink, feignDeath, amplification, renewal, purifySoul, divineSave, bodyType, thresholdGuard, enduranceDrain, skillLimit, statCap] =
+      await Promise.all([
+        getSpellDetail(236),
+        getSpellDetail(1728),
+        getSpellDetail(366),
+        getSpellDetail(2603),
+        getSpellDetail(3232),
+        getSpellDetail(2742),
+        getSpellDetail(5612),
+        getSpellDetail(9432),
+        getSpellDetail(34057),
+        getSpellDetail(4253),
+        getSpellDetail(4802),
+        getSpellDetail(3171)
+      ]);
+
+    expect(shieldskin?.effects.map((entry) => entry.text)).toContain("Absorb Melee Damage by 27 (lvl 1) to 55 (lvl 60)");
+    expect(manasink?.effects.map((entry) => entry.text)).toContain("Absorb Spell Damage by 250");
+    expect(feignDeath?.effects.map((entry) => entry.text)).toContain("Feign Death Chance by 87%");
+    expect(amplification?.effects.map((entry) => entry.text)).toContain("Increase Singing Skill by 2% (lvl 1) to 9% (lvl 60)");
+    expect(renewal?.effects.map((entry) => entry.text)).toContain("Heal for 75% of Max HP, up to 4680");
+    expect(purifySoul?.effects.map((entry) => entry.text)).toContain("Decrease Curse Counter by 36");
+    expect(purifySoul?.effects.map((entry) => entry.text)).toContain("Remove Detrimental (95% chance)");
+    expect(divineSave?.effects.map((entry) => entry.text)).toContain("Divine Save: 2% Chance to Cast Touch of the Divine I");
+    expect(bodyType?.effects.map((entry) => entry.text)).toContain("Modify Body Type to Undead");
+    expect(thresholdGuard?.effects.map((entry) => entry.text)).toContain(
+      "Mitigate Melee Damage by 75% when a hit exceeds 18500, Total 77348"
+    );
+    expect(enduranceDrain?.effects.map((entry) => entry.text)).toContain("Decrease Current Endurance by 0.6% up to 90");
+    expect(skillLimit?.effects.map((entry) => entry.text)).toContain("Limit: Skill (Archery)");
+    expect(statCap?.effects.map((entry) => entry.text)).toContain("Increase STA Cap by 2 (lvl 1) to 90 (lvl 60)");
   });
 
   it("deduplicates repeated spell effect slots and renders skill attacks with translated skill names", async () => {
@@ -2122,7 +2199,7 @@ describe("catalog services", () => {
 
     expect(criticalHealAura?.effects.map((entry) => entry.text)).toContain("Increase Chance to Critical Heal by 12%");
     expect(doubleAttackBuff?.effects.map((entry) => entry.text)).toContain("Increase Chance to Double Attack by 100% (Additive)");
-    expect(gravityFlux?.effects.map((entry) => entry.text)).toContain("Gravity Flux");
+    expect(gravityFlux?.effects.map((entry) => entry.text)).toContain("Gravity Flux by 100 Distance");
     expect(manaburn?.effects.map((entry) => entry.text)).toContain(
       "Manaburn: Consumes up to 12000 mana to deal 40% of that mana as direct damage"
     );
@@ -2132,7 +2209,7 @@ describe("catalog services", () => {
     expect(healFromMana?.effects.map((entry) => entry.text)).toContain(
       "Increase Group Current HP by up to 30786 (11.6 HP per 1 Mana Drained)"
     );
-    expect(skillDamageBonus?.effects.map((entry) => entry.text)).toContain("Increase Hit Damage Bonus by 102");
+    expect(skillDamageBonus?.effects.map((entry) => entry.text)).toContain("Increase All Skills Damage Bonus by 102");
     expect(criticalRenewal?.effects.map((entry) => entry.text)).toContain("Increase Chance to Critical Heal by 23%");
     expect(criticalRenewal?.effects.map((entry) => entry.text)).toContain("Increase Chance to Critical HoT by 23%");
     expect(corruptionDebuff?.effects.map((entry) => entry.text)).toContain("Decrease Corruption Resist by 32");
@@ -2180,7 +2257,7 @@ describe("catalog services", () => {
     expect(castingLevel?.effects.map((entry) => entry.text)).toContain("Decrease Effective Casting Level by 15");
     expect(negativeHp?.effects.map((entry) => entry.text)).toContain("Increase Max Negative HP by 11449");
     expect(spellClassLimit?.effects.map((entry) => entry.text)).toContain("Limit: Spell Class (ID 3)");
-    expect(doppelganger?.effects.map((entry) => entry.text)).toContain("Summon Doppelganger AKMOverlordAdd");
+    expect(doppelganger?.effects.map((entry) => entry.text)).toContain("Summon 2 Doppelgangers: AKMOverlordAdd for 20 sec");
     expect(maxHpPercent?.effects.map((entry) => entry.text)).toContain("Decrease Max HP by 4.5%");
     expect(tauntLock?.effects.map((entry) => entry.text)).toContain(
       "Lock Aggro on Caster and Decrease Other Aggro by 10% up to level 100"
@@ -2192,7 +2269,7 @@ describe("catalog services", () => {
       "Decrease Current HP by up to 15000 and Drain up to 10000 mana (1.5 HP per 1 Target Mana Drained)"
     );
     expect(dotRune?.effects.map((entry) => entry.text)).toContain("Absorb DoT Damage: 25% Total 100000000");
-    expect(endurancePct?.effects.map((entry) => entry.text)).toContain("Decrease Current Endurance by 50% up to 75");
+    expect(endurancePct?.effects.map((entry) => entry.text)).toContain("Decrease Current Endurance by 0.6% up to 90");
     expect(wakeTheDead?.effects.map((entry) => entry.text)).toContain("Wake the Dead: animateDead6 x 5 for 90 sec");
     expect(offhandDs?.effects.map((entry) => entry.text)).toContain("Decrease Offhand Damage Shield Taken by 57%");
     expect(auraCount?.effects.map((entry) => entry.text)).toContain("Increase Aura Count by 1");
