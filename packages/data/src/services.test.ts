@@ -2000,10 +2000,34 @@ describe("catalog services", () => {
   });
 
   it("uses the Spire SPA fallback names for unmapped spell effects", () => {
+    expect(getSpellEffectName(161)).toBe("Mitigate Spell Damage Rune");
+    expect(getSpellEffectName(162)).toBe("Mitigate Melee Damage Rune");
     expect(getSpellEffectName(193)).toBe("Skill Attack");
     expect(getSpellEffectName(220)).toBe("Skill Damage Bonus");
     expect(getSpellEffectName(262)).toBe("Raise Stat Cap");
     expect(getSpellEffectName(385)).toBe("Limit: Spell Group");
+  });
+
+  it("renders spell and melee mitigation runes using percent, per-hit cap, and total pool semantics", async () => {
+    const spellGuard = await getSpellDetail(4388);
+    const guard = await getSpellDetail(4384);
+    const wardOfVie = await getSpellDetail(4088);
+    const glyphOfDragonScales = await getSpellDetail(9475);
+
+    expect(spellGuard?.effect).toBe("Mitigate Spell Damage Rune");
+    expect(spellGuard?.effects.map((entry) => entry.text)).toContain("Mitigate Spell Damage by 5%, Total 75");
+    expect(guard?.effect).toBe("Mitigate Melee Damage Rune");
+    expect(guard?.effects.map((entry) => entry.text)).toContain("Mitigate Melee Damage by 5%, Total 75");
+    expect(wardOfVie?.effects.map((entry) => entry.text)).toEqual([
+      "Mitigate Melee Damage by 10%, Total 1800",
+      "Mitigate Spell Damage by 10%, Total 1800"
+    ]);
+    expect(glyphOfDragonScales?.effects.map((entry) => entry.text)).toEqual(
+      expect.arrayContaining([
+        "Mitigate Spell Damage by 50%, Max Per Hit 1000, Total 10000",
+        "Mitigate Melee Damage by 50%, Max Per Hit 1000, Total 10000"
+      ])
+    );
   });
 
   it("deduplicates repeated spell effect slots and renders skill attacks with translated skill names", async () => {
@@ -2089,6 +2113,7 @@ describe("catalog services", () => {
     const gravityFlux = await getSpellDetail(12319);
     const manaburn = await getSpellDetail(12667);
     const absorbDamage = await getSpellDetail(14711);
+    const cappedAbsorbDamage = await getSpellDetail(36382);
     const manaShield = await getSpellDetail(16745);
     const healFromMana = await getSpellDetail(28436);
     const skillDamageBonus = await getSpellDetail(30245);
@@ -2101,7 +2126,8 @@ describe("catalog services", () => {
     expect(manaburn?.effects.map((entry) => entry.text)).toContain(
       "Manaburn: Consumes up to 12000 mana to deal 40% of that mana as direct damage"
     );
-    expect(absorbDamage?.effects.map((entry) => entry.text)).toContain("Absorb 10 Hits or Spells 10%");
+    expect(absorbDamage?.effects.map((entry) => entry.text)).toContain("Absorb 10 Hits or Spells");
+    expect(cappedAbsorbDamage?.effects.map((entry) => entry.text)).toContain("Absorb 9 Hits or Spells, Max Per Hit 22902");
     expect(manaShield?.effects.map((entry) => entry.text)).toContain("Absorb Damage using Mana: 70%");
     expect(healFromMana?.effects.map((entry) => entry.text)).toContain(
       "Increase Group Current HP by up to 30786 (11.6 HP per 1 Mana Drained)"

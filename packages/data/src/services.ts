@@ -1845,8 +1845,12 @@ function describeSpellEffectSlot(row: Record<string, unknown>, slot: number, ref
       return `Limit: Duration Type (${base ? "Instant spells only" : "Duration spells only"})`;
     case 160:
       return `Intoxicate if Tolerance under ${Math.abs(base)}`;
+    case 161:
+      return `Mitigate Spell Damage by ${Math.abs(base)}%${limit > 0 ? `, Max Per Hit ${Math.abs(limit)}` : ""}${max > 0 ? `, Total ${Math.abs(max)}` : ""}`;
+    case 162:
+      return `Mitigate Melee Damage by ${Math.abs(base)}%${limit > 0 ? `, Max Per Hit ${Math.abs(limit)}` : ""}${max > 0 ? `, Total ${Math.abs(max)}` : ""}`;
     case 163:
-      return `Absorb ${Math.abs(base)} Hits or Spells ${Math.abs(base)}%${max > 0 ? `, Max Per Hit ${Math.abs(max)}` : ""}`;
+      return `Absorb ${Math.abs(base)} ${Math.abs(base) === 1 ? "Hit or Spell" : "Hits or Spells"}${max > 0 ? `, Max Per Hit ${Math.abs(max)}` : ""}`;
     case 210:
       return `Pet Shielding for ${Math.abs(base) * 12} sec${limit !== 0 ? ` (Owner Mitigation: ${Math.abs(limit)}%)` : ""}${max !== 0 ? ` (Pet Mitigation: ${Math.abs(max)}%)` : ""}`;
     case 214:
