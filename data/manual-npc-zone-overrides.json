@@ -2,81 +2,2581 @@
   {
     "npcId": 113457,
     "zoneShortName": "kael",
-    "note": "Manual zone presence for scripted spawn"
+    "note": "The Avatar of War — scripted spawn"
   },
   {
     "npcId": 93066,
     "zoneShortName": "kerraridge",
-    "note": "Manual zone presence for scripted spawn"
+    "note": "Crakuawk the Stormbringer — scripted spawn"
   },
   {
     "npcId": 13026,
     "zoneShortName": "kerraridge",
-    "note": "Manual zone presence for scripted spawn"
+    "note": "Fenris the Furious — scripted spawn"
   },
   {
     "npcId": 13006,
     "zoneShortName": "kerraridge",
-    "note": "Manual zone presence for scripted spawn"
+    "note": "Gastaur the Cruel — scripted spawn"
   },
   {
     "npcId": 13132,
     "zoneShortName": "kerraridge",
-    "note": "Manual zone presence for scripted spawn"
+    "note": "Tukkesk the Devourer — scripted spawn"
   },
   {
     "npcId": 126373,
     "zoneShortName": "mischiefplane",
-    "note": "Manual zone presence for scripted spawn"
+    "note": "Bristlebane the King of Thieves — scripted spawn"
   },
   {
     "npcId": 13200,
     "zoneShortName": "northkarana",
-    "note": "Manual zone presence for scripted spawn"
+    "note": "Enraged Scarecrow — scripted spawn"
   },
   {
     "npcId": 13200,
     "zoneShortName": "southkarana",
-    "note": "Manual zone presence for scripted spawn"
+    "note": "Enraged Scarecrow — scripted spawn"
   },
   {
     "npcId": 13200,
     "zoneShortName": "eastkarana",
-    "note": "Manual zone presence for scripted spawn"
+    "note": "Enraged Scarecrow — scripted spawn"
   },
   {
     "npcId": 13200,
     "zoneShortName": "qey2hh1",
-    "note": "Manual zone presence for scripted spawn"
+    "note": "Enraged Scarecrow — scripted spawn"
   },
   {
     "npcId": 13012,
     "zoneShortName": "northkarana",
-    "note": "Manual zone presence for scripted spawn"
+    "note": "Harbinger of Fear — scripted spawn"
   },
   {
     "npcId": 13012,
     "zoneShortName": "southkarana",
-    "note": "Manual zone presence for scripted spawn"
+    "note": "Harbinger of Fear — scripted spawn"
   },
   {
     "npcId": 13012,
     "zoneShortName": "eastkarana",
-    "note": "Manual zone presence for scripted spawn"
+    "note": "Harbinger of Fear — scripted spawn"
   },
   {
     "npcId": 13012,
     "zoneShortName": "qey2hh1",
-    "note": "Manual zone presence for scripted spawn"
+    "note": "Harbinger of Fear — scripted spawn"
   },
   {
     "npcId": 37012,
     "zoneShortName": "oasis",
-    "note": "Manual zone presence for scripted spawn"
+    "note": "Cazel the Arisen — scripted spawn"
   },
   {
     "npcId": 127098,
     "zoneShortName": "growthplane",
-    "note": "Manual zone presence for scripted spawn"
+    "note": "Tunare — scripted spawn"
+  },
+  {
+    "npcId": 90174,
+    "zoneShortName": "citymist",
+    "note": "Lord Rak`Ashiir — scripted spawn"
+  },
+  {
+    "npcId": 90180,
+    "zoneShortName": "citymist",
+    "note": "Lord Ghiosk — scripted spawn"
+  },
+  {
+    "npcId": 90183,
+    "zoneShortName": "citymist",
+    "note": "Lord Rak`Ashiir — scripted spawn"
+  },
+  {
+    "npcId": 90184,
+    "zoneShortName": "citymist",
+    "note": "Neh`Ashiir — scripted spawn"
+  },
+  {
+    "npcId": 90187,
+    "zoneShortName": "citymist",
+    "note": "Lhranc — scripted spawn"
+  },
+  {
+    "npcId": 90189,
+    "zoneShortName": "citymist",
+    "note": "Marl Kastane — scripted spawn"
+  },
+  {
+    "npcId": 90190,
+    "zoneShortName": "citymist",
+    "note": "a raging golem — scripted spawn"
+  },
+  {
+    "npcId": 90193,
+    "zoneShortName": "citymist",
+    "note": "Mist Reaver — scripted spawn"
+  },
+  {
+    "npcId": 71034,
+    "zoneShortName": "airplane",
+    "note": "Overseer of Air — scripted spawn"
+  },
+  {
+    "npcId": 71040,
+    "zoneShortName": "airplane",
+    "note": "Master of Elements — scripted spawn"
+  },
+  {
+    "npcId": 71058,
+    "zoneShortName": "airplane",
+    "note": "Sirran the Lunatic — scripted spawn"
+  },
+  {
+    "npcId": 71059,
+    "zoneShortName": "airplane",
+    "note": "Protector of Sky — scripted spawn"
+  },
+  {
+    "npcId": 71060,
+    "zoneShortName": "airplane",
+    "note": "the Hand of Veeshan — scripted spawn"
+  },
+  {
+    "npcId": 71061,
+    "zoneShortName": "airplane",
+    "note": "Rayne — scripted spawn"
+  },
+  {
+    "npcId": 71063,
+    "zoneShortName": "airplane",
+    "note": "Gragrot — scripted spawn"
+  },
+  {
+    "npcId": 71064,
+    "zoneShortName": "airplane",
+    "note": "Ogog — scripted spawn"
+  },
+  {
+    "npcId": 71067,
+    "zoneShortName": "airplane",
+    "note": "Falorn — scripted spawn"
+  },
+  {
+    "npcId": 71068,
+    "zoneShortName": "airplane",
+    "note": "Kendrick — scripted spawn"
+  },
+  {
+    "npcId": 71069,
+    "zoneShortName": "airplane",
+    "note": "Gwan — scripted spawn"
+  },
+  {
+    "npcId": 71070,
+    "zoneShortName": "airplane",
+    "note": "an essence carrier — scripted spawn"
+  },
+  {
+    "npcId": 71071,
+    "zoneShortName": "airplane",
+    "note": "an essence tamer — scripted spawn"
+  },
+  {
+    "npcId": 71072,
+    "zoneShortName": "airplane",
+    "note": "Bazzt Zzzt — scripted spawn"
+  },
+  {
+    "npcId": 71073,
+    "zoneShortName": "airplane",
+    "note": "Gkzzallk — scripted spawn"
+  },
+  {
+    "npcId": 71074,
+    "zoneShortName": "airplane",
+    "note": "Jzil GSix — scripted spawn"
+  },
+  {
+    "npcId": 71075,
+    "zoneShortName": "airplane",
+    "note": "Keeper of Souls — scripted spawn"
+  },
+  {
+    "npcId": 71076,
+    "zoneShortName": "airplane",
+    "note": "Sister of the Spire — scripted spawn"
+  },
+  {
+    "npcId": 71077,
+    "zoneShortName": "airplane",
+    "note": "Dirkog Steelhand — scripted spawn"
+  },
+  {
+    "npcId": 71079,
+    "zoneShortName": "airplane",
+    "note": "Abec Ianor — scripted spawn"
+  },
+  {
+    "npcId": 71080,
+    "zoneShortName": "airplane",
+    "note": "Alan Harten — scripted spawn"
+  },
+  {
+    "npcId": 71081,
+    "zoneShortName": "airplane",
+    "note": "Clarisa Spiritsong — scripted spawn"
+  },
+  {
+    "npcId": 71082,
+    "zoneShortName": "airplane",
+    "note": "Denise Songweaver — scripted spawn"
+  },
+  {
+    "npcId": 71083,
+    "zoneShortName": "airplane",
+    "note": "Deric Lennox — scripted spawn"
+  },
+  {
+    "npcId": 71084,
+    "zoneShortName": "airplane",
+    "note": "Dugaas Helpyre — scripted spawn"
+  },
+  {
+    "npcId": 71085,
+    "zoneShortName": "airplane",
+    "note": "Enderbite — scripted spawn"
+  },
+  {
+    "npcId": 71086,
+    "zoneShortName": "airplane",
+    "note": "Fenalla Moonshadow — scripted spawn"
+  },
+  {
+    "npcId": 71087,
+    "zoneShortName": "airplane",
+    "note": "Gina McStargan — scripted spawn"
+  },
+  {
+    "npcId": 71088,
+    "zoneShortName": "airplane",
+    "note": "Frederic Calermin — scripted spawn"
+  },
+  {
+    "npcId": 71089,
+    "zoneShortName": "airplane",
+    "note": "Gregori Lightbringer — scripted spawn"
+  },
+  {
+    "npcId": 71090,
+    "zoneShortName": "airplane",
+    "note": "Gordon Treecaller — scripted spawn"
+  },
+  {
+    "npcId": 71091,
+    "zoneShortName": "airplane",
+    "note": "Inte Akera — scripted spawn"
+  },
+  {
+    "npcId": 71092,
+    "zoneShortName": "airplane",
+    "note": "Neasin Leornic — scripted spawn"
+  },
+  {
+    "npcId": 71093,
+    "zoneShortName": "airplane",
+    "note": "Ooga — scripted spawn"
+  },
+  {
+    "npcId": 71094,
+    "zoneShortName": "airplane",
+    "note": "Roanis Elindar — scripted spawn"
+  },
+  {
+    "npcId": 71095,
+    "zoneShortName": "airplane",
+    "note": "Relinin Skyrunner — scripted spawn"
+  },
+  {
+    "npcId": 71096,
+    "zoneShortName": "airplane",
+    "note": "Ton Po — scripted spawn"
+  },
+  {
+    "npcId": 71097,
+    "zoneShortName": "airplane",
+    "note": "Wu the Enlightened — scripted spawn"
+  },
+  {
+    "npcId": 71098,
+    "zoneShortName": "airplane",
+    "note": "Tynicon DLin — scripted spawn"
+  },
+  {
+    "npcId": 71099,
+    "zoneShortName": "airplane",
+    "note": "Will Treewalker — scripted spawn"
+  },
+  {
+    "npcId": 71100,
+    "zoneShortName": "airplane",
+    "note": "a soul tamer — scripted spawn"
+  },
+  {
+    "npcId": 71101,
+    "zoneShortName": "airplane",
+    "note": "Bzzzt — scripted spawn"
+  },
+  {
+    "npcId": 71102,
+    "zoneShortName": "airplane",
+    "note": "Bizazzzt — scripted spawn"
+  },
+  {
+    "npcId": 71103,
+    "zoneShortName": "airplane",
+    "note": "Bazzzazzt — scripted spawn"
+  },
+  {
+    "npcId": 71104,
+    "zoneShortName": "airplane",
+    "note": "Lelulean — scripted spawn"
+  },
+  {
+    "npcId": 71106,
+    "zoneShortName": "airplane",
+    "note": "Bazzzazzt — scripted spawn"
+  },
+  {
+    "npcId": 71107,
+    "zoneShortName": "airplane",
+    "note": "Bazzzazzt — scripted spawn"
+  },
+  {
+    "npcId": 71110,
+    "zoneShortName": "airplane",
+    "note": "a soul harvester — scripted spawn"
+  },
+  {
+    "npcId": 36091,
+    "zoneShortName": "befallen",
+    "note": "Sir Ariam Arcanum — scripted spawn"
+  },
+  {
+    "npcId": 36092,
+    "zoneShortName": "befallen",
+    "note": "a skeletal foreman — scripted spawn"
+  },
+  {
+    "npcId": 36096,
+    "zoneShortName": "befallen",
+    "note": "Cmdr Windstream — scripted spawn"
+  },
+  {
+    "npcId": 36102,
+    "zoneShortName": "befallen",
+    "note": "Flighty Rose Wisp — scripted spawn"
+  },
+  {
+    "npcId": 54237,
+    "zoneShortName": "burningwood",
+    "note": "Faelin Bloodbriar — scripted spawn"
+  },
+  {
+    "npcId": 87111,
+    "zoneShortName": "burningwood",
+    "note": "Ghorgash the Incited — scripted spawn"
+  },
+  {
+    "npcId": 87151,
+    "zoneShortName": "burningwood",
+    "note": "Ixiblat Fer — scripted spawn"
+  },
+  {
+    "npcId": 87154,
+    "zoneShortName": "burningwood",
+    "note": "Clerk Doval — scripted spawn"
+  },
+  {
+    "npcId": 87155,
+    "zoneShortName": "burningwood",
+    "note": "a crippled wurm — scripted spawn"
+  },
+  {
+    "npcId": 68251,
+    "zoneShortName": "butcher",
+    "note": "a lesser spirit — scripted spawn"
+  },
+  {
+    "npcId": 68266,
+    "zoneShortName": "butcher",
+    "note": "Signus Boran — scripted spawn"
+  },
+  {
+    "npcId": 68267,
+    "zoneShortName": "butcher",
+    "note": "Enraged Corflunk — scripted spawn"
+  },
+  {
+    "npcId": 68268,
+    "zoneShortName": "butcher",
+    "note": "Enraged Zarchoomi — scripted spawn"
+  },
+  {
+    "npcId": 68270,
+    "zoneShortName": "butcher",
+    "note": "an ancient chest — scripted spawn"
+  },
+  {
+    "npcId": 106301,
+    "zoneShortName": "cabeast",
+    "note": "an Iksar crusader — scripted spawn"
+  },
+  {
+    "npcId": 82050,
+    "zoneShortName": "cabwest",
+    "note": "Warlord Xyzith — scripted spawn"
+  },
+  {
+    "npcId": 82052,
+    "zoneShortName": "cabwest",
+    "note": "Grand Arcanist Zhevan — scripted spawn"
+  },
+  {
+    "npcId": 82053,
+    "zoneShortName": "cabwest",
+    "note": "an air elemental — scripted spawn"
+  },
+  {
+    "npcId": 82054,
+    "zoneShortName": "cabwest",
+    "note": "an earth elemental — scripted spawn"
+  },
+  {
+    "npcId": 82055,
+    "zoneShortName": "cabwest",
+    "note": "a fire elemental — scripted spawn"
+  },
+  {
+    "npcId": 82056,
+    "zoneShortName": "cabwest",
+    "note": "a water elemental — scripted spawn"
+  },
+  {
+    "npcId": 70059,
+    "zoneShortName": "cauldron",
+    "note": "Bilge Farfathom — scripted spawn"
+  },
+  {
+    "npcId": 70060,
+    "zoneShortName": "cauldron",
+    "note": "an aqua goblin mariner — scripted spawn"
+  },
+  {
+    "npcId": 70061,
+    "zoneShortName": "cauldron",
+    "note": "aqua goblin shaman — scripted spawn"
+  },
+  {
+    "npcId": 70062,
+    "zoneShortName": "cauldron",
+    "note": "an undertow skeleton — scripted spawn"
+  },
+  {
+    "npcId": 70063,
+    "zoneShortName": "cauldron",
+    "note": "a cauldron rat — scripted spawn"
+  },
+  {
+    "npcId": 70069,
+    "zoneShortName": "cauldron",
+    "note": "The Fabled Bilge Farfathom — scripted spawn"
+  },
+  {
+    "npcId": 70071,
+    "zoneShortName": "cauldron",
+    "note": "Jagged Fang — scripted spawn"
+  },
+  {
+    "npcId": 70072,
+    "zoneShortName": "cauldron",
+    "note": "Captain Klunga — scripted spawn"
+  },
+  {
+    "npcId": 105182,
+    "zoneShortName": "charasis",
+    "note": "Venril Sathir — scripted spawn"
+  },
+  {
+    "npcId": 105183,
+    "zoneShortName": "charasis",
+    "note": "an Arisen Priest — scripted spawn"
+  },
+  {
+    "npcId": 105184,
+    "zoneShortName": "charasis",
+    "note": "an Arisen Necromancer — scripted spawn"
+  },
+  {
+    "npcId": 105185,
+    "zoneShortName": "charasis",
+    "note": "an Arisen Acolyte — scripted spawn"
+  },
+  {
+    "npcId": 105186,
+    "zoneShortName": "charasis",
+    "note": "an Arisen Disciple — scripted spawn"
+  },
+  {
+    "npcId": 105187,
+    "zoneShortName": "charasis",
+    "note": "the spirit of Rile — scripted spawn"
+  },
+  {
+    "npcId": 105290,
+    "zoneShortName": "charasis",
+    "note": "Ghost of Mera — scripted spawn"
+  },
+  {
+    "npcId": 103217,
+    "zoneShortName": "chardok",
+    "note": "Historian Silren Di`zok — scripted spawn"
+  },
+  {
+    "npcId": 277124,
+    "zoneShortName": "chardokb",
+    "note": "Spawn of Korucust — scripted spawn"
+  },
+  {
+    "npcId": 117089,
+    "zoneShortName": "cobaltscar",
+    "note": "Darting Shark — scripted spawn"
+  },
+  {
+    "npcId": 117090,
+    "zoneShortName": "cobaltscar",
+    "note": "Feeder Shark — scripted spawn"
+  },
+  {
+    "npcId": 117091,
+    "zoneShortName": "cobaltscar",
+    "note": "Gnashing Killer Shark — scripted spawn"
+  },
+  {
+    "npcId": 117094,
+    "zoneShortName": "cobaltscar",
+    "note": "Tiknonmanin — scripted spawn"
+  },
+  {
+    "npcId": 21031,
+    "zoneShortName": "commons",
+    "note": "a Tortured Revenant — scripted spawn"
+  },
+  {
+    "npcId": 21136,
+    "zoneShortName": "commons",
+    "note": "Duggin Scumber — scripted spawn"
+  },
+  {
+    "npcId": 58060,
+    "zoneShortName": "crushbone",
+    "note": "Orc Messenger — scripted spawn"
+  },
+  {
+    "npcId": 121088,
+    "zoneShortName": "crystal",
+    "note": "Ghost of Burdael — scripted spawn"
+  },
+  {
+    "npcId": 104075,
+    "zoneShortName": "dalnir",
+    "note": "Haggle Baron Dalnir — scripted spawn"
+  },
+  {
+    "npcId": 86115,
+    "zoneShortName": "dreadlands",
+    "note": "a drachnid webspinner — scripted spawn"
+  },
+  {
+    "npcId": 86116,
+    "zoneShortName": "dreadlands",
+    "note": "a drachnid emerger — scripted spawn"
+  },
+  {
+    "npcId": 86117,
+    "zoneShortName": "dreadlands",
+    "note": "a hatchling — scripted spawn"
+  },
+  {
+    "npcId": 86155,
+    "zoneShortName": "dreadlands",
+    "note": "Brother Balatin — scripted spawn"
+  },
+  {
+    "npcId": 86174,
+    "zoneShortName": "dreadlands",
+    "note": "Chaos Elemental — scripted spawn"
+  },
+  {
+    "npcId": 81166,
+    "zoneShortName": "droga",
+    "note": "a diseased baby spider — scripted spawn"
+  },
+  {
+    "npcId": 81191,
+    "zoneShortName": "droga",
+    "note": "Warlord Skargus — scripted spawn"
+  },
+  {
+    "npcId": 13134,
+    "zoneShortName": "eastkarana",
+    "note": "a fiesty scarecrow — scripted spawn"
+  },
+  {
+    "npcId": 13135,
+    "zoneShortName": "eastkarana",
+    "note": "a fancy scarecrow — scripted spawn"
+  },
+  {
+    "npcId": 13136,
+    "zoneShortName": "eastkarana",
+    "note": "a goofy scarecrow — scripted spawn"
+  },
+  {
+    "npcId": 13137,
+    "zoneShortName": "eastkarana",
+    "note": "a scary scarecrow — scripted spawn"
+  },
+  {
+    "npcId": 15150,
+    "zoneShortName": "eastkarana",
+    "note": "Dark Elf Reaver — scripted spawn"
+  },
+  {
+    "npcId": 15153,
+    "zoneShortName": "eastkarana",
+    "note": "Dark Elf Corruptor — scripted spawn"
+  },
+  {
+    "npcId": 15167,
+    "zoneShortName": "eastkarana",
+    "note": "Nuien — scripted spawn"
+  },
+  {
+    "npcId": 15170,
+    "zoneShortName": "eastkarana",
+    "note": "Teloa — scripted spawn"
+  },
+  {
+    "npcId": 15178,
+    "zoneShortName": "eastkarana",
+    "note": "Sionae — scripted spawn"
+  },
+  {
+    "npcId": 15183,
+    "zoneShortName": "eastkarana",
+    "note": "Vance Bearstalker — scripted spawn"
+  },
+  {
+    "npcId": 15193,
+    "zoneShortName": "eastkarana",
+    "note": "Guard Elias — scripted spawn"
+  },
+  {
+    "npcId": 15198,
+    "zoneShortName": "eastkarana",
+    "note": "Knight Templar — scripted spawn"
+  },
+  {
+    "npcId": 15199,
+    "zoneShortName": "eastkarana",
+    "note": "Knight Templar — scripted spawn"
+  },
+  {
+    "npcId": 116182,
+    "zoneShortName": "eastwastes",
+    "note": "Kromrif Elite — scripted spawn"
+  },
+  {
+    "npcId": 116191,
+    "zoneShortName": "eastwastes",
+    "note": "Boridain Glacierbane — scripted spawn"
+  },
+  {
+    "npcId": 116540,
+    "zoneShortName": "eastwastes",
+    "note": "Kromrif Death Squad — scripted spawn"
+  },
+  {
+    "npcId": 116541,
+    "zoneShortName": "eastwastes",
+    "note": "Priest of Brell — scripted spawn"
+  },
+  {
+    "npcId": 116542,
+    "zoneShortName": "eastwastes",
+    "note": "Tanik Greskil — scripted spawn"
+  },
+  {
+    "npcId": 116544,
+    "zoneShortName": "eastwastes",
+    "note": "an oracle of Ry`Gorr — scripted spawn"
+  },
+  {
+    "npcId": 116545,
+    "zoneShortName": "eastwastes",
+    "note": "Rabid Tundra Kodiak — scripted spawn"
+  },
+  {
+    "npcId": 116546,
+    "zoneShortName": "eastwastes",
+    "note": "a Ry`Gorr invader — scripted spawn"
+  },
+  {
+    "npcId": 116548,
+    "zoneShortName": "eastwastes",
+    "note": "Kromrif Soldier — scripted spawn"
+  },
+  {
+    "npcId": 116549,
+    "zoneShortName": "eastwastes",
+    "note": "Paladin of Brell — scripted spawn"
+  },
+  {
+    "npcId": 116552,
+    "zoneShortName": "eastwastes",
+    "note": "Kromrif Guard — scripted spawn"
+  },
+  {
+    "npcId": 116553,
+    "zoneShortName": "eastwastes",
+    "note": "Ry`Gorr Basher — scripted spawn"
+  },
+  {
+    "npcId": 116555,
+    "zoneShortName": "eastwastes",
+    "note": "Royal Archer — scripted spawn"
+  },
+  {
+    "npcId": 116556,
+    "zoneShortName": "eastwastes",
+    "note": "Ry`Gorr Elite — scripted spawn"
+  },
+  {
+    "npcId": 116560,
+    "zoneShortName": "eastwastes",
+    "note": "Ghrek Squatnot — scripted spawn"
+  },
+  {
+    "npcId": 116563,
+    "zoneShortName": "eastwastes",
+    "note": "Royal Wolven Guard — scripted spawn"
+  },
+  {
+    "npcId": 116566,
+    "zoneShortName": "eastwastes",
+    "note": "Poxbreath Yellowfang — scripted spawn"
+  },
+  {
+    "npcId": 116568,
+    "zoneShortName": "eastwastes",
+    "note": "Scarbrow Ga`Hruk — scripted spawn"
+  },
+  {
+    "npcId": 116569,
+    "zoneShortName": "eastwastes",
+    "note": "Commander Bahreck — scripted spawn"
+  },
+  {
+    "npcId": 116573,
+    "zoneShortName": "eastwastes",
+    "note": "Captain Berradin — scripted spawn"
+  },
+  {
+    "npcId": 116574,
+    "zoneShortName": "eastwastes",
+    "note": "Peffin Ambersnow — scripted spawn"
+  },
+  {
+    "npcId": 116576,
+    "zoneShortName": "eastwastes",
+    "note": "Garadain Glacierbane — scripted spawn"
+  },
+  {
+    "npcId": 116577,
+    "zoneShortName": "eastwastes",
+    "note": "Chief Ry`Gorr — scripted spawn"
+  },
+  {
+    "npcId": 116611,
+    "zoneShortName": "eastwastes",
+    "note": "a frost giant — scripted spawn"
+  },
+  {
+    "npcId": 22209,
+    "zoneShortName": "ecommons",
+    "note": "a militia myrmidon — scripted spawn"
+  },
+  {
+    "npcId": 22210,
+    "zoneShortName": "ecommons",
+    "note": "a militia rake — scripted spawn"
+  },
+  {
+    "npcId": 22211,
+    "zoneShortName": "ecommons",
+    "note": "a militia vicar — scripted spawn"
+  },
+  {
+    "npcId": 94126,
+    "zoneShortName": "emeraldjungle",
+    "note": "The Spirit of Rage — scripted spawn"
+  },
+  {
+    "npcId": 94140,
+    "zoneShortName": "emeraldjungle",
+    "note": "corrupted gorilla — scripted spawn"
+  },
+  {
+    "npcId": 94143,
+    "zoneShortName": "emeraldjungle",
+    "note": "Lativ — scripted spawn"
+  },
+  {
+    "npcId": 23001,
+    "zoneShortName": "erudnint",
+    "note": "Slansin — scripted spawn"
+  },
+  {
+    "npcId": 23080,
+    "zoneShortName": "erudnint",
+    "note": "Slansin — scripted spawn"
+  },
+  {
+    "npcId": 98046,
+    "zoneShortName": "erudsxing",
+    "note": "Srafen the Soaked — scripted spawn"
+  },
+  {
+    "npcId": 98047,
+    "zoneShortName": "erudsxing",
+    "note": "Froham the Forgotten — scripted spawn"
+  },
+  {
+    "npcId": 98050,
+    "zoneShortName": "erudsxing",
+    "note": "Abe the Abandoned — scripted spawn"
+  },
+  {
+    "npcId": 98051,
+    "zoneShortName": "erudsxing",
+    "note": "Dillon the Drowned — scripted spawn"
+  },
+  {
+    "npcId": 98052,
+    "zoneShortName": "erudsxing",
+    "note": "a greater spirit — scripted spawn"
+  },
+  {
+    "npcId": 26100,
+    "zoneShortName": "everfrost",
+    "note": "a gingerly bread man — scripted spawn"
+  },
+  {
+    "npcId": 26101,
+    "zoneShortName": "everfrost",
+    "note": "a gingerly bread man — scripted spawn"
+  },
+  {
+    "npcId": 26102,
+    "zoneShortName": "everfrost",
+    "note": "a gingerly bread man — scripted spawn"
+  },
+  {
+    "npcId": 26103,
+    "zoneShortName": "everfrost",
+    "note": "a gingerly bread man — scripted spawn"
+  },
+  {
+    "npcId": 26104,
+    "zoneShortName": "everfrost",
+    "note": "a gingerly bread man — scripted spawn"
+  },
+  {
+    "npcId": 26105,
+    "zoneShortName": "everfrost",
+    "note": "a gingerly bread man — scripted spawn"
+  },
+  {
+    "npcId": 26106,
+    "zoneShortName": "everfrost",
+    "note": "a gingerly bread man — scripted spawn"
+  },
+  {
+    "npcId": 26107,
+    "zoneShortName": "everfrost",
+    "note": "a gingerly bread man — scripted spawn"
+  },
+  {
+    "npcId": 26108,
+    "zoneShortName": "everfrost",
+    "note": "a not so gingerly bread man — scripted spawn"
+  },
+  {
+    "npcId": 26109,
+    "zoneShortName": "everfrost",
+    "note": "not so gingerly bread shard — scripted spawn"
+  },
+  {
+    "npcId": 26110,
+    "zoneShortName": "everfrost",
+    "note": "not so gingerly bread shard — scripted spawn"
+  },
+  {
+    "npcId": 26111,
+    "zoneShortName": "everfrost",
+    "note": "not so gingerly bread shard — scripted spawn"
+  },
+  {
+    "npcId": 26112,
+    "zoneShortName": "everfrost",
+    "note": "not so gingerly bread shard — scripted spawn"
+  },
+  {
+    "npcId": 72068,
+    "zoneShortName": "fearplane",
+    "note": "Essence of Rage — scripted spawn"
+  },
+  {
+    "npcId": 72069,
+    "zoneShortName": "fearplane",
+    "note": "Ireblind Imp — scripted spawn"
+  },
+  {
+    "npcId": 72105,
+    "zoneShortName": "fearplane",
+    "note": "Iksar broodling — scripted spawn"
+  },
+  {
+    "npcId": 72106,
+    "zoneShortName": "fearplane",
+    "note": "an enraged golem — scripted spawn"
+  },
+  {
+    "npcId": 72108,
+    "zoneShortName": "fearplane",
+    "note": "Enraged Imp — scripted spawn"
+  },
+  {
+    "npcId": 47205,
+    "zoneShortName": "feerrott",
+    "note": "The Spirit of Decay — scripted spawn"
+  },
+  {
+    "npcId": 47206,
+    "zoneShortName": "feerrott",
+    "note": "Thugat the Champion — scripted spawn"
+  },
+  {
+    "npcId": 47208,
+    "zoneShortName": "feerrott",
+    "note": "Swamp Terror — scripted spawn"
+  },
+  {
+    "npcId": 47211,
+    "zoneShortName": "feerrott",
+    "note": "spirit of revenge — scripted spawn"
+  },
+  {
+    "npcId": 47212,
+    "zoneShortName": "feerrott",
+    "note": "Vengeful Spirit — scripted spawn"
+  },
+  {
+    "npcId": 61095,
+    "zoneShortName": "felwithea",
+    "note": "Tolon Nurbyte — scripted spawn"
+  },
+  {
+    "npcId": 78003,
+    "zoneShortName": "fieldofbone",
+    "note": "Vynoissu — scripted spawn"
+  },
+  {
+    "npcId": 78029,
+    "zoneShortName": "fieldofbone",
+    "note": "Vynoissu the Undying — scripted spawn"
+  },
+  {
+    "npcId": 78211,
+    "zoneShortName": "fieldofbone",
+    "note": "a lesser spirit — scripted spawn"
+  },
+  {
+    "npcId": 78212,
+    "zoneShortName": "fieldofbone",
+    "note": "Berserker`s Image — scripted spawn"
+  },
+  {
+    "npcId": 78213,
+    "zoneShortName": "fieldofbone",
+    "note": "Berserker`s Image — scripted spawn"
+  },
+  {
+    "npcId": 78215,
+    "zoneShortName": "fieldofbone",
+    "note": "An Arisen Iksar — scripted spawn"
+  },
+  {
+    "npcId": 78218,
+    "zoneShortName": "fieldofbone",
+    "note": "Warlord Xyzith — scripted spawn"
+  },
+  {
+    "npcId": 157116,
+    "zoneShortName": "fieldofbone",
+    "note": "Draz Nurakk — scripted spawn"
+  },
+  {
+    "npcId": 364030,
+    "zoneShortName": "fieldofbone",
+    "note": "a risen corpse — scripted spawn"
+  },
+  {
+    "npcId": 84028,
+    "zoneShortName": "firiona",
+    "note": "Tracker Azeal — scripted spawn"
+  },
+  {
+    "npcId": 84311,
+    "zoneShortName": "firiona",
+    "note": "a drachnid spy — scripted spawn"
+  },
+  {
+    "npcId": 84312,
+    "zoneShortName": "firiona",
+    "note": "Squire Fuzzmin — scripted spawn"
+  },
+  {
+    "npcId": 84319,
+    "zoneShortName": "firiona",
+    "note": "Hero Goxnok — scripted spawn"
+  },
+  {
+    "npcId": 84401,
+    "zoneShortName": "firiona",
+    "note": "Hero Goxnok — scripted spawn"
+  },
+  {
+    "npcId": 10000,
+    "zoneShortName": "freporte",
+    "note": "Orc Centurion — scripted spawn"
+  },
+  {
+    "npcId": 8110,
+    "zoneShortName": "freportn",
+    "note": "Guard Willia — scripted spawn"
+  },
+  {
+    "npcId": 8118,
+    "zoneShortName": "freportn",
+    "note": "a greater spirit — scripted spawn"
+  },
+  {
+    "npcId": 9143,
+    "zoneShortName": "freportw",
+    "note": "Krazen Loosh — scripted spawn"
+  },
+  {
+    "npcId": 9154,
+    "zoneShortName": "freportw",
+    "note": "Grand Arcanist Zhevan — scripted spawn"
+  },
+  {
+    "npcId": 9155,
+    "zoneShortName": "freportw",
+    "note": "a fire elemental — scripted spawn"
+  },
+  {
+    "npcId": 9156,
+    "zoneShortName": "freportw",
+    "note": "an air elemental — scripted spawn"
+  },
+  {
+    "npcId": 9157,
+    "zoneShortName": "freportw",
+    "note": "a water elemental — scripted spawn"
+  },
+  {
+    "npcId": 9158,
+    "zoneShortName": "freportw",
+    "note": "an earth elemental — scripted spawn"
+  },
+  {
+    "npcId": 382255,
+    "zoneShortName": "freportw",
+    "note": "a Freeport guard — scripted spawn"
+  },
+  {
+    "npcId": 382256,
+    "zoneShortName": "freportw",
+    "note": "a seasoned Freeport guard — scripted spawn"
+  },
+  {
+    "npcId": 92117,
+    "zoneShortName": "frontiermtns",
+    "note": "Blabor — scripted spawn"
+  },
+  {
+    "npcId": 92120,
+    "zoneShortName": "frontiermtns",
+    "note": "Xador — scripted spawn"
+  },
+  {
+    "npcId": 92121,
+    "zoneShortName": "frontiermtns",
+    "note": "Ebor — scripted spawn"
+  },
+  {
+    "npcId": 92122,
+    "zoneShortName": "frontiermtns",
+    "note": "Vredhor — scripted spawn"
+  },
+  {
+    "npcId": 92124,
+    "zoneShortName": "frontiermtns",
+    "note": "Zasor — scripted spawn"
+  },
+  {
+    "npcId": 92127,
+    "zoneShortName": "frontiermtns",
+    "note": "Toltor — scripted spawn"
+  },
+  {
+    "npcId": 92198,
+    "zoneShortName": "frontiermtns",
+    "note": "Goblin King Dronan — scripted spawn"
+  },
+  {
+    "npcId": 92199,
+    "zoneShortName": "frontiermtns",
+    "note": "Whip Cracker Garzul — scripted spawn"
+  },
+  {
+    "npcId": 92200,
+    "zoneShortName": "frontiermtns",
+    "note": "Earth Seer Hunknort — scripted spawn"
+  },
+  {
+    "npcId": 111141,
+    "zoneShortName": "frozenshadow",
+    "note": "an enraged shadow beast — scripted spawn"
+  },
+  {
+    "npcId": 111143,
+    "zoneShortName": "frozenshadow",
+    "note": "an enraged relative — scripted spawn"
+  },
+  {
+    "npcId": 111144,
+    "zoneShortName": "frozenshadow",
+    "note": "VhalSera — scripted spawn"
+  },
+  {
+    "npcId": 111147,
+    "zoneShortName": "frozenshadow",
+    "note": "lucid spirit of Abrams — scripted spawn"
+  },
+  {
+    "npcId": 111154,
+    "zoneShortName": "frozenshadow",
+    "note": "Tserrina Syl`Tor — scripted spawn"
+  },
+  {
+    "npcId": 111158,
+    "zoneShortName": "frozenshadow",
+    "note": "a large undead gnoll — scripted spawn"
+  },
+  {
+    "npcId": 111161,
+    "zoneShortName": "frozenshadow",
+    "note": "an angry librarian — scripted spawn"
+  },
+  {
+    "npcId": 111163,
+    "zoneShortName": "frozenshadow",
+    "note": "Cara Omica — scripted spawn"
+  },
+  {
+    "npcId": 111173,
+    "zoneShortName": "frozenshadow",
+    "note": "an enraged vampire — scripted spawn"
+  },
+  {
+    "npcId": 111174,
+    "zoneShortName": "frozenshadow",
+    "note": "an enraged vampire — scripted spawn"
+  },
+  {
+    "npcId": 111190,
+    "zoneShortName": "frozenshadow",
+    "note": "Mirror Reflection — scripted spawn"
+  },
+  {
+    "npcId": 54309,
+    "zoneShortName": "gfaydark",
+    "note": "Scout Varun — scripted spawn"
+  },
+  {
+    "npcId": 57160,
+    "zoneShortName": "gfaydark",
+    "note": "a brownie hierophant — scripted spawn"
+  },
+  {
+    "npcId": 57161,
+    "zoneShortName": "gfaydark",
+    "note": "a brownie blackguard — scripted spawn"
+  },
+  {
+    "npcId": 57162,
+    "zoneShortName": "gfaydark",
+    "note": "a brownie scout — scripted spawn"
+  },
+  {
+    "npcId": 57163,
+    "zoneShortName": "gfaydark",
+    "note": "a brownie champion — scripted spawn"
+  },
+  {
+    "npcId": 57164,
+    "zoneShortName": "gfaydark",
+    "note": "a brownie muse — scripted spawn"
+  },
+  {
+    "npcId": 57165,
+    "zoneShortName": "gfaydark",
+    "note": "a brownie tamer — scripted spawn"
+  },
+  {
+    "npcId": 57167,
+    "zoneShortName": "gfaydark",
+    "note": "a brownie Lieutenant — scripted spawn"
+  },
+  {
+    "npcId": 57169,
+    "zoneShortName": "gfaydark",
+    "note": "a brownie Lieutenant — scripted spawn"
+  },
+  {
+    "npcId": 57171,
+    "zoneShortName": "gfaydark",
+    "note": "a brownie Captain — scripted spawn"
+  },
+  {
+    "npcId": 57173,
+    "zoneShortName": "gfaydark",
+    "note": "a brownie Captain — scripted spawn"
+  },
+  {
+    "npcId": 57175,
+    "zoneShortName": "gfaydark",
+    "note": "Colonel Reon — scripted spawn"
+  },
+  {
+    "npcId": 57177,
+    "zoneShortName": "gfaydark",
+    "note": "General Achaoc — scripted spawn"
+  },
+  {
+    "npcId": 27129,
+    "zoneShortName": "greatdivide",
+    "note": "A Plasmatic Priest — scripted spawn"
+  },
+  {
+    "npcId": 27130,
+    "zoneShortName": "greatdivide",
+    "note": "A Plasmatic Priestess — scripted spawn"
+  },
+  {
+    "npcId": 118026,
+    "zoneShortName": "greatdivide",
+    "note": "bloody gnome captive — scripted spawn"
+  },
+  {
+    "npcId": 118164,
+    "zoneShortName": "greatdivide",
+    "note": "an angry shardwurm — scripted spawn"
+  },
+  {
+    "npcId": 118207,
+    "zoneShortName": "greatdivide",
+    "note": "Fergul Frostsky — scripted spawn"
+  },
+  {
+    "npcId": 118208,
+    "zoneShortName": "greatdivide",
+    "note": "Gralk Dwarfkiller — scripted spawn"
+  },
+  {
+    "npcId": 127105,
+    "zoneShortName": "growthplane",
+    "note": "Flighty Viridian Wisp — scripted spawn"
+  },
+  {
+    "npcId": 65068,
+    "zoneShortName": "guktop",
+    "note": "a saltwater croc — scripted spawn"
+  },
+  {
+    "npcId": 65069,
+    "zoneShortName": "guktop",
+    "note": "a saltwater croc — scripted spawn"
+  },
+  {
+    "npcId": 65094,
+    "zoneShortName": "guktop",
+    "note": "a saltwater croc — scripted spawn"
+  },
+  {
+    "npcId": 65095,
+    "zoneShortName": "guktop",
+    "note": "a saltwater croc — scripted spawn"
+  },
+  {
+    "npcId": 65134,
+    "zoneShortName": "guktop",
+    "note": "a saltwater croc — scripted spawn"
+  },
+  {
+    "npcId": 65139,
+    "zoneShortName": "guktop",
+    "note": "an ancient croc — scripted spawn"
+  },
+  {
+    "npcId": 29089,
+    "zoneShortName": "halas",
+    "note": "Arantir Karondor — scripted spawn"
+  },
+  {
+    "npcId": 186150,
+    "zoneShortName": "hateplane",
+    "note": "thought destroyer — scripted spawn"
+  },
+  {
+    "npcId": 6184,
+    "zoneShortName": "highkeep",
+    "note": "Fenn Kaedrick — scripted spawn"
+  },
+  {
+    "npcId": 6185,
+    "zoneShortName": "highkeep",
+    "note": "Xentil Herkanon — scripted spawn"
+  },
+  {
+    "npcId": 6186,
+    "zoneShortName": "highkeep",
+    "note": "Lartin — scripted spawn"
+  },
+  {
+    "npcId": 6187,
+    "zoneShortName": "highkeep",
+    "note": "Grex — scripted spawn"
+  },
+  {
+    "npcId": 5088,
+    "zoneShortName": "highpasshold",
+    "note": "Stanos Herkanor — scripted spawn"
+  },
+  {
+    "npcId": 39083,
+    "zoneShortName": "hole",
+    "note": "High Scale Kirn — scripted spawn"
+  },
+  {
+    "npcId": 39154,
+    "zoneShortName": "hole",
+    "note": "Jaeil the Insane — scripted spawn"
+  },
+  {
+    "npcId": 39155,
+    "zoneShortName": "hole",
+    "note": "Kyrenna — scripted spawn"
+  },
+  {
+    "npcId": 39165,
+    "zoneShortName": "hole",
+    "note": "Mummy of Glohnor — scripted spawn"
+  },
+  {
+    "npcId": 39168,
+    "zoneShortName": "hole",
+    "note": "Stone Collector — scripted spawn"
+  },
+  {
+    "npcId": 9157,
+    "zoneShortName": "iceclad",
+    "note": "a water elemental — scripted spawn"
+  },
+  {
+    "npcId": 110091,
+    "zoneShortName": "iceclad",
+    "note": "an agitated snowfang — scripted spawn"
+  },
+  {
+    "npcId": 110093,
+    "zoneShortName": "iceclad",
+    "note": "enraged walrus — scripted spawn"
+  },
+  {
+    "npcId": 110097,
+    "zoneShortName": "iceclad",
+    "note": "Kromrif tracking wolf — scripted spawn"
+  },
+  {
+    "npcId": 110109,
+    "zoneShortName": "iceclad",
+    "note": "Commander Vjorik — scripted spawn"
+  },
+  {
+    "npcId": 110112,
+    "zoneShortName": "iceclad",
+    "note": "Commander Kvarid — scripted spawn"
+  },
+  {
+    "npcId": 110118,
+    "zoneShortName": "iceclad",
+    "note": "General Bragmur — scripted spawn"
+  },
+  {
+    "npcId": 110119,
+    "zoneShortName": "iceclad",
+    "note": "Avatar of Below — scripted spawn"
+  },
+  {
+    "npcId": 110120,
+    "zoneShortName": "iceclad",
+    "note": "Frost Giant Skirmisher — scripted spawn"
+  },
+  {
+    "npcId": 110121,
+    "zoneShortName": "iceclad",
+    "note": "Frost Giant Skirmisher — scripted spawn"
+  },
+  {
+    "npcId": 110122,
+    "zoneShortName": "iceclad",
+    "note": "Kromrif Tracking Wolf — scripted spawn"
+  },
+  {
+    "npcId": 116008,
+    "zoneShortName": "iceclad",
+    "note": "a snow cougar — scripted spawn"
+  },
+  {
+    "npcId": 181224,
+    "zoneShortName": "jaggedpine",
+    "note": "a forest dragon — scripted spawn"
+  },
+  {
+    "npcId": 181225,
+    "zoneShortName": "jaggedpine",
+    "note": "Dismal Darkpaw Mystic — scripted spawn"
+  },
+  {
+    "npcId": 181226,
+    "zoneShortName": "jaggedpine",
+    "note": "Firwyn — scripted spawn"
+  },
+  {
+    "npcId": 113341,
+    "zoneShortName": "kael",
+    "note": "The Idol of Rallos Zek — scripted spawn"
+  },
+  {
+    "npcId": 113440,
+    "zoneShortName": "kael",
+    "note": "Doldigun Steinwielder — scripted spawn"
+  },
+  {
+    "npcId": 113443,
+    "zoneShortName": "kael",
+    "note": "Grondon Zekkin — scripted spawn"
+  },
+  {
+    "npcId": 113471,
+    "zoneShortName": "kael",
+    "note": "Zlirron Windchill — scripted spawn"
+  },
+  {
+    "npcId": 113492,
+    "zoneShortName": "kael",
+    "note": "Vinric Thunderclap — scripted spawn"
+  },
+  {
+    "npcId": 113508,
+    "zoneShortName": "kael",
+    "note": "Doldigun Steinwielder — scripted spawn"
+  },
+  {
+    "npcId": 113528,
+    "zoneShortName": "kael",
+    "note": "Valorankt Zekkin — scripted spawn"
+  },
+  {
+    "npcId": 113534,
+    "zoneShortName": "kael",
+    "note": "Khalerogg Dorfenbane — scripted spawn"
+  },
+  {
+    "npcId": 113548,
+    "zoneShortName": "kael",
+    "note": "Kromzog Zekkin — scripted spawn"
+  },
+  {
+    "npcId": 113554,
+    "zoneShortName": "kael",
+    "note": "Grondon Zekkin — scripted spawn"
+  },
+  {
+    "npcId": 113555,
+    "zoneShortName": "kael",
+    "note": "Kromzog Zekkin — scripted spawn"
+  },
+  {
+    "npcId": 113556,
+    "zoneShortName": "kael",
+    "note": "Vinric Thunderclap — scripted spawn"
+  },
+  {
+    "npcId": 113557,
+    "zoneShortName": "kael",
+    "note": "Zlirron Windchill — scripted spawn"
+  },
+  {
+    "npcId": 113559,
+    "zoneShortName": "kael",
+    "note": "Khalerogg Dorfenbane — scripted spawn"
+  },
+  {
+    "npcId": 88087,
+    "zoneShortName": "kaesora",
+    "note": "enraged spectral librarian — scripted spawn"
+  },
+  {
+    "npcId": 88093,
+    "zoneShortName": "kaesora",
+    "note": "A Freed Soul — scripted spawn"
+  },
+  {
+    "npcId": 67089,
+    "zoneShortName": "kaladimb",
+    "note": "Usbak the Old — scripted spawn"
+  },
+  {
+    "npcId": 67090,
+    "zoneShortName": "kaladimb",
+    "note": "Nella Stonebraids — scripted spawn"
+  },
+  {
+    "npcId": 64050,
+    "zoneShortName": "kedge",
+    "note": "corrupted seahorse — scripted spawn"
+  },
+  {
+    "npcId": 20276,
+    "zoneShortName": "kithicor",
+    "note": "Eenot — scripted spawn"
+  },
+  {
+    "npcId": 20277,
+    "zoneShortName": "kithicor",
+    "note": "Reggit — scripted spawn"
+  },
+  {
+    "npcId": 20278,
+    "zoneShortName": "kithicor",
+    "note": "Kobb — scripted spawn"
+  },
+  {
+    "npcId": 20290,
+    "zoneShortName": "kithicor",
+    "note": "a cloaked figure — scripted spawn"
+  },
+  {
+    "npcId": 20291,
+    "zoneShortName": "kithicor",
+    "note": "a malignant shadow — scripted spawn"
+  },
+  {
+    "npcId": 20292,
+    "zoneShortName": "kithicor",
+    "note": "a shadow thief — scripted spawn"
+  },
+  {
+    "npcId": 20293,
+    "zoneShortName": "kithicor",
+    "note": "Uglib Gaibido — scripted spawn"
+  },
+  {
+    "npcId": 20294,
+    "zoneShortName": "kithicor",
+    "note": "Xotmidd Ferlop — scripted spawn"
+  },
+  {
+    "npcId": 20295,
+    "zoneShortName": "kithicor",
+    "note": "Jarnig Kilanid — scripted spawn"
+  },
+  {
+    "npcId": 20296,
+    "zoneShortName": "kithicor",
+    "note": "Valinda Erginton — scripted spawn"
+  },
+  {
+    "npcId": 20297,
+    "zoneShortName": "kithicor",
+    "note": "Shressa Farondi — scripted spawn"
+  },
+  {
+    "npcId": 20298,
+    "zoneShortName": "kithicor",
+    "note": "Tilminos Farondi — scripted spawn"
+  },
+  {
+    "npcId": 20299,
+    "zoneShortName": "kithicor",
+    "note": "Blackened Treant — scripted spawn"
+  },
+  {
+    "npcId": 20300,
+    "zoneShortName": "kithicor",
+    "note": "Blackened Tree Limb — scripted spawn"
+  },
+  {
+    "npcId": 20301,
+    "zoneShortName": "kithicor",
+    "note": "Blackened Dryad — scripted spawn"
+  },
+  {
+    "npcId": 85211,
+    "zoneShortName": "lakeofillomen",
+    "note": "Vorash — scripted spawn"
+  },
+  {
+    "npcId": 85223,
+    "zoneShortName": "lakeofillomen",
+    "note": "Deep — scripted spawn"
+  },
+  {
+    "npcId": 85224,
+    "zoneShortName": "lakeofillomen",
+    "note": "corrupted barracuda — scripted spawn"
+  },
+  {
+    "npcId": 85225,
+    "zoneShortName": "lakeofillomen",
+    "note": "Impervious Bloodbeast — scripted spawn"
+  },
+  {
+    "npcId": 85226,
+    "zoneShortName": "lakeofillomen",
+    "note": "Bruiser Noz — scripted spawn"
+  },
+  {
+    "npcId": 85234,
+    "zoneShortName": "lakeofillomen",
+    "note": "a bloodgill forager — scripted spawn"
+  },
+  {
+    "npcId": 51113,
+    "zoneShortName": "lakerathe",
+    "note": "Vortix — scripted spawn"
+  },
+  {
+    "npcId": 51138,
+    "zoneShortName": "lakerathe",
+    "note": "Natasha Whitewater — scripted spawn"
+  },
+  {
+    "npcId": 51144,
+    "zoneShortName": "lakerathe",
+    "note": "a tortured soul — scripted spawn"
+  },
+  {
+    "npcId": 51145,
+    "zoneShortName": "lakerathe",
+    "note": "a spirit of flame — scripted spawn"
+  },
+  {
+    "npcId": 51149,
+    "zoneShortName": "lakerathe",
+    "note": "corrupted aquagoblin — scripted spawn"
+  },
+  {
+    "npcId": 51152,
+    "zoneShortName": "lakerathe",
+    "note": "a failed apprentice — scripted spawn"
+  },
+  {
+    "npcId": 51153,
+    "zoneShortName": "lakerathe",
+    "note": "a bone golem — scripted spawn"
+  },
+  {
+    "npcId": 51171,
+    "zoneShortName": "lakerathe",
+    "note": "The Lake Lurker — scripted spawn"
+  },
+  {
+    "npcId": 51176,
+    "zoneShortName": "lakerathe",
+    "note": "Princess Lenya Thex — scripted spawn"
+  },
+  {
+    "npcId": 27119,
+    "zoneShortName": "lavastorm",
+    "note": "Eejag — scripted spawn"
+  },
+  {
+    "npcId": 27126,
+    "zoneShortName": "lavastorm",
+    "note": "Scorchfist — scripted spawn"
+  },
+  {
+    "npcId": 27128,
+    "zoneShortName": "lavastorm",
+    "note": "High Priestess Shima — scripted spawn"
+  },
+  {
+    "npcId": 27129,
+    "zoneShortName": "lavastorm",
+    "note": "A Plasmatic Priest — scripted spawn"
+  },
+  {
+    "npcId": 27130,
+    "zoneShortName": "lavastorm",
+    "note": "A Plasmatic Priestess — scripted spawn"
+  },
+  {
+    "npcId": 57117,
+    "zoneShortName": "lfaydark",
+    "note": "corrupted brownie — scripted spawn"
+  },
+  {
+    "npcId": 57119,
+    "zoneShortName": "lfaydark",
+    "note": "The Spirit of Malevolence — scripted spawn"
+  },
+  {
+    "npcId": 126366,
+    "zoneShortName": "mischiefplane",
+    "note": "Stomples — scripted spawn"
+  },
+  {
+    "npcId": 126375,
+    "zoneShortName": "mischiefplane",
+    "note": "a devious guardian jokester — scripted spawn"
+  },
+  {
+    "npcId": 126376,
+    "zoneShortName": "mischiefplane",
+    "note": "a tricky guardian jester — scripted spawn"
+  },
+  {
+    "npcId": 126377,
+    "zoneShortName": "mischiefplane",
+    "note": "a dazed guardian jester — scripted spawn"
+  },
+  {
+    "npcId": 126378,
+    "zoneShortName": "mischiefplane",
+    "note": "a charming guardian jester — scripted spawn"
+  },
+  {
+    "npcId": 126379,
+    "zoneShortName": "mischiefplane",
+    "note": "Flora Dor — scripted spawn"
+  },
+  {
+    "npcId": 126380,
+    "zoneShortName": "mischiefplane",
+    "note": "Nezzna — scripted spawn"
+  },
+  {
+    "npcId": 126381,
+    "zoneShortName": "mischiefplane",
+    "note": "Lilara Vinewipper — scripted spawn"
+  },
+  {
+    "npcId": 126382,
+    "zoneShortName": "mischiefplane",
+    "note": "The Garden Overseer — scripted spawn"
+  },
+  {
+    "npcId": 126383,
+    "zoneShortName": "mischiefplane",
+    "note": "vine swarmer — scripted spawn"
+  },
+  {
+    "npcId": 126384,
+    "zoneShortName": "mischiefplane",
+    "note": "a vanishing jokester — scripted spawn"
+  },
+  {
+    "npcId": 126386,
+    "zoneShortName": "mischiefplane",
+    "note": "a White King — scripted spawn"
+  },
+  {
+    "npcId": 126387,
+    "zoneShortName": "mischiefplane",
+    "note": "a Black King — scripted spawn"
+  },
+  {
+    "npcId": 126388,
+    "zoneShortName": "mischiefplane",
+    "note": "a buried treasure chest — scripted spawn"
+  },
+  {
+    "npcId": 126389,
+    "zoneShortName": "mischiefplane",
+    "note": "a crazed black jester — scripted spawn"
+  },
+  {
+    "npcId": 126390,
+    "zoneShortName": "mischiefplane",
+    "note": "a mad black jester — scripted spawn"
+  },
+  {
+    "npcId": 126391,
+    "zoneShortName": "mischiefplane",
+    "note": "an insane black jester — scripted spawn"
+  },
+  {
+    "npcId": 126392,
+    "zoneShortName": "mischiefplane",
+    "note": "The Hidden Jester — scripted spawn"
+  },
+  {
+    "npcId": 126393,
+    "zoneShortName": "mischiefplane",
+    "note": "a helping hand — scripted spawn"
+  },
+  {
+    "npcId": 126394,
+    "zoneShortName": "mischiefplane",
+    "note": "A nether portal — scripted spawn"
+  },
+  {
+    "npcId": 126397,
+    "zoneShortName": "mischiefplane",
+    "note": "a grinnuch naysayer — scripted spawn"
+  },
+  {
+    "npcId": 33146,
+    "zoneShortName": "misty",
+    "note": "Slaythe — scripted spawn"
+  },
+  {
+    "npcId": 44104,
+    "zoneShortName": "najena",
+    "note": "Rathyl reincarnate — scripted spawn"
+  },
+  {
+    "npcId": 44108,
+    "zoneShortName": "najena",
+    "note": "Akksstaff`s Minion — scripted spawn"
+  },
+  {
+    "npcId": 44109,
+    "zoneShortName": "najena",
+    "note": "Host of Akksstaff — scripted spawn"
+  },
+  {
+    "npcId": 123097,
+    "zoneShortName": "necropolis",
+    "note": "a dragon construct — scripted spawn"
+  },
+  {
+    "npcId": 123132,
+    "zoneShortName": "necropolis",
+    "note": "a swarming beetle — scripted spawn"
+  },
+  {
+    "npcId": 123150,
+    "zoneShortName": "necropolis",
+    "note": "Stiggles Cogswin — scripted spawn"
+  },
+  {
+    "npcId": 123151,
+    "zoneShortName": "necropolis",
+    "note": "Stiggles Cogswin — scripted spawn"
+  },
+  {
+    "npcId": 123164,
+    "zoneShortName": "necropolis",
+    "note": "Tarn Macklin — scripted spawn"
+  },
+  {
+    "npcId": 123165,
+    "zoneShortName": "necropolis",
+    "note": "a mercenary guard — scripted spawn"
+  },
+  {
+    "npcId": 123191,
+    "zoneShortName": "necropolis",
+    "note": "Garzicor`s Corpse — scripted spawn"
+  },
+  {
+    "npcId": 22213,
+    "zoneShortName": "nektulos",
+    "note": "Maldan the Thief — scripted spawn"
+  },
+  {
+    "npcId": 13042,
+    "zoneShortName": "northkarana",
+    "note": "Regis the Reverent — scripted spawn"
+  },
+  {
+    "npcId": 13120,
+    "zoneShortName": "northkarana",
+    "note": "a tiny skeleton — scripted spawn"
+  },
+  {
+    "npcId": 13123,
+    "zoneShortName": "northkarana",
+    "note": "Flighty Azure Wisp — scripted spawn"
+  },
+  {
+    "npcId": 13130,
+    "zoneShortName": "northkarana",
+    "note": "a plains dragon — scripted spawn"
+  },
+  {
+    "npcId": 13131,
+    "zoneShortName": "northkarana",
+    "note": "A Tainted Beast — scripted spawn"
+  },
+  {
+    "npcId": 13134,
+    "zoneShortName": "northkarana",
+    "note": "a fiesty scarecrow — scripted spawn"
+  },
+  {
+    "npcId": 13135,
+    "zoneShortName": "northkarana",
+    "note": "a fancy scarecrow — scripted spawn"
+  },
+  {
+    "npcId": 13136,
+    "zoneShortName": "northkarana",
+    "note": "a goofy scarecrow — scripted spawn"
+  },
+  {
+    "npcId": 13137,
+    "zoneShortName": "northkarana",
+    "note": "a scary scarecrow — scripted spawn"
+  },
+  {
+    "npcId": 107161,
+    "zoneShortName": "nurga",
+    "note": "Trunt — scripted spawn"
+  },
+  {
+    "npcId": 49127,
+    "zoneShortName": "oggok",
+    "note": "Emissary Glib — scripted spawn"
+  },
+  {
+    "npcId": 69010,
+    "zoneShortName": "oot",
+    "note": "Allizewsaur the Tainted — scripted spawn"
+  },
+  {
+    "npcId": 69132,
+    "zoneShortName": "oot",
+    "note": "Sentry Xyrin — scripted spawn"
+  },
+  {
+    "npcId": 69141,
+    "zoneShortName": "oot",
+    "note": "A Corrupted Koalindl — scripted spawn"
+  },
+  {
+    "npcId": 69142,
+    "zoneShortName": "oot",
+    "note": "corrupted seafury cyclops — scripted spawn"
+  },
+  {
+    "npcId": 69149,
+    "zoneShortName": "oot",
+    "note": "a lesser spirit — scripted spawn"
+  },
+  {
+    "npcId": 93056,
+    "zoneShortName": "overthere",
+    "note": "a scorpikis illusion — scripted spawn"
+  },
+  {
+    "npcId": 93189,
+    "zoneShortName": "overthere",
+    "note": "child of Charasis — scripted spawn"
+  },
+  {
+    "npcId": 93190,
+    "zoneShortName": "overthere",
+    "note": "a glowing cliff golem — scripted spawn"
+  },
+  {
+    "npcId": 93303,
+    "zoneShortName": "overthere",
+    "note": "an undead marine — scripted spawn"
+  },
+  {
+    "npcId": 48240,
+    "zoneShortName": "paineel",
+    "note": "Avatar of Terror — scripted spawn"
+  },
+  {
+    "npcId": 75164,
+    "zoneShortName": "paineel",
+    "note": "avatar of dread — scripted spawn"
+  },
+  {
+    "npcId": 73107,
+    "zoneShortName": "permafrost",
+    "note": "The Icebound Spirit — scripted spawn"
+  },
+  {
+    "npcId": 12172,
+    "zoneShortName": "qey2hh1",
+    "note": "Thrackin Griften — scripted spawn"
+  },
+  {
+    "npcId": 12173,
+    "zoneShortName": "qey2hh1",
+    "note": "Maligars Enraged Doppleganger — scripted spawn"
+  },
+  {
+    "npcId": 12181,
+    "zoneShortName": "qey2hh1",
+    "note": "Draze Slashyn — scripted spawn"
+  },
+  {
+    "npcId": 12182,
+    "zoneShortName": "qey2hh1",
+    "note": "a Splitpaw assassin — scripted spawn"
+  },
+  {
+    "npcId": 12190,
+    "zoneShortName": "qey2hh1",
+    "note": "Basil — scripted spawn"
+  },
+  {
+    "npcId": 12191,
+    "zoneShortName": "qey2hh1",
+    "note": "Paglan — scripted spawn"
+  },
+  {
+    "npcId": 13134,
+    "zoneShortName": "qey2hh1",
+    "note": "a fiesty scarecrow — scripted spawn"
+  },
+  {
+    "npcId": 13135,
+    "zoneShortName": "qey2hh1",
+    "note": "a fancy scarecrow — scripted spawn"
+  },
+  {
+    "npcId": 13136,
+    "zoneShortName": "qey2hh1",
+    "note": "a goofy scarecrow — scripted spawn"
+  },
+  {
+    "npcId": 13137,
+    "zoneShortName": "qey2hh1",
+    "note": "a scary scarecrow — scripted spawn"
+  },
+  {
+    "npcId": 1179,
+    "zoneShortName": "qeynos",
+    "note": "Raffel Minnmorn — scripted spawn"
+  },
+  {
+    "npcId": 1182,
+    "zoneShortName": "qeynos",
+    "note": "Guard Sylus — scripted spawn"
+  },
+  {
+    "npcId": 1183,
+    "zoneShortName": "qeynos",
+    "note": "Riley Shplots — scripted spawn"
+  },
+  {
+    "npcId": 1197,
+    "zoneShortName": "qeynos",
+    "note": "Donally Stultz — scripted spawn"
+  },
+  {
+    "npcId": 1201,
+    "zoneShortName": "qeynos",
+    "note": "Willie Garrote — scripted spawn"
+  },
+  {
+    "npcId": 1202,
+    "zoneShortName": "qeynos",
+    "note": "Executioner — scripted spawn"
+  },
+  {
+    "npcId": 1303,
+    "zoneShortName": "qeynos",
+    "note": "a young lion — scripted spawn"
+  },
+  {
+    "npcId": 1314,
+    "zoneShortName": "qeynos",
+    "note": "Guard Sylus — scripted spawn"
+  },
+  {
+    "npcId": 4190,
+    "zoneShortName": "qeytoqrg",
+    "note": "Varsoon the Undying — scripted spawn"
+  },
+  {
+    "npcId": 4192,
+    "zoneShortName": "qeytoqrg",
+    "note": "a strange skeleton — scripted spawn"
+  },
+  {
+    "npcId": 50306,
+    "zoneShortName": "rathemtn",
+    "note": "a lesser spirit — scripted spawn"
+  },
+  {
+    "npcId": 50322,
+    "zoneShortName": "rathemtn",
+    "note": "corrupted hill giant — scripted spawn"
+  },
+  {
+    "npcId": 50327,
+    "zoneShortName": "rathemtn",
+    "note": "Raving Sphinx Spiritservant — scripted spawn"
+  },
+  {
+    "npcId": 50329,
+    "zoneShortName": "rathemtn",
+    "note": "Warrior Spirit Chalex — scripted spawn"
+  },
+  {
+    "npcId": 50331,
+    "zoneShortName": "rathemtn",
+    "note": "Troll Captain Krignok — scripted spawn"
+  },
+  {
+    "npcId": 50332,
+    "zoneShortName": "rathemtn",
+    "note": "Undead Troll Marauder — scripted spawn"
+  },
+  {
+    "npcId": 50346,
+    "zoneShortName": "rathemtn",
+    "note": "Ytyrs Reborn — scripted spawn"
+  },
+  {
+    "npcId": 89182,
+    "zoneShortName": "sebilis",
+    "note": "Froglok Krup Watcher — scripted spawn"
+  },
+  {
+    "npcId": 89183,
+    "zoneShortName": "sebilis",
+    "note": "a fallen monk master — scripted spawn"
+  },
+  {
+    "npcId": 89194,
+    "zoneShortName": "sebilis",
+    "note": "An Ancient Sebilite Protector — scripted spawn"
+  },
+  {
+    "npcId": 125075,
+    "zoneShortName": "sirens",
+    "note": "Mistress of the Darkwater — scripted spawn"
+  },
+  {
+    "npcId": 91090,
+    "zoneShortName": "skyfire",
+    "note": "Zordakalicus Ragefire — scripted spawn"
+  },
+  {
+    "npcId": 91096,
+    "zoneShortName": "skyfire",
+    "note": "Zordak Ragefire — scripted spawn"
+  },
+  {
+    "npcId": 91097,
+    "zoneShortName": "skyfire",
+    "note": "Suled Dar`s Shade — scripted spawn"
+  },
+  {
+    "npcId": 91193,
+    "zoneShortName": "skyfire",
+    "note": "Rithnok the Tormented — scripted spawn"
+  },
+  {
+    "npcId": 114437,
+    "zoneShortName": "skyshrine",
+    "note": "a Kromzek Spy — scripted spawn"
+  },
+  {
+    "npcId": 114583,
+    "zoneShortName": "skyshrine",
+    "note": "Kerafyrm — scripted spawn"
+  },
+  {
+    "npcId": 80042,
+    "zoneShortName": "soltemple",
+    "note": "a plasmatic priest — scripted spawn"
+  },
+  {
+    "npcId": 13134,
+    "zoneShortName": "southkarana",
+    "note": "a fiesty scarecrow — scripted spawn"
+  },
+  {
+    "npcId": 13135,
+    "zoneShortName": "southkarana",
+    "note": "a fancy scarecrow — scripted spawn"
+  },
+  {
+    "npcId": 13136,
+    "zoneShortName": "southkarana",
+    "note": "a goofy scarecrow — scripted spawn"
+  },
+  {
+    "npcId": 13137,
+    "zoneShortName": "southkarana",
+    "note": "a scary scarecrow — scripted spawn"
+  },
+  {
+    "npcId": 14127,
+    "zoneShortName": "southkarana",
+    "note": "Markus Cachexia — scripted spawn"
+  },
+  {
+    "npcId": 14139,
+    "zoneShortName": "southkarana",
+    "note": "Quillmane — scripted spawn"
+  },
+  {
+    "npcId": 14140,
+    "zoneShortName": "southkarana",
+    "note": "Skeletal Servant — scripted spawn"
+  },
+  {
+    "npcId": 14146,
+    "zoneShortName": "southkarana",
+    "note": "Theodore Exanthem — scripted spawn"
+  },
+  {
+    "npcId": 14147,
+    "zoneShortName": "southkarana",
+    "note": "Morley Murrain — scripted spawn"
+  },
+  {
+    "npcId": 14172,
+    "zoneShortName": "southkarana",
+    "note": "Jale Phlintoes — scripted spawn"
+  },
+  {
+    "npcId": 35069,
+    "zoneShortName": "sro",
+    "note": "a terrorantuling — scripted spawn"
+  },
+  {
+    "npcId": 56150,
+    "zoneShortName": "steamfont",
+    "note": "Crusader Swiftmoon — scripted spawn"
+  },
+  {
+    "npcId": 56152,
+    "zoneShortName": "steamfont",
+    "note": "Minotaur Hero — scripted spawn"
+  },
+  {
+    "npcId": 56161,
+    "zoneShortName": "steamfont",
+    "note": "Minotaur Lord — scripted spawn"
+  },
+  {
+    "npcId": 56172,
+    "zoneShortName": "steamfont",
+    "note": "Renux Herkanor — scripted spawn"
+  },
+  {
+    "npcId": 56178,
+    "zoneShortName": "steamfont",
+    "note": "Hector the highway bandit — scripted spawn"
+  },
+  {
+    "npcId": 56179,
+    "zoneShortName": "steamfont",
+    "note": "Renaldo the highway bandit — scripted spawn"
+  },
+  {
+    "npcId": 56180,
+    "zoneShortName": "steamfont",
+    "note": "Jerald the highway bandit — scripted spawn"
+  },
+  {
+    "npcId": 448200,
+    "zoneShortName": "steamfont",
+    "note": "Renux Herkanor — scripted spawn"
+  },
+  {
+    "npcId": 448203,
+    "zoneShortName": "steamfont",
+    "note": "a decomposing body — scripted spawn"
+  },
+  {
+    "npcId": 100133,
+    "zoneShortName": "stonebrunt",
+    "note": "Disciple Okarote — scripted spawn"
+  },
+  {
+    "npcId": 100218,
+    "zoneShortName": "stonebrunt",
+    "note": "Flighty Orange Wisp — scripted spawn"
+  },
+  {
+    "npcId": 100220,
+    "zoneShortName": "stonebrunt",
+    "note": "The Spirit of Torment — scripted spawn"
+  },
+  {
+    "npcId": 100221,
+    "zoneShortName": "stonebrunt",
+    "note": "Ridossan the Unliving — scripted spawn"
+  },
+  {
+    "npcId": 100222,
+    "zoneShortName": "stonebrunt",
+    "note": "Ghost of Ridossan — scripted spawn"
+  },
+  {
+    "npcId": 100223,
+    "zoneShortName": "stonebrunt",
+    "note": "a fading erudite apparition — scripted spawn"
+  },
+  {
+    "npcId": 100224,
+    "zoneShortName": "stonebrunt",
+    "note": "a fading heretic apparition — scripted spawn"
+  },
+  {
+    "npcId": 100225,
+    "zoneShortName": "stonebrunt",
+    "note": "a heretic apparition — scripted spawn"
+  },
+  {
+    "npcId": 100227,
+    "zoneShortName": "stonebrunt",
+    "note": "a mountain dragon — scripted spawn"
+  },
+  {
+    "npcId": 83244,
+    "zoneShortName": "swampofnohope",
+    "note": "The Spirit of Sorrow — scripted spawn"
+  },
+  {
+    "npcId": 83245,
+    "zoneShortName": "swampofnohope",
+    "note": "Flighty Violet Wisp — scripted spawn"
+  },
+  {
+    "npcId": 83249,
+    "zoneShortName": "swampofnohope",
+    "note": "a swamp dragon — scripted spawn"
+  },
+  {
+    "npcId": 129063,
+    "zoneShortName": "thurgadinb",
+    "note": "Councilor Juliah Lockheart — scripted spawn"
+  },
+  {
+    "npcId": 96074,
+    "zoneShortName": "timorous",
+    "note": "Jhassad Oceanson — scripted spawn"
+  },
+  {
+    "npcId": 96080,
+    "zoneShortName": "timorous",
+    "note": "Natasha Whitewater — scripted spawn"
+  },
+  {
+    "npcId": 96086,
+    "zoneShortName": "timorous",
+    "note": "Avatar of Water — scripted spawn"
+  },
+  {
+    "npcId": 96088,
+    "zoneShortName": "timorous",
+    "note": "a dancing skeleton — scripted spawn"
+  },
+  {
+    "npcId": 96318,
+    "zoneShortName": "timorous",
+    "note": "Grandmaster Rinmark — scripted spawn"
+  },
+  {
+    "npcId": 96319,
+    "zoneShortName": "timorous",
+    "note": "Master Rinmark — scripted spawn"
+  },
+  {
+    "npcId": 96320,
+    "zoneShortName": "timorous",
+    "note": "Rinmark — scripted spawn"
+  },
+  {
+    "npcId": 96321,
+    "zoneShortName": "timorous",
+    "note": "Draz Nurakk — scripted spawn"
+  },
+  {
+    "npcId": 96368,
+    "zoneShortName": "timorous",
+    "note": "Gefaari Drokaz — scripted spawn"
+  },
+  {
+    "npcId": 96369,
+    "zoneShortName": "timorous",
+    "note": "Zordak`s Minion — scripted spawn"
+  },
+  {
+    "npcId": 95108,
+    "zoneShortName": "trakanon",
+    "note": "Emperor Ganak the Corrupted — scripted spawn"
+  },
+  {
+    "npcId": 95184,
+    "zoneShortName": "trakanon",
+    "note": "Zhaoku — scripted spawn"
+  },
+  {
+    "npcId": 63111,
+    "zoneShortName": "unrest",
+    "note": "Khrix Abomination — scripted spawn"
+  },
+  {
+    "npcId": 169128,
+    "zoneShortName": "unrest",
+    "note": "Drema Young — scripted spawn"
+  },
+  {
+    "npcId": 109093,
+    "zoneShortName": "veksar",
+    "note": "a raging bloodgill goblin — scripted spawn"
+  },
+  {
+    "npcId": 109107,
+    "zoneShortName": "veksar",
+    "note": "Garudon — scripted spawn"
+  },
+  {
+    "npcId": 112047,
+    "zoneShortName": "velketor",
+    "note": "a crystalline shard — scripted spawn"
+  },
+  {
+    "npcId": 112055,
+    "zoneShortName": "velketor",
+    "note": "Bled — scripted spawn"
+  },
+  {
+    "npcId": 112085,
+    "zoneShortName": "velketor",
+    "note": "Kerd — scripted spawn"
+  },
+  {
+    "npcId": 119158,
+    "zoneShortName": "wakening",
+    "note": "accolyte of Zek — scripted spawn"
+  },
+  {
+    "npcId": 119164,
+    "zoneShortName": "wakening",
+    "note": "Bloodpriest Ioukond — scripted spawn"
+  },
+  {
+    "npcId": 119166,
+    "zoneShortName": "wakening",
+    "note": "Berzerker Dolvad — scripted spawn"
+  },
+  {
+    "npcId": 119167,
+    "zoneShortName": "wakening",
+    "note": "Berzerker Voldak — scripted spawn"
+  },
+  {
+    "npcId": 119168,
+    "zoneShortName": "wakening",
+    "note": "Corporal Hlash — scripted spawn"
+  },
+  {
+    "npcId": 119169,
+    "zoneShortName": "wakening",
+    "note": "Disciple Atharm — scripted spawn"
+  },
+  {
+    "npcId": 119173,
+    "zoneShortName": "wakening",
+    "note": "Lieutenant Krofer — scripted spawn"
+  },
+  {
+    "npcId": 119174,
+    "zoneShortName": "wakening",
+    "note": "a sifaye defender — scripted spawn"
+  },
+  {
+    "npcId": 119176,
+    "zoneShortName": "wakening",
+    "note": "Dark Disciple Master — scripted spawn"
+  },
+  {
+    "npcId": 79126,
+    "zoneShortName": "warslikswood",
+    "note": "Raving Goblinmaster — scripted spawn"
+  },
+  {
+    "npcId": 79127,
+    "zoneShortName": "warslikswood",
+    "note": "Raving Goblinmaster — scripted spawn"
+  },
+  {
+    "npcId": 79128,
+    "zoneShortName": "warslikswood",
+    "note": "Ferocious Goblin — scripted spawn"
+  },
+  {
+    "npcId": 79129,
+    "zoneShortName": "warslikswood",
+    "note": "a frantic goblin — scripted spawn"
+  },
+  {
+    "npcId": 120112,
+    "zoneShortName": "westwastes",
+    "note": "Scout Pirri — scripted spawn"
+  },
+  {
+    "npcId": 120115,
+    "zoneShortName": "westwastes",
+    "note": "a Kromzek Captain — scripted spawn"
+  },
+  {
+    "npcId": 120138,
+    "zoneShortName": "westwastes",
+    "note": "Disciple of Moon — scripted spawn"
   }
 ]
