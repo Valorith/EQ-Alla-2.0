@@ -1545,6 +1545,48 @@ describe("catalog services", () => {
     );
   }, 20_000);
 
+  it("translates world crafting station containers to proper names and stations", async () => {
+    const [kilnRecipe, loomRecipe, barrelRecipe, ovenRecipe] = await Promise.all([
+      getRecipeDetail(8635),
+      getRecipeDetail(2428),
+      getRecipeDetail(7547),
+      getRecipeDetail(10143)
+    ]);
+
+    expect(kilnRecipe).toBeTruthy();
+    expect(kilnRecipe?.container).toBe("Kiln");
+    expect(kilnRecipe?.containers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 22,
+          name: "Kiln",
+          isDiscovered: true
+        })
+      ])
+    );
+    expect(kilnRecipe?.requiredStations).toEqual(
+      expect.arrayContaining([expect.objectContaining({ slug: "pottery-kiln" })])
+    );
+
+    expect(loomRecipe).toBeTruthy();
+    expect(loomRecipe?.container).toBe("Loom");
+    expect(loomRecipe?.requiredStations).toEqual(
+      expect.arrayContaining([expect.objectContaining({ slug: "tailoring" })])
+    );
+
+    expect(barrelRecipe).toBeTruthy();
+    expect(barrelRecipe?.container).toBe("Brewing Barrel");
+    expect(barrelRecipe?.requiredStations).toEqual(
+      expect.arrayContaining([expect.objectContaining({ slug: "brewing" })])
+    );
+
+    expect(ovenRecipe).toBeTruthy();
+    expect(ovenRecipe?.container).toBe("Oven, Mixing Bowl");
+    expect(ovenRecipe?.requiredStations).toEqual(
+      expect.arrayContaining([expect.objectContaining({ slug: "baking" })])
+    );
+  }, 20_000);
+
   it("keeps raw recipe-detail item rows visible even when their item pages are undiscovered", async () => {
     const db = getDb();
     expect(db).toBeTruthy();

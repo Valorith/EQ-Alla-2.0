@@ -555,8 +555,25 @@ const recipeTradeskillNames: Record<number, string> = {
 };
 
 const staticTradeskillContainers: Record<number, { name: string; icon: string }> = {
+  14: { name: "Oven", icon: "" },
   15: { name: "Mixing Bowl", icon: "" },
-  17: { name: "Forge", icon: "" }
+  16: { name: "Loom", icon: "" },
+  17: { name: "Forge", icon: "" },
+  18: { name: "Fletching Kit", icon: "" },
+  19: { name: "Brewing Barrel", icon: "" },
+  20: { name: "Jeweler's Kit", icon: "" },
+  21: { name: "Pottery Wheel", icon: "" },
+  22: { name: "Kiln", icon: "" },
+  31: { name: "Forge", icon: "" },
+  32: { name: "Forge", icon: "" },
+  33: { name: "Forge", icon: "" },
+  34: { name: "Forge", icon: "" },
+  36: { name: "Forge", icon: "" },
+  38: { name: "Forge", icon: "" },
+  39: { name: "Forge", icon: "" },
+  40: { name: "Forge", icon: "" },
+  47: { name: "Forge", icon: "" },
+  48: { name: "Forge", icon: "" }
 };
 
 const zoneCraftingObjectTypes = [
@@ -5313,13 +5330,15 @@ export async function getRecipeDetail(id: number): Promise<RecipeDetail | undefi
           return accumulator;
         }
 
-        const isDiscovered = Number(entry.item_is_discovered ?? 0) !== 0;
+        const staticContainer = !entry.item_name?.trim() ? staticTradeskillContainers[entry.item_id] : undefined;
+        const isItemDiscovered = Number(entry.item_is_discovered ?? 0) !== 0;
+        const isDiscovered = isItemDiscovered || Boolean(staticContainer);
 
         accumulator.push({
           id: entry.item_id,
-          name: entry.item_name?.trim() || staticTradeskillContainers[entry.item_id]?.name || `Item ${entry.item_id}`,
-          href: isDiscovered ? `/items/${entry.item_id}` : undefined,
-          icon: String(entry.item_icon ?? staticTradeskillContainers[entry.item_id]?.icon ?? ""),
+          name: entry.item_name?.trim() || staticContainer?.name || `Item ${entry.item_id}`,
+          href: isItemDiscovered ? `/items/${entry.item_id}` : undefined,
+          icon: String(entry.item_icon ?? staticContainer?.icon ?? ""),
           isDiscovered
         });
 
