@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Button, Input } from "@eq-alla/ui";
+import { Input } from "@eq-alla/ui";
+import { CompactPaginationControls } from "./catalog-shell";
 import { ItemIcon } from "./item-icon";
 
 type ZoneMode = "npcs" | "named" | "items" | "forage";
@@ -276,9 +277,6 @@ export function ZoneResourceLedger({
     return filteredEntries.slice(start, start + pageSize);
   }, [currentPage, filteredEntries, pageSize]);
 
-  const start = filteredEntries.length > 0 ? (currentPage - 1) * pageSize + 1 : 0;
-  const end = Math.min(currentPage * pageSize, filteredEntries.length);
-
   return (
     <div className="space-y-4">
       <div className="border-b border-white/8 px-5 py-4 sm:px-6">
@@ -311,33 +309,16 @@ export function ZoneResourceLedger({
         </div>
       )}
 
-      {totalPages > 1 ? (
-        <div className="flex flex-col gap-3 border-t border-white/8 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#8f836f]">
-            Showing {start}-{end} of {formatCount(filteredEntries.length)}
-          </p>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Button
-              type="button"
-              variant="ghost"
-              className="rounded-lg border border-white/8 px-2.5 py-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-[#c8bea9] hover:border-white/14 hover:bg-white/[0.03]"
-              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-              disabled={currentPage === 1}
-            >
-              Prev
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              className="rounded-lg border border-white/8 px-2.5 py-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-[#c8bea9] hover:border-white/14 hover:bg-white/[0.03]"
-              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-              disabled={currentPage === totalPages}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      ) : null}
+      <div className="px-5 pb-4 sm:px-6">
+        <CompactPaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredEntries.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          formatTotal={formatCount}
+        />
+      </div>
     </div>
   );
 }

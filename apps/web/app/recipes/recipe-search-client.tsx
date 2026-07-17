@@ -6,7 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import type { RecipeSummary } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
-import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../components/catalog-shell";
+import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable, TableSkeleton } from "../../components/catalog-shell";
+import { SearchErrorNotice } from "../../components/search-error-notice";
 import { waitForLoadingIndicator } from "../../components/loading-state";
 import { useTableSort, type TableSortColumn } from "../../components/table-sorting";
 
@@ -306,7 +307,7 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
   const pagedResults = sortedResults.slice((visiblePage - 1) * recipeResultsPerPage, visiblePage * recipeResultsPerPage);
   const showResults = hasQuery(filters) || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading recipes" : `${results.length} recipes`) : "Results";
-  const statusLabel = error ? error : isFetching ? "Refreshing results..." : buildSearchParams(filters).toString() === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
+  const statusLabel = isFetching ? "Refreshing results..." : buildSearchParams(filters).toString() === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
   const resolvedTiming =
     resolutionMeta && resolutionMeta.key === displayKey && !isFetching
       ? `Loaded in ${formatDuration(resolutionMeta.durationMs)}${resolutionMeta.source === "cache" ? " from cache" : ""}`
@@ -367,6 +368,15 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
           </div>
         </div>
       </SectionCard>
+
+      {error ? (
+        <SearchErrorNotice
+          message={error}
+          onRetry={() => setSubmitCount((current) => current + 1)}
+          isRetrying={isFetching}
+        />
+      ) : null}
+
       <SectionCard title={resultTitle}>
         <div className="relative">
           {showResults && results.length > 0 ? (
@@ -374,6 +384,7 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
               <SimpleTable
                 columns={recipeTableColumnLabels}
                 sort={tableSort}
+                rowKeys={pagedResults.map((recipe) => recipe.id)}
                 rows={pagedResults.map((recipe) => [
                   <Link key={recipe.id} href={`/recipes/${recipe.id}`} className="font-medium hover:underline">
                     {recipe.name}
@@ -393,7 +404,7 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
             </div>
           ) : showResults ? (
             isFetching ? (
-              <ClassLoadingIndicator message="Loading recipes" detail="Sifting ingredients, trivials, and results." />
+              <TableSkeleton columnCount={4} />
             ) : buildSearchParams(filters).toString() !== displayKey ? (
               <SearchPrompt message="Press Search to apply these filters." />
             ) : (

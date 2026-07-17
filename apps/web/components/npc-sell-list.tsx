@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@eq-alla/ui";
+import { CompactPaginationControls } from "./catalog-shell";
 import { CoinDisplay } from "./coin-display";
 import { ItemIcon } from "./item-icon";
 
@@ -73,21 +73,13 @@ export function NpcSellList({ items }: { items: NpcSellEntry[] }) {
         })}
       </div>
 
-      {items.length > merchantPageSize ? (
-        <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-[#9f8e79]">
-            Showing {(currentPage - 1) * merchantPageSize + 1}-{Math.min(currentPage * merchantPageSize, items.length)} of {items.length}
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1}>
-              Previous
-            </Button>
-            <Button type="button" variant="outline" onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages}>
-              Next
-            </Button>
-          </div>
-        </div>
-      ) : null}
+      <CompactPaginationControls
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={items.length}
+        pageSize={merchantPageSize}
+        onPageChange={setCurrentPage}
+      />
     </div>
   );
 }

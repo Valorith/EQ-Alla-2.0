@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@eq-alla/ui";
+import { CompactPaginationControls } from "./catalog-shell";
 
 type RelatedEntry = {
   href: string;
@@ -31,8 +31,6 @@ export function PaginatedRelatedSection({
     const start = (currentPage - 1) * pageSize;
     return items.slice(start, start + pageSize);
   }, [currentPage, items, pageSize]);
-  const start = (currentPage - 1) * pageSize + 1;
-  const end = Math.min(currentPage * pageSize, items.length);
 
   return (
     <section className="space-y-3">
@@ -53,33 +51,15 @@ export function PaginatedRelatedSection({
               </li>
             ))}
           </ul>
-          {totalPages > 1 ? (
-            <div className="mt-4 flex flex-col gap-3 border-t border-white/8 pt-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#8f836f]">
-                Showing {start}-{end} of {items.length}
-              </p>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="rounded-lg border border-white/8 px-2.5 py-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-[#c8bea9] hover:border-white/14 hover:bg-white/[0.03]"
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                  disabled={currentPage === 1}
-                >
-                  Prev
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="rounded-lg border border-white/8 px-2.5 py-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-[#c8bea9] hover:border-white/14 hover:bg-white/[0.03]"
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          ) : null}
+          <div className="mt-4">
+            <CompactPaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={items.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+            />
+          </div>
         </div>
       ) : (
         <div className="rounded-[10px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,23,31,0.94),rgba(11,15,22,0.92))] px-4 py-3 shadow-[0_14px_30px_rgba(0,0,0,0.28)]">

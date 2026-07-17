@@ -7,8 +7,9 @@ import type { ItemSummary } from "@eq-alla/data";
 import { itemClassFilterOptions, itemSlotFilterOptions } from "@eq-alla/data/item-search-filters";
 import { itemTypeFilterOptions } from "@eq-alla/data/item-types";
 import { Button, Input } from "@eq-alla/ui";
-import { PaginationControls, SearchPrompt, SectionCard, SimpleTable } from "../../components/catalog-shell";
+import { PaginationControls, SearchPrompt, SectionCard, SimpleTable, TableSkeleton } from "../../components/catalog-shell";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
+import { SearchErrorNotice } from "../../components/search-error-notice";
 import { waitForLoadingIndicator } from "../../components/loading-state";
 import { ItemIcon } from "../../components/item-icon";
 import { useTableSort, type TableSortColumn } from "../../components/table-sorting";
@@ -577,7 +578,7 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
   const draftKey = buildSearchParams(filters).toString();
   const showResults = hasActiveFilters(filters) || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && items.length === 0 ? "Loading items" : `${items.length} matching items`) : "Results";
-  const statusLabel = error ? error : isFetching ? "Refreshing results..." : draftKey === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
+  const statusLabel = isFetching ? "Refreshing results..." : draftKey === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
   const resolvedTiming =
     resolutionMeta && resolutionMeta.key === displayKey && !isFetching
       ? `Loaded in ${formatDuration(resolutionMeta.durationMs)}${resolutionMeta.source === "cache" ? " from cache" : ""}`
@@ -664,6 +665,14 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
         </div>
       </SectionCard>
 
+      {error ? (
+        <SearchErrorNotice
+          message={error}
+          onRetry={() => setSubmitCount((current) => current + 1)}
+          isRetrying={isFetching}
+        />
+      ) : null}
+
       <SectionCard title={resultTitle} className={`relative z-0 ${frameClassName}`.trim()}>
         <div className="relative">
           {showResults && items.length > 0 ? (
@@ -671,6 +680,7 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
               <SimpleTable
                 columns={itemTableColumnLabels}
                 sort={tableSort}
+                rowKeys={pagedItems.map((item) => item.id)}
                 rows={pagedItems.map((item) => [
                   <ItemIcon key={`${item.id}-icon`} icon={item.icon} name={item.name} size="sm" tooltipItemId={item.id} />,
                   <Link
@@ -699,7 +709,7 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
             </div>
           ) : showResults ? (
             isFetching ? (
-              <ClassLoadingIndicator detail="Summoning item records from the archive." message="Loading matching items..." />
+              <TableSkeleton columnCount={9} />
             ) : draftKey !== displayKey ? (
               <SearchPrompt message="Press Search to apply these filters." />
             ) : (

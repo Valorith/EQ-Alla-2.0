@@ -38,7 +38,7 @@ test("missing routes show the branded archive not-found page", async ({ page }) 
   expect(response?.status()).toBe(404);
   await expect(page.getByRole("heading", { name: /This record isn't in the archive/i })).toBeVisible();
   await expect(page.getByRole("searchbox", { name: /Search items, NPCs, zones/i })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Items" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Items", exact: true }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Return to home" })).toBeVisible();
 });
 
@@ -69,7 +69,7 @@ test("spell rows keep their applied class while draft class filters are pending"
   const draughtRow = page.getByRole("row").filter({ hasText: "Draught of Fire" });
   await expect(draughtRow).toContainText("Wizard");
 
-  await page.getByLabel("Class").selectOption("Shadow Knight");
+  await page.locator('select[name="class"]').selectOption("Shadow Knight");
 
   await expect(page.getByText("Press Search to apply filters")).toBeVisible();
   await expect(draughtRow).toContainText("Wizard");

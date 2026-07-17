@@ -6,7 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import type { ZoneSummary } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
-import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../components/catalog-shell";
+import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable, TableSkeleton } from "../../components/catalog-shell";
+import { SearchErrorNotice } from "../../components/search-error-notice";
 import { waitForLoadingIndicator } from "../../components/loading-state";
 import { useTableSort, type TableSortColumn } from "../../components/table-sorting";
 
@@ -284,7 +285,7 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
   const draftKey = buildSearchParams(filters).toString();
   const showResults = hasActiveFilters(filters) || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading zones" : `${results.length} zones`) : "Results";
-  const statusLabel = error ? error : isFetching ? "Refreshing results..." : draftKey === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
+  const statusLabel = isFetching ? "Refreshing results..." : draftKey === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
   const resolvedTiming =
     resolutionMeta && resolutionMeta.key === displayKey && !isFetching
       ? `Loaded in ${formatDuration(resolutionMeta.durationMs)}${resolutionMeta.source === "cache" ? " from cache" : ""}`
@@ -341,6 +342,15 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
           </div>
         </div>
       </SectionCard>
+
+      {error ? (
+        <SearchErrorNotice
+          message={error}
+          onRetry={() => setSubmitCount((current) => current + 1)}
+          isRetrying={isFetching}
+        />
+      ) : null}
+
       <SectionCard title={resultTitle}>
         <div className="relative">
           {showResults && results.length > 0 ? (
@@ -348,6 +358,7 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
               <SimpleTable
                 columns={zoneTableColumnLabels}
                 sort={tableSort}
+                rowKeys={pagedResults.map((zone) => zone.id)}
                 rows={pagedResults.map((zone) => [
                   <Link key={zone.shortName} href={`/zones/${zone.shortName}`} className="font-medium hover:underline">
                     {zone.longName}
@@ -367,7 +378,7 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
             </div>
           ) : showResults ? (
             isFetching ? (
-              <ClassLoadingIndicator message="Loading zones" detail="Surveying eras, levels, and populations." />
+              <TableSkeleton columnCount={4} />
             ) : draftKey !== displayKey ? (
               <SearchPrompt message="Press Search to apply these filters." />
             ) : (

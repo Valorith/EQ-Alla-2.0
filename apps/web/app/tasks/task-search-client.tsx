@@ -6,7 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import type { TaskDetail } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
-import { PaginationControls, SearchPrompt, SectionCard, SimpleTable } from "../../components/catalog-shell";
+import { PaginationControls, SearchPrompt, SectionCard, SimpleTable, TableSkeleton } from "../../components/catalog-shell";
+import { SearchErrorNotice } from "../../components/search-error-notice";
 import { waitForLoadingIndicator } from "../../components/loading-state";
 import { getLeadingSortNumber, useTableSort, type TableSortColumn } from "../../components/table-sorting";
 
@@ -253,7 +254,7 @@ export function TaskSearchClient({ initialQuery }: TaskSearchClientProps) {
   const pagedResults = sortedResults.slice((visiblePage - 1) * taskResultsPerPage, visiblePage * taskResultsPerPage);
   const showResults = activeQuery.length > 0 || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading tasks" : `${results.length} tasks`) : "Results";
-  const statusLabel = error ? error : isFetching ? "Refreshing results..." : activeQuery === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
+  const statusLabel = isFetching ? "Refreshing results..." : activeQuery === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
   const resolvedTiming =
     resolutionMeta && resolutionMeta.key === displayKey && !isFetching
       ? `Loaded in ${formatDuration(resolutionMeta.durationMs)}${resolutionMeta.source === "cache" ? " from cache" : ""}`
@@ -291,6 +292,15 @@ export function TaskSearchClient({ initialQuery }: TaskSearchClientProps) {
           </Button>
         </div>
       </SectionCard>
+
+      {error ? (
+        <SearchErrorNotice
+          message={error}
+          onRetry={() => setSubmitCount((current) => current + 1)}
+          isRetrying={isFetching}
+        />
+      ) : null}
+
       <SectionCard title={resultTitle}>
         <div className="relative">
           {showResults && results.length > 0 ? (
@@ -298,6 +308,7 @@ export function TaskSearchClient({ initialQuery }: TaskSearchClientProps) {
               <SimpleTable
                 columns={taskTableColumnLabels}
                 sort={tableSort}
+                rowKeys={pagedResults.map((task) => task.id)}
                 rows={pagedResults.map((task) => [
                   <Link key={task.id} href={`/tasks/${task.id}`} className="font-medium hover:underline">
                     {task.title}
@@ -317,7 +328,7 @@ export function TaskSearchClient({ initialQuery }: TaskSearchClientProps) {
             </div>
           ) : showResults ? (
             isFetching ? (
-              <ClassLoadingIndicator message="Loading tasks" detail="Reviewing quests, zones, and rewards." />
+              <TableSkeleton columnCount={4} />
             ) : activeQuery !== displayKey ? (
               <SearchPrompt message="Press Search to apply this query." />
             ) : (

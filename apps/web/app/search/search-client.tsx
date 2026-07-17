@@ -6,7 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import type { SearchHit } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
-import { PaginationControls, SearchPrompt, SectionCard } from "../../components/catalog-shell";
+import { PaginationControls, SearchPrompt, SectionCard, TableSkeleton } from "../../components/catalog-shell";
+import { SearchErrorNotice } from "../../components/search-error-notice";
 import { waitForLoadingIndicator } from "../../components/loading-state";
 import { ItemIcon } from "../../components/item-icon";
 import { SpellIcon } from "../../components/spell-icon";
@@ -330,7 +331,7 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
   const pagedVisibleHits = visibleHits.slice((visiblePage - 1) * globalSearchResultsPerPage, visiblePage * globalSearchResultsPerPage);
   const showResults = activeQuery.length > 0 || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && hits.length === 0 ? "Loading matches" : `${hits.length} matches`) : "Results";
-  const statusLabel = error ? error : isFetching ? "Refreshing results..." : activeQuery === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
+  const statusLabel = isFetching ? "Refreshing results..." : activeQuery === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
   const resolvedTiming =
     resolutionMeta && resolutionMeta.key === displayKey && !isFetching
       ? `Loaded in ${formatDuration(resolutionMeta.durationMs)}${resolutionMeta.source === "cache" ? " from cache" : ""}`
@@ -378,6 +379,14 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
           </Button>
         </div>
       </SectionCard>
+
+      {error ? (
+        <SearchErrorNotice
+          message={error}
+          onRetry={() => setSubmitCount((current) => current + 1)}
+          isRetrying={isFetching}
+        />
+      ) : null}
 
       <SectionCard title={resultTitle}>
         <div className="relative">
@@ -429,7 +438,7 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
             </div>
           ) : showResults ? (
             isFetching ? (
-              <ClassLoadingIndicator message="Loading global search" detail="Sweeping items, spells, NPCs, and zones." />
+              <TableSkeleton columnCount={3} />
             ) : activeQuery !== displayKey ? (
               <SearchPrompt message="Press Search to apply this query." />
             ) : (

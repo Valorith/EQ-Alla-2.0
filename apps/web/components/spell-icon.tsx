@@ -1,12 +1,13 @@
 type SpellIconProps = {
   icon: string;
   name: string;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
 };
 
 const iconSizes = {
   sm: "size-9 rounded-xl text-[10px]",
-  md: "size-10 rounded-xl text-xs"
+  md: "size-10 rounded-xl text-xs",
+  lg: "size-14 rounded-2xl text-base"
 } as const;
 
 function getRemoteSpellIconSrc(icon: string) {

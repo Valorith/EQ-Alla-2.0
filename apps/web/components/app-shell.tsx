@@ -31,12 +31,14 @@ type NavGroup = {
 function SidebarNavContent({
   showSidebarSearch,
   navGroups,
+  activeHref,
   footerClassName,
   onNavigate,
   onOpenSettings
 }: {
   showSidebarSearch: boolean;
   navGroups: NavGroup[];
+  activeHref: string | null;
   footerClassName: string;
   onNavigate?: () => void;
   onOpenSettings: () => void;
@@ -59,7 +61,7 @@ function SidebarNavContent({
             <Input
               type="search"
               name="q"
-              placeholder="Search zones, NPCs, items..."
+              placeholder="Items, NPCs, zones..."
               className="border-white/12 bg-white/10 pl-11 text-white placeholder:text-white/45 focus:border-[#f0c36a] focus:bg-white/14"
             />
           </div>
@@ -71,17 +73,32 @@ function SidebarNavContent({
           <div key={group.label} className="space-y-2">
             <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--sidebar-muted)]">{group.label}</p>
             <div className="grid gap-1.5">
-              {group.items.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={onNavigate}
-                  className="group flex min-h-11 items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium text-white/88 transition hover:bg-white/10 hover:text-white"
-                >
-                  <span>{item.label}</span>
-                  <ArrowRight className="size-4 text-white/40 transition group-hover:translate-x-0.5 group-hover:text-white/85" />
-                </Link>
-              ))}
+              {group.items.map((item) => {
+                const isActive = item.href === activeHref;
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={onNavigate}
+                    aria-current={isActive ? "page" : undefined}
+                    className={cn(
+                      "group flex min-h-11 items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition",
+                      isActive
+                        ? "bg-white/12 text-white shadow-[inset_0_0_0_1px_rgba(240,195,106,0.38)]"
+                        : "text-white/88 hover:bg-white/10 hover:text-white"
+                    )}
+                  >
+                    <span>{item.label}</span>
+                    <ArrowRight
+                      className={cn(
+                        "size-4 transition group-hover:translate-x-0.5",
+                        isActive ? "text-[#f0c36a]" : "text-white/40 group-hover:text-white/85"
+                      )}
+                    />
+                  </Link>
+                );
+              })}
             </div>
           </div>
         ))}
@@ -140,15 +157,49 @@ function SettingsModal({
   onClose: () => void;
 }) {
   const { isPageLoadingEnabled, setIsPageLoadingEnabled } = usePageLoadingPreference();
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!isOpen) {
       return;
     }
 
+    restoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    const focusableSelector =
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const focusTarget = dialogRef.current?.querySelector<HTMLElement>(focusableSelector);
+    focusTarget?.focus();
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         onClose();
+        return;
+      }
+
+      if (event.key !== "Tab" || !dialogRef.current) {
+        return;
+      }
+
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(focusableSelector)).filter(
+        (element) => element.offsetParent !== null
+      );
+
+      if (focusable.length === 0) {
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+
+      if (event.shiftKey && (active === first || !dialogRef.current.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !dialogRef.current.contains(active))) {
+        event.preventDefault();
+        first.focus();
       }
     };
 
@@ -156,6 +207,8 @@ function SettingsModal({
 
     return () => {
       window.removeEventListener("keydown", onKeyDown);
+      restoreFocusRef.current?.focus();
+      restoreFocusRef.current = null;
     };
   }, [isOpen, onClose]);
 
@@ -166,6 +219,7 @@ function SettingsModal({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#06080d]/72 p-4 backdrop-blur-sm" onClick={onClose}>
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="eq-settings-title"
@@ -197,7 +251,7 @@ function SettingsModal({
             <div className="min-w-0">
               <p className="text-sm font-semibold text-white">Page loading animation</p>
               <p className="mt-1 text-sm leading-6 text-[#dccfb7]/76">
-                Shows the full-page gnome animation during route transitions and loading boundaries.
+                Shows the full-page gnome animation during route transitions and loading boundaries. A slim progress bar is shown when this is off.
               </p>
             </div>
 
@@ -239,7 +293,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const mainShellClassName = isHome
     ? "min-w-0 xl:col-start-2 xl:row-start-1 xl:self-start"
-    : "min-w-0 w-full rounded-[28px] border border-white/10 bg-black/20 p-3 backdrop-blur-sm xl:max-w-[1320px] xl:min-h-0 xl:justify-self-center xl:self-stretch xl:p-4";
+    : "min-w-0 w-full rounded-[28px] border border-white/10 bg-black/20 p-3 backdrop-blur-sm xl:max-w-[1500px] 2xl:max-w-[1760px] xl:min-h-0 xl:justify-self-center xl:self-stretch xl:p-4";
   const desktopGridClassName = isHome
     ? "relative z-50 grid gap-4 xl:h-full xl:grid-cols-[290px_minmax(0,1fr)] xl:items-start xl:overflow-hidden"
     : "relative z-50 grid gap-4 xl:h-full xl:grid-cols-[290px_minmax(0,1fr)] xl:items-stretch xl:overflow-hidden";
@@ -278,6 +332,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     setSettingsOpen(true);
   };
   const closeSettings = () => setSettingsOpen(false);
+
+  const allNavHrefs = navGroups.flatMap((group) => group.items.map((item) => item.href));
+  const activeHref =
+    allNavHrefs
+      .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
+      .sort((left, right) => right.length - left.length)[0] ?? null;
 
   useEffect(() => {
     setMobileNavOpen(false);
@@ -357,6 +417,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="eq-app-shell-padding min-h-screen xl:h-dvh xl:overflow-hidden">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[80] focus:rounded-xl focus:border focus:border-[#f0c36a]/60 focus:bg-[#0f131a] focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-[#f0c36a] focus:shadow-[0_10px_30px_rgba(0,0,0,0.5)]"
+      >
+        Skip to content
+      </a>
       {mobileNavOpen ? (
         <button
           type="button"
@@ -403,6 +469,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <SidebarNavContent
                   showSidebarSearch={showSidebarSearch}
                   navGroups={navGroups}
+                  activeHref={activeHref}
                   footerClassName="mt-4 grid gap-3"
                   onNavigate={closeMobileNav}
                   onOpenSettings={openSettings}
@@ -434,6 +501,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <SidebarNavContent
                 showSidebarSearch={showSidebarSearch}
                 navGroups={navGroups}
+                activeHref={activeHref}
                 footerClassName="mt-auto grid gap-3"
                 onOpenSettings={openSettings}
               />
@@ -441,7 +509,12 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </aside>
 
-        <main ref={mainScrollRef} className={`eq-scroll-pane ${mainShellClassName} xl:min-h-0 xl:h-full xl:overflow-y-auto xl:overscroll-contain`}>
+        <main
+          ref={mainScrollRef}
+          id="main-content"
+          tabIndex={-1}
+          className={`eq-scroll-pane ${mainShellClassName} outline-none xl:min-h-0 xl:h-full xl:overflow-y-auto xl:overscroll-contain`}
+        >
           <div className={isHome ? "flex min-w-0 flex-col" : "flex min-w-0 flex-col gap-4"}>{children}</div>
         </main>
       </div>

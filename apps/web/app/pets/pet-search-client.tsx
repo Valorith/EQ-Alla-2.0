@@ -6,7 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import type { PetSummary } from "@eq-alla/data";
 import { Button } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
-import { PaginationControls, SearchPrompt, SectionCard, SimpleTable } from "../../components/catalog-shell";
+import { PaginationControls, SearchPrompt, SectionCard, SimpleTable, TableSkeleton } from "../../components/catalog-shell";
+import { SearchErrorNotice } from "../../components/search-error-notice";
 import { waitForLoadingIndicator } from "../../components/loading-state";
 import { SpellIcon } from "../../components/spell-icon";
 import { useTableSort, type TableSortColumn } from "../../components/table-sorting";
@@ -359,15 +360,13 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
   const visiblePage = Math.min(page, totalPages);
   const pagedResults = sortedResults.slice((visiblePage - 1) * petResultsPerPage, visiblePage * petResultsPerPage);
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading pets" : `${results.length} pets`) : "Results";
-  const statusLabel = error
-    ? error
-    : isFetching
-      ? "Refreshing results..."
-      : hasQuery(selectedClasses) && buildSearchKey(selectedClasses) === displayKey
-        ? "Filters applied"
-        : hasQuery(selectedClasses)
-          ? "Press Search to apply class filters"
-          : "Select one or more classes";
+  const statusLabel = isFetching
+    ? "Refreshing results..."
+    : hasQuery(selectedClasses) && buildSearchKey(selectedClasses) === displayKey
+      ? "Filters applied"
+      : hasQuery(selectedClasses)
+        ? "Press Search to apply class filters"
+        : "Select one or more classes";
   const resolvedTiming =
     resolutionMeta && resolutionMeta.key === displayKey && !isFetching
       ? `Loaded in ${formatDuration(resolutionMeta.durationMs)}${resolutionMeta.source === "cache" ? " from cache" : ""}`
@@ -409,6 +408,14 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
         </div>
       </SectionCard>
 
+      {error ? (
+        <SearchErrorNotice
+          message={error}
+          onRetry={() => setSubmitCount((current) => current + 1)}
+          isRetrying={isFetching}
+        />
+      ) : null}
+
       <SectionCard title={resultTitle}>
         <div className="relative">
           {showResults && results.length > 0 ? (
@@ -416,6 +423,7 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
               <SimpleTable
                 columns={petTableColumnLabels}
                 sort={tableSort}
+                rowKeys={pagedResults.map((pet) => `${pet.id}-${pet.ownerClassId}`)}
                 rows={pagedResults.map((pet) => [
                   pet.ownerClass,
                   pet.spellLevel,
@@ -446,7 +454,7 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
             </div>
           ) : showResults ? (
             isFetching ? (
-              <ClassLoadingIndicator message="Loading pets" detail="Calling companions and familiars to the roster." />
+              <TableSkeleton columnCount={13} />
             ) : buildSearchKey(selectedClasses) !== displayKey ? (
               <SearchPrompt message="Press Search to apply these class filters." />
             ) : (

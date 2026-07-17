@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Button, Input } from "@eq-alla/ui";
+import { Input } from "@eq-alla/ui";
+import { CompactPaginationControls } from "./catalog-shell";
 
 type LinkEntry = {
   href: string;
@@ -47,9 +48,6 @@ export function SearchablePaginatedLinkList({
     return filteredItems.slice(start, start + pageSize);
   }, [currentPage, filteredItems, pageSize]);
 
-  const start = filteredItems.length > 0 ? (currentPage - 1) * pageSize + 1 : 0;
-  const end = Math.min(currentPage * pageSize, filteredItems.length);
-
   return (
     <div className="space-y-4">
       <Input
@@ -75,33 +73,13 @@ export function SearchablePaginatedLinkList({
             ))}
           </div>
 
-          {filteredItems.length > pageSize ? (
-            <div className="flex flex-col gap-3 border-t border-white/8 pt-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#8f836f]">
-                Showing {start}-{end} of {filteredItems.length}
-              </p>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="rounded-lg border border-white/8 px-2.5 py-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-[#c8bea9] hover:border-white/14 hover:bg-white/[0.03]"
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                  disabled={currentPage === 1}
-                >
-                  Prev
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="rounded-lg border border-white/8 px-2.5 py-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-[#c8bea9] hover:border-white/14 hover:bg-white/[0.03]"
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          ) : null}
+          <CompactPaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filteredItems.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+          />
         </div>
       ) : (
         <p className="text-[15px] leading-6 text-[#aeb8ca]">

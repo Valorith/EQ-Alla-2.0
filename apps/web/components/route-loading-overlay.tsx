@@ -64,29 +64,7 @@ export function RouteLoadingOverlay() {
   }, [isRouteLoading, pathname, searchParams]);
 
   useEffect(() => {
-    if (isPageLoadingEnabled) {
-      return;
-    }
-
-    setIsRouteLoading(false);
-
-    if (hideTimerRef.current !== null) {
-      window.clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = null;
-    }
-
-    if (failSafeTimerRef.current !== null) {
-      window.clearTimeout(failSafeTimerRef.current);
-      failSafeTimerRef.current = null;
-    }
-  }, [isPageLoadingEnabled]);
-
-  useEffect(() => {
     const startRouteLoading = () => {
-      if (!isPageLoadingEnabled) {
-        return;
-      }
-
       startedAtRef.current = performance.now();
       setIsRouteLoading(true);
 
@@ -185,10 +163,18 @@ export function RouteLoadingOverlay() {
         failSafeTimerRef.current = null;
       }
     };
-  }, [isPageLoadingEnabled]);
+  }, []);
 
-  if (!isPageLoadingEnabled || !isRouteLoading) {
+  if (!isRouteLoading) {
     return null;
+  }
+
+  if (!isPageLoadingEnabled) {
+    return (
+      <div aria-hidden="true" className="eq-route-progress">
+        <div className="eq-route-progress-bar" />
+      </div>
+    );
   }
 
   return <ClassLoadingIndicator fullScreen message="Loading page" detail="The gnome is flipping to the right entry." />;

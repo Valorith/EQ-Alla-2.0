@@ -6,7 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import type { FactionSummary } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
-import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../components/catalog-shell";
+import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable, TableSkeleton } from "../../components/catalog-shell";
+import { SearchErrorNotice } from "../../components/search-error-notice";
 import { waitForLoadingIndicator } from "../../components/loading-state";
 import { useTableSort, type TableSortColumn } from "../../components/table-sorting";
 
@@ -409,7 +410,7 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
   const pagedResults = sortedResults.slice((visiblePage - 1) * factionResultsPerPage, visiblePage * factionResultsPerPage);
   const showResults = activeQuery.length > 0 || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading factions" : `${results.length} factions`) : "Results";
-  const statusLabel = error ? error : isFetching ? "Refreshing results..." : activeQuery === displayKey && displayKey ? "Filters applied" : "Press Search or View all to apply filters";
+  const statusLabel = isFetching ? "Refreshing results..." : activeQuery === displayKey && displayKey ? "Filters applied" : "Press Search or View all to apply filters";
   const resolvedTiming =
     resolutionMeta && resolutionMeta.key === displayKey && !isFetching
       ? `Loaded in ${formatDuration(resolutionMeta.durationMs)}${resolutionMeta.source === "cache" ? " from cache" : ""}`
@@ -481,6 +482,15 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
           </div>
         </div>
       </SectionCard>
+
+      {error ? (
+        <SearchErrorNotice
+          message={error}
+          onRetry={() => setSubmitCount((current) => current + 1)}
+          isRetrying={isFetching}
+        />
+      ) : null}
+
       <SectionCard title={resultTitle}>
         <div className="relative">
           {showResults && results.length > 0 ? (
@@ -488,6 +498,7 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
               <SimpleTable
                 columns={factionTableColumnLabels}
                 sort={tableSort}
+                rowKeys={pagedResults.map((faction) => faction.id)}
                 rows={pagedResults.map((faction) => [
                   <Link key={faction.id} href={`/factions/${faction.id}`} className="font-medium hover:underline">
                     {faction.name}
@@ -507,7 +518,7 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
             </div>
           ) : showResults ? (
             isFetching ? (
-              <ClassLoadingIndicator message="Loading factions" detail="Resolving alliances and rivalries." />
+              <TableSkeleton columnCount={4} />
             ) : activeQuery !== displayKey ? (
               <SearchPrompt message="Press Search or View all to apply these filters." />
             ) : (

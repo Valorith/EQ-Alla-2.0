@@ -29,7 +29,7 @@ export function ArchiveBoundaryContent({
   detail
 }: ArchiveBoundaryContentProps) {
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6 px-1 pb-8 pt-2 sm:px-2">
+    <div className="w-full space-y-6 px-1 pb-8 pt-2 sm:px-2">
       <PageHero eyebrow={eyebrow} title={title} description={description} actions={actions} />
 
       {detail ? (
@@ -57,7 +57,7 @@ export function ArchiveBoundaryContent({
       </SectionCard>
 
       <SectionCard title="Browse the catalog">
-        <div className="grid gap-2">
+        <div className="grid gap-2 lg:grid-cols-2 2xl:grid-cols-3">
           {archiveShortcuts.map((item) => (
             <Link
               key={item.href}

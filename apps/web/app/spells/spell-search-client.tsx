@@ -6,7 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import type { SpellSummary } from "@eq-alla/data";
 import { Button, Input } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
-import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTableHeaderRow } from "../../components/catalog-shell";
+import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTableHeaderRow, TableSkeleton } from "../../components/catalog-shell";
+import { SearchErrorNotice } from "../../components/search-error-notice";
 import { waitForLoadingIndicator } from "../../components/loading-state";
 import { SpellIcon } from "../../components/spell-icon";
 import {
@@ -372,7 +373,7 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
   const groupedResults = appliedClassName ? groupSpellsByLevel(pagedResults) : [];
   const showResults = hasActiveFilters(filters) || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && displayResults.length === 0 ? "Loading spells" : `${displayResults.length} matching spells`) : "Results";
-  const statusLabel = error ? error : isFetching ? "Refreshing results..." : draftKey === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
+  const statusLabel = isFetching ? "Refreshing results..." : draftKey === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
   const resolvedTiming =
     resolutionMeta && resolutionMeta.key === displayKey && !isFetching
       ? `Loaded in ${formatDuration(resolutionMeta.durationMs)}${resolutionMeta.source === "cache" ? " from cache" : ""}`
@@ -438,6 +439,14 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
         </div>
       </SectionCard>
 
+      {error ? (
+        <SearchErrorNotice
+          message={error}
+          onRetry={() => setSubmitCount((current) => current + 1)}
+          isRetrying={isFetching}
+        />
+      ) : null}
+
       <SectionCard title={resultTitle}>
         <div className="relative">
           {showResults && results.length > 0 ? (
@@ -494,7 +503,7 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
             </div>
           ) : showResults ? (
             isFetching ? (
-              <ClassLoadingIndicator message="Loading spells" detail="Paging through the spell archive." />
+              <TableSkeleton columnCount={7} />
             ) : (
               <SearchPrompt message="No spells matched this search." />
             )

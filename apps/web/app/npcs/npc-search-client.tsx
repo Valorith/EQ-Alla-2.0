@@ -6,7 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import type { NpcSummary } from "@eq-alla/data";
 import { Input, Button } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
-import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable } from "../../components/catalog-shell";
+import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable, TableSkeleton } from "../../components/catalog-shell";
+import { SearchErrorNotice } from "../../components/search-error-notice";
 import { waitForLoadingIndicator } from "../../components/loading-state";
 import { getLeadingSortNumber, useTableSort, type TableSortColumn } from "../../components/table-sorting";
 
@@ -330,7 +331,7 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
   const draftKey = buildSearchParams(filters, mode).toString();
   const showResults = hasActiveFilters(filters) || isFetching || displayKey.length > 0;
   const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading NPCs" : `${results.length} ${mode === "advanced" ? "matches" : "matching NPCs"}`) : "Results";
-  const statusLabel = error ? error : isFetching ? "Refreshing results..." : draftKey === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
+  const statusLabel = isFetching ? "Refreshing results..." : draftKey === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
   const resolvedTiming =
     resolutionMeta && resolutionMeta.key === displayKey && !isFetching
       ? `Loaded in ${formatDuration(resolutionMeta.durationMs)}${resolutionMeta.source === "cache" ? " from cache" : ""}`
@@ -390,6 +391,15 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
           </div>
         </div>
       </SectionCard>
+
+      {error ? (
+        <SearchErrorNotice
+          message={error}
+          onRetry={() => setSubmitCount((current) => current + 1)}
+          isRetrying={isFetching}
+        />
+      ) : null}
+
       <SectionCard title={resultTitle}>
         <div className="relative">
           {showResults && results.length > 0 ? (
@@ -397,6 +407,7 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
               <SimpleTable
                 columns={npcTableColumnLabels}
                 sort={tableSort}
+                rowKeys={pagedResults.map((npc) => npc.id)}
                 rows={pagedResults.map((npc) =>
                   mode === "advanced"
                     ? [
@@ -423,7 +434,7 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
             </div>
           ) : showResults ? (
             isFetching ? (
-              <ClassLoadingIndicator message="Loading NPCs" detail="Checking spawns, zones, and named flags." />
+              <TableSkeleton columnCount={npcTableColumnLabels.length} />
             ) : draftKey !== displayKey ? (
               <SearchPrompt message="Press Search to apply these filters." />
             ) : (

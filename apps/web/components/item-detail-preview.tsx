@@ -250,12 +250,12 @@ export function ItemDetailPreview({ item, className = "" }: { item: ItemDetail; 
   const hasLowerColumns = lowerColumns.length > 0;
   const statGridColumnCount = Math.max(topColumns.length, lowerColumns.length, 1);
   const statGridStyle: CSSProperties = {
-    gridTemplateColumns: `repeat(${statGridColumnCount}, max-content)`
+    ["--eq-stat-cols" as keyof CSSProperties]: statGridColumnCount
   };
 
   return (
     <section
-      className={`inline-block max-w-full rounded-[12px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,29,38,0.96),rgba(14,19,27,0.94))] px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.3)] backdrop-blur-sm sm:px-4 sm:py-3 ${className}`.trim()}
+      className={`w-full rounded-[12px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,29,38,0.96),rgba(14,19,27,0.94))] px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.3)] backdrop-blur-sm sm:inline-block sm:w-auto sm:max-w-full sm:px-4 sm:py-3 ${className}`.trim()}
     >
       <div className="space-y-3">
         <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start">
@@ -276,11 +276,11 @@ export function ItemDetailPreview({ item, className = "" }: { item: ItemDetail; 
         </div>
 
         <div className="space-y-4">
-          <div className="grid justify-start gap-x-4 gap-y-2.5" style={statGridStyle}>
+          <div className="eq-item-stat-grid grid w-full justify-start gap-x-4 gap-y-2.5" style={statGridStyle}>
             {topColumns.map((column, index) => (
               <div
                 key={column.key}
-                className="min-w-max"
+                className="min-w-0 sm:min-w-max"
                 style={{ gridColumn: index + 1, gridRow: 1 }}
               >
                 <StatPairList rows={column.rows} alignValuesRight />
@@ -290,7 +290,7 @@ export function ItemDetailPreview({ item, className = "" }: { item: ItemDetail; 
               ? lowerColumns.map((column, index) => (
                 <div
                   key={column.key}
-                  className="min-w-max"
+                  className="min-w-0 sm:min-w-max"
                   style={{ gridColumn: index + 1, gridRow: 2 }}
                 >
                   <StatPairList rows={column.rows} alignValuesRight />
@@ -301,7 +301,7 @@ export function ItemDetailPreview({ item, className = "" }: { item: ItemDetail; 
         </div>
 
         {hasVisibleRows(modifierRows) ? (
-          <div className="min-w-max">
+          <div className="min-w-0 sm:min-w-max">
             <StatPairList rows={modifierRows} />
           </div>
         ) : null}

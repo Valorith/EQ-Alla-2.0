@@ -103,7 +103,7 @@ export function LinkList({
         <Link
           key={`${item.href}-${item.label}`}
           href={item.href}
-          className="group flex items-start justify-between gap-4 rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-4 py-4 transition duration-200 hover:border-[var(--accent)] hover:bg-white"
+          className="group flex items-start justify-between gap-4 rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-4 py-4 transition duration-200 hover:border-[var(--accent)] hover:bg-white/6"
         >
           <div className="min-w-0">
             <p className="text-sm font-semibold text-[var(--foreground)]">{item.label}</p>
@@ -172,11 +172,13 @@ export function SimpleTableHeaderRow({
 export function SimpleTable({
   columns,
   rows,
-  sort
+  sort,
+  rowKeys
 }: {
   columns: readonly string[];
   rows: ReactNode[][];
   sort?: TableSortControl;
+  rowKeys?: Array<string | number>;
 }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-[#7b603b]/20 bg-[linear-gradient(180deg,rgba(35,30,27,0.86),rgba(18,20,24,0.84))] shadow-[0_18px_44px_rgba(0,0,0,0.24)] backdrop-blur-md">
@@ -187,7 +189,7 @@ export function SimpleTable({
         <tbody>
           {rows.map((row, index) => (
             <tr
-              key={index}
+              key={rowKeys?.[index] ?? index}
               className="border-t border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.018),rgba(255,255,255,0.008))] transition hover:bg-[linear-gradient(180deg,rgba(215,164,95,0.075),rgba(255,255,255,0.02))]"
             >
               {row.map((cell, cellIndex) => (
@@ -199,6 +201,38 @@ export function SimpleTable({
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+export function TableSkeleton({
+  columnCount,
+  rowCount = 8
+}: {
+  columnCount: number;
+  rowCount?: number;
+}) {
+  return (
+    <div
+      aria-hidden="true"
+      className="overflow-hidden rounded-2xl border border-[#7b603b]/20 bg-[linear-gradient(180deg,rgba(35,30,27,0.86),rgba(18,20,24,0.84))] shadow-[0_18px_44px_rgba(0,0,0,0.24)] backdrop-blur-md"
+    >
+      <div className="border-b border-white/8 bg-[linear-gradient(180deg,rgba(215,164,95,0.08),rgba(255,255,255,0.02))] px-4 py-3.5">
+        <div className="h-3 w-32 rounded-full bg-white/10" />
+      </div>
+      <div className="grid gap-px">
+        {Array.from({ length: rowCount }, (_, rowIndex) => (
+          <div key={rowIndex} className="flex items-center gap-6 border-t border-white/6 px-4 py-3.5">
+            {Array.from({ length: columnCount }, (_, columnIndex) => (
+              <div
+                key={columnIndex}
+                className="h-3 animate-pulse rounded-full bg-white/8 motion-reduce:animate-none"
+                style={{ width: `${[38, 22, 14, 10, 10, 12][columnIndex % 6]}%`, animationDelay: `${(rowIndex * 90 + columnIndex * 60) % 600}ms` }}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -246,7 +280,13 @@ export function PaginationControls({
         Showing {start}-{end} of {totalItems}
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant="outline" onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          aria-label="Go to previous page"
+        >
           Previous
         </Button>
         {pageList.map((entry) =>
@@ -257,6 +297,7 @@ export function PaginationControls({
               variant={entry === currentPage ? "default" : "outline"}
               onClick={() => onPageChange(entry)}
               aria-current={entry === currentPage ? "page" : undefined}
+              aria-label={entry === currentPage ? `Page ${entry}, current page` : `Go to page ${entry}`}
             >
               {entry}
             </Button>
@@ -266,7 +307,75 @@ export function PaginationControls({
             </span>
           )
         )}
-        <Button type="button" variant="outline" onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          aria-label="Go to next page"
+        >
+          Next
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+export function CompactPaginationControls({
+  currentPage,
+  totalPages,
+  totalItems,
+  pageSize,
+  onPageChange,
+  itemLabel,
+  formatTotal
+}: {
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  itemLabel?: string;
+  formatTotal?: (value: number) => string;
+}) {
+  if (totalItems <= pageSize || totalPages <= 1) {
+    return null;
+  }
+
+  const start = (currentPage - 1) * pageSize + 1;
+  const end = Math.min(currentPage * pageSize, totalItems);
+  const formattedTotal = formatTotal ? formatTotal(totalItems) : totalItems;
+  const compactButtonClassName =
+    "rounded-lg border border-white/8 px-2.5 py-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-[#c8bea9] hover:border-white/14 hover:bg-white/[0.03]";
+
+  return (
+    <div className="flex flex-col gap-3 border-t border-white/8 pt-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#8f836f]">
+        Showing {start}-{end} of {formattedTotal}
+        {itemLabel ? ` ${itemLabel}` : ""}
+      </p>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Button
+          type="button"
+          variant="ghost"
+          className={compactButtonClassName}
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          aria-label="Go to previous page"
+        >
+          Prev
+        </Button>
+        <span aria-hidden="true" className="px-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[#8f836f]">
+          {currentPage} / {totalPages}
+        </span>
+        <Button
+          type="button"
+          variant="ghost"
+          className={compactButtonClassName}
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          aria-label="Go to next page"
+        >
           Next
         </Button>
       </div>
