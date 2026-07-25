@@ -1969,6 +1969,24 @@ describe("catalog services", () => {
     expect(effectTexts).toContain("Limit: Min Level 51");
   });
 
+  it("uses canonical EQEmu casting skill names in spell detail and search results", async () => {
+    const expectedSpellSkills = [
+      { id: 11, skill: "Abjuration" },
+      { id: 269, skill: "Alteration" },
+      { id: 164, skill: "Conjuration" },
+      { id: 205, skill: "Divination" },
+      { id: 350, skill: "Evocation" },
+      { id: 917, skill: "Combat Ability" }
+    ];
+    const spellSkills = await Promise.all(
+      expectedSpellSkills.map(async ({ id }) => ({ id, skill: (await getSpellDetail(id))?.skill }))
+    );
+    const trueNorthSearch = await listSpells({ q: "205" });
+
+    expect(spellSkills).toEqual(expectedSpellSkills);
+    expect(trueNorthSearch.find((spell) => spell.id === 205)?.skill).toBe("Divination");
+  });
+
   it("keeps spell effect increase/decrease direction aligned with the stored values", () => {
     expect(resolveSpellEffectDirection("Increase Hitpoints", -750)).toBe("Decrease Hitpoints");
     expect(resolveSpellEffectDirection("Increase hate", -400)).toBe("Decrease hate");

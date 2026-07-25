@@ -275,12 +275,7 @@ const npcClassNames: Record<number, string> = {
   41: "Merchant"
 };
 
-const spellSkillNames: Record<number, string> = {
-  4: "Abjuration",
-  5: "Alteration",
-  14: "Evocation",
-  18: "Conjuration",
-  24: "Divination",
+const spellSkillSpecialNames: Record<number, string> = {
   98: "Combat Ability"
 };
 
@@ -952,7 +947,7 @@ function formatNpcClass(klass: number | null | undefined) {
 
 function formatSpellSkill(skill: number | null | undefined) {
   const normalized = Number(skill ?? 0);
-  return spellSkillNames[normalized] ?? eqEmuSkillTypeNames[normalized] ?? `Skill ${normalized}`;
+  return eqEmuSkillTypeNames[normalized] ?? spellSkillSpecialNames[normalized] ?? `Skill ${normalized}`;
 }
 
 function formatSpellClassMask(mask: number | null | undefined) {
