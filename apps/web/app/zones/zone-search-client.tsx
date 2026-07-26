@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { ZoneSummary } from "@eq-alla/data";
-import { Button, Input } from "@eq-alla/ui";
+import { Button, Input, rowLinkClass } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable, TableSkeleton } from "../../components/catalog-shell";
 import { SearchErrorNotice } from "../../components/search-error-notice";
 import { waitForLoadingIndicator } from "../../components/loading-state";
 import { useTableSort, type TableSortColumn } from "../../components/table-sorting";
+import { useUrlPageState } from "../../components/url-list-state";
 
 type ZoneSearchClientProps = {
   initialQuery: string;
@@ -142,7 +143,7 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
   const [displayKey, setDisplayKey] = useState("");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
   const [submitCount, setSubmitCount] = useState(0);
-  const [page, setPage] = useState(1);
+  const { page, setPage, resetPage, clampPage } = useUrlPageState(displayKey);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(buildSearchParams({ q: initialQuery, era: initialEra }).toString());
   const lastHandledSubmitRef = useRef(0);
@@ -163,7 +164,7 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
       setDisplayKey("");
       setIsFetching(false);
       setResolutionMeta(null);
-      setPage(1);
+      resetPage();
       return;
     }
 
@@ -172,7 +173,7 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
     setDisplayKey("");
     setIsFetching(false);
     setResolutionMeta(null);
-    setPage(1);
+    resetPage();
     setSubmitCount((current) => current + 1);
   }, [initialEra, initialQuery]);
 
@@ -203,7 +204,7 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
     setDisplayKey("");
     setIsFetching(false);
     setResolutionMeta(null);
-    setPage(1);
+    resetPage();
     currentUrlKeyRef.current = "";
     router.replace(pathname, { scroll: false });
   };
@@ -228,7 +229,7 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
       setDisplayKey("");
       setIsFetching(false);
       setResolutionMeta(null);
-      setPage(1);
+      resetPage();
       return;
     }
 
@@ -277,6 +278,7 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
   }, [filters, pathname, submitCount]);
 
   const { sortedRows: sortedResults, sort: tableSort } = useTableSort(results, zoneTableColumns, {
+    urlParam: "sort",
     onSortChange: () => setPage(1)
   });
   const totalPages = Math.max(1, Math.ceil(sortedResults.length / zoneResultsPerPage));
@@ -292,14 +294,8 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
       : null;
 
   useEffect(() => {
-    setPage(1);
-  }, [displayKey]);
-
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
+    clampPage(totalPages);
+  }, [clampPage, totalPages]);
 
   return (
     <>
@@ -351,16 +347,17 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
         />
       ) : null}
 
-      <SectionCard title={resultTitle}>
+      <SectionCard title={resultTitle} announceTitle>
         <div className="relative">
           {showResults && results.length > 0 ? (
             <div className={isFetching ? "transition duration-200 opacity-40 blur-[2px]" : undefined}>
               <SimpleTable
                 columns={zoneTableColumnLabels}
+                stickyColumnIndex={0}
                 sort={tableSort}
                 rowKeys={pagedResults.map((zone) => zone.id)}
                 rows={pagedResults.map((zone) => [
-                  <Link key={zone.shortName} href={`/zones/${zone.shortName}`} className="font-medium hover:underline">
+                  <Link key={zone.shortName} href={`/zones/${zone.shortName}`} className={rowLinkClass}>
                     {zone.longName}
                   </Link>,
                   zone.shortName,
@@ -382,7 +379,11 @@ export function ZoneSearchClient({ initialQuery, initialEra, eraOptions }: ZoneS
             ) : draftKey !== displayKey ? (
               <SearchPrompt message="Press Search to apply these filters." />
             ) : (
-              <SearchPrompt message="No zones matched this search." />
+              <SearchPrompt
+                message="No zones matched this search."
+                hint="Try a partial name, or clear the era filter."
+                action={{ label: "Clear filters", onClick: clearFilters }}
+              />
             )
           ) : (
             <SearchPrompt message="Enter a zone name to load results." />

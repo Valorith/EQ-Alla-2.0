@@ -1,9 +1,17 @@
 import { PageHero } from "../../components/catalog-shell";
 import { FactionSearchClient } from "./faction-search-client";
+import { buildPageMetadata } from "../../components/page-metadata";
 
 type FactionsPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
+
+export const metadata = buildPageMetadata({
+  title: "Faction Search",
+  description:
+    "Track faction groups, aligned zones, and the NPCs that raise or lower each standing.",
+  path: "/factions"
+});
 
 export default async function FactionsPage({ searchParams }: FactionsPageProps) {
   const params = await searchParams;

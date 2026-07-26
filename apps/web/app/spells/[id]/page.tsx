@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-import { getSpellDetail, type SpellEffect } from "@eq-alla/data";
-import { Badge, Card, CardContent } from "@eq-alla/ui";
+import { type SpellEffect } from "@eq-alla/data";
+import { Badge, Card, CardContent, entityLinkClass } from "@eq-alla/ui";
+import { Breadcrumbs } from "../../../components/breadcrumbs";
+import { loadSpellDetail } from "../../../components/detail-loaders";
+import { buildNotFoundMetadata, buildPageMetadata, joinDescriptionParts } from "../../../components/page-metadata";
 import { ItemIcon } from "../../../components/item-icon";
 import { SectionCard } from "../../../components/catalog-shell";
 import { SpellIcon } from "../../../components/spell-icon";
@@ -112,7 +115,7 @@ function renderSpellEffect(entry: SpellEffect) {
         href={entry.link.href}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-[#7ab8ff] underline decoration-[1.5px] underline-offset-2 hover:text-[#a7d2ff]"
+        className={entityLinkClass}
       >
         {entry.link.label}
       </Link>
@@ -121,9 +124,31 @@ function renderSpellEffect(entry: SpellEffect) {
   );
 }
 
+export async function generateMetadata({ params }: SpellDetailPageProps) {
+  const { id } = await params;
+  const spell = await loadSpellDetail(Number(id));
+
+  if (!spell) {
+    return buildNotFoundMetadata("Spell");
+  }
+
+  const classSummary = spell.classLevels.map((entry) => `${entry.className} ${entry.level}`).join(", ");
+
+  return buildPageMetadata({
+    title: spell.name,
+    description:
+      joinDescriptionParts([
+        spell.description,
+        classSummary || "NPC-only spell",
+        spell.resist ? `${spell.resist} resist` : null
+      ]) || `Effects, components, and casting details for ${spell.name}.`,
+    path: `/spells/${spell.id}`
+  });
+}
+
 export default async function SpellDetailPage({ params }: SpellDetailPageProps) {
   const { id } = await params;
-  const spell = await getSpellDetail(Number(id));
+  const spell = await loadSpellDetail(Number(id));
 
   if (!spell) notFound();
 
@@ -133,6 +158,7 @@ export default async function SpellDetailPage({ params }: SpellDetailPageProps) 
 
   return (
     <>
+      <Breadcrumbs entries={[{ label: "Spells", href: "/spells" }, { label: spell.name }]} />
       <Card className="overflow-hidden border-white/10 bg-transparent">
         <CardContent className="eq-hero-surface relative overflow-hidden border border-white/10">
           <div className="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-center">

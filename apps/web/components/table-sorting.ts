@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { readSearchParam, useSyncedSearchParam } from "./url-list-state";
 
 export type TableSortDirection = "ascending" | "descending";
 
@@ -21,7 +22,36 @@ export type TableSortControl = {
 type UseTableSortOptions<Row> = {
   groupBy?: (row: Row) => number | string | null | undefined;
   onSortChange?: () => void;
+  /**
+   * Search param to mirror the active sort into, e.g. "sort". Values look like
+   * `sort=item` (ascending) or `sort=-item` (descending), keyed on the column
+   * label rather than its index so the link survives column reordering.
+   */
+  urlParam?: string;
 };
+
+const sortParamName = "sort";
+
+export function toSortSlug(label: string) {
+  return label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function readSortStateFromUrl<Row>(paramName: string, columns: readonly TableSortColumn<Row>[]) {
+  const raw = readSearchParam(paramName);
+
+  if (!raw) {
+    return null;
+  }
+
+  const direction: TableSortDirection = raw.startsWith("-") ? "descending" : "ascending";
+  const slug = raw.replace(/^-/, "");
+  const columnIndex = columns.findIndex((column) => Boolean(column.getSortValue) && toSortSlug(column.label) === slug);
+
+  return columnIndex === -1 ? null : { columnIndex, direction };
+}
 
 const tableSortCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 
@@ -71,13 +101,21 @@ function stableSortRows<Row>(
 export function useTableSort<Row>(
   rows: Row[],
   columns: readonly TableSortColumn<Row>[],
-  { groupBy, onSortChange }: UseTableSortOptions<Row> = {}
+  { groupBy, onSortChange, urlParam }: UseTableSortOptions<Row> = {}
 ) {
-  const [sortState, setSortState] = useState<{ columnIndex: number | null; direction: TableSortDirection }>({
-    columnIndex: null,
-    direction: "ascending"
-  });
+  const [sortState, setSortState] = useState<{ columnIndex: number | null; direction: TableSortDirection }>(
+    () => (urlParam ? readSortStateFromUrl(urlParam, columns) : null) ?? { columnIndex: null, direction: "ascending" }
+  );
   const previousColumnsRef = useRef(columns);
+
+  const activeSortSlug =
+    sortState.columnIndex === null ? null : toSortSlug(columns[sortState.columnIndex]?.label ?? "") || null;
+
+  // Opt-in only: tables without a urlParam must not touch the shared "sort" key.
+  useSyncedSearchParam(
+    urlParam ?? null,
+    activeSortSlug ? `${sortState.direction === "descending" ? "-" : ""}${activeSortSlug}` : null
+  );
 
   useEffect(() => {
     if (previousColumnsRef.current === columns) {

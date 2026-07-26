@@ -3,10 +3,18 @@ import { getCraftedSpellCatalog } from "@eq-alla/data";
 import { Button } from "@eq-alla/ui";
 import { PageHero } from "../../components/catalog-shell";
 import { CraftedSpellsViewer } from "./crafted-spells-viewer";
+import { buildPageMetadata } from "../../components/page-metadata";
 
 type CraftedSpellsPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
+
+export const metadata = buildPageMetadata({
+  title: "Crafted Spells",
+  description:
+    "Browse Victoria's spell and tome combines by class, level band, and catalyst type, parsed from the live quest script.",
+  path: "/crafted-spells"
+});
 
 export default async function CraftedSpellsPage({ searchParams }: CraftedSpellsPageProps) {
   const params = await searchParams;

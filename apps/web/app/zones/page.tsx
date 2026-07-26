@@ -1,6 +1,7 @@
 import { listZoneEras, resolveZoneEraLabel } from "@eq-alla/data";
 import { PageHero } from "../../components/catalog-shell";
 import { ZoneSearchClient } from "./zone-search-client";
+import { buildPageMetadata } from "../../components/page-metadata";
 
 const zoneSearchEraOptions = [
   "Classic",
@@ -11,6 +12,13 @@ const zoneSearchEraOptions = [
 type ZonesPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
+
+export const metadata = buildPageMetadata({
+  title: "Zones",
+  description:
+    "Browse EverQuest zones by name, era, or level range, with bestiary listings, named spawns, item drops, and crafting stations.",
+  path: "/zones"
+});
 
 export default async function ZonesPage({ searchParams }: ZonesPageProps) {
   const params = await searchParams;

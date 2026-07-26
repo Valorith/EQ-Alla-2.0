@@ -1,6 +1,9 @@
 @import "tailwindcss";
 
 :root {
+  /* Lets native controls (select popups, scrollbars, autofill) theme themselves
+     instead of rendering light chrome against the dark surfaces. */
+  color-scheme: dark;
   --font-display:
     "Avenir Next",
     "Segoe UI",
@@ -585,32 +588,36 @@ body.eq-home-page.eq-home-search-focused::before {
   background-color: rgba(255, 255, 255, 0.45);
 }
 
+/* Kept close to the OS default width and desaturated toward --border-strong so
+   the scrollbar stops being the highest-contrast element on the page. */
 .eq-scroll-pane {
   scrollbar-gutter: stable;
-  scrollbar-width: auto;
-  scrollbar-color: rgba(240, 195, 106, 0.92) rgba(255, 255, 255, 0.12);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(201, 167, 114, 0.5) rgba(255, 255, 255, 0.06);
 }
 
 .eq-scroll-pane::-webkit-scrollbar {
-  width: 24px;
-  height: 24px;
+  width: 12px;
+  height: 12px;
 }
 
 .eq-scroll-pane::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
   border-radius: 9999px;
 }
 
 .eq-scroll-pane::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(249, 214, 140, 0.98), rgba(213, 165, 90, 0.98));
+  background: rgba(201, 167, 114, 0.42);
   border-radius: 9999px;
-  border: 3px solid rgba(13, 16, 22, 0.55);
+  border: 3px solid transparent;
   background-clip: padding-box;
-  min-height: 56px;
+  min-height: 48px;
+  transition: background-color 160ms ease;
 }
 
 .eq-scroll-pane::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(255, 229, 176, 1), rgba(230, 182, 102, 1));
+  background: rgba(215, 164, 95, 0.72);
+  background-clip: padding-box;
 }
 
 .eq-zones-level-scroll {

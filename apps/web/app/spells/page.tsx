@@ -1,10 +1,18 @@
 import { spellSearchLevelCap } from "@eq-alla/data";
 import { PageHero } from "../../components/catalog-shell";
 import { SpellSearchClient } from "./spell-search-client";
+import { buildPageMetadata } from "../../components/page-metadata";
 
 type SpellsPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
+
+export const metadata = buildPageMetadata({
+  title: "Spell Search",
+  description:
+    "Search EverQuest spells by class, level, and role. Every result links to full effects, components, casting times, and item sources.",
+  path: "/spells"
+});
 
 export default async function SpellsPage({ searchParams }: SpellsPageProps) {
   const params = await searchParams;

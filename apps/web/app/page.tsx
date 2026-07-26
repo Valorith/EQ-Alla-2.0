@@ -64,8 +64,14 @@ function HomePageBody({ query }: { query: string }) {
               placeholder="Search Items, NPCs, etc..."
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
-              className="h-16 rounded-[30px] border-white/18 bg-white/10 pl-14 pr-5 text-base text-white shadow-[0_22px_60px_rgba(7,10,15,0.2),inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-[24px] placeholder:text-white/52 focus:border-white/24 focus:bg-white/14 focus:shadow-[0_0_0_4px_rgba(255,255,255,0.08)]"
+              className="h-16 rounded-[30px] border-white/18 bg-white/10 pl-14 pr-16 text-base text-white shadow-[0_22px_60px_rgba(7,10,15,0.2),inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-[24px] placeholder:text-white/52 focus:border-white/24 focus:bg-white/14 focus:shadow-[0_0_0_4px_rgba(255,255,255,0.08)]"
             />
+            <kbd
+              aria-hidden="true"
+              className="pointer-events-none absolute right-5 top-1/2 hidden -translate-y-1/2 rounded-md border border-white/18 bg-white/10 px-2 py-1 font-[var(--font-body)] text-[11px] font-semibold text-white/55 sm:block"
+            >
+              /
+            </kbd>
           </div>
         </form>
       </section>

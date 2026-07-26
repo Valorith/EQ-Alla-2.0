@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { SearchHit } from "@eq-alla/data";
-import { Button, Input } from "@eq-alla/ui";
+import { Button, Input, rowLinkClass } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { PaginationControls, SearchPrompt, SectionCard, TableSkeleton } from "../../components/catalog-shell";
 import { SearchErrorNotice } from "../../components/search-error-notice";
 import { waitForLoadingIndicator } from "../../components/loading-state";
 import { ItemIcon } from "../../components/item-icon";
 import { SpellIcon } from "../../components/spell-icon";
+import { useUrlPageState } from "../../components/url-list-state";
 
 type SearchClientProps = {
   initialQuery: string;
@@ -185,7 +186,7 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
   const [submitCount, setSubmitCount] = useState(0);
   const [activeType, setActiveType] = useState<SearchHit["type"] | null>(null);
-  const [page, setPage] = useState(1);
+  const { page, setPage, resetPage, clampPage } = useUrlPageState(displayKey);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(buildSearchKey(initialQuery));
   const lastHandledSubmitRef = useRef(0);
@@ -207,7 +208,7 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
       setResolutionMeta(null);
       setIsFetching(false);
       setActiveType(null);
-      setPage(1);
+      resetPage();
       return;
     }
 
@@ -347,15 +348,15 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
     }
   }, [groupedHits, visibleType]);
 
+  // useUrlPageState already resets when the result set changes; this covers the
+  // type tabs, which page independently of the query.
   useEffect(() => {
-    setPage(1);
-  }, [displayKey, visibleType]);
+    resetPage();
+  }, [resetPage, visibleType]);
 
   useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
+    clampPage(totalPages);
+  }, [clampPage, totalPages]);
 
   return (
     <>
@@ -388,7 +389,7 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
         />
       ) : null}
 
-      <SectionCard title={resultTitle}>
+      <SectionCard title={resultTitle} announceTitle>
         <div className="relative">
           {showResults && hits.length > 0 ? (
             <div className={`space-y-4 ${isFetching ? "transition duration-200 opacity-40 blur-[2px]" : ""}`.trim()}>
@@ -415,7 +416,7 @@ export function SearchClient({ initialQuery }: SearchClientProps) {
                     <li key={hit.href} className="grid grid-cols-[2rem_minmax(0,1fr)] items-start gap-x-3 text-left text-sm text-[#e8dfcf]">
                       <div className="pt-0.5">{renderSearchHitIcon(hit)}</div>
                       <div className="min-w-0">
-                        <Link href={hit.href} className="block truncate font-medium hover:underline">
+                        <Link href={hit.href} className={`block truncate ${rowLinkClass}`}>
                           {hit.title}
                         </Link>
                         {hit.subtitle || hit.tags.length > 0 ? (

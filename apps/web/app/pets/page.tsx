@@ -1,9 +1,17 @@
 import { PageHero } from "../../components/catalog-shell";
 import { PetSearchClient } from "./pet-search-client";
+import { buildPageMetadata } from "../../components/page-metadata";
 
 type PetsPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
+
+export const metadata = buildPageMetadata({
+  title: "Pet Search",
+  description:
+    "Browse summoned pets by owner class, then drill into the summoning spell, level range, and pet stats.",
+  path: "/pets"
+});
 
 export default async function PetsPage({ searchParams }: PetsPageProps) {
   const params = await searchParams;

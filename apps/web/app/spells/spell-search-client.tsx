@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { SpellSummary } from "@eq-alla/data";
-import { Button, Input } from "@eq-alla/ui";
+import { Button, Input, rowLinkClass } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTableHeaderRow, TableSkeleton } from "../../components/catalog-shell";
 import { SearchErrorNotice } from "../../components/search-error-notice";
@@ -15,6 +15,7 @@ import {
   type TableSortColumn,
   type TableSortControl
 } from "../../components/table-sorting";
+import { useUrlPageState } from "../../components/url-list-state";
 
 type LevelMode = "exact" | "min" | "max";
 
@@ -215,7 +216,7 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
   const [displayKey, setDisplayKey] = useState("");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
   const [submitCount, setSubmitCount] = useState(0);
-  const [page, setPage] = useState(1);
+  const { page, setPage, resetPage, clampPage } = useUrlPageState(displayKey);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(buildSearchParams(initialFilters).toString());
   const lastHandledSubmitRef = useRef(0);
@@ -241,7 +242,7 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
       setDisplayKey("");
       setIsFetching(false);
       setResolutionMeta(null);
-      setPage(1);
+      resetPage();
       return;
     }
 
@@ -250,7 +251,7 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
     setDisplayKey("");
     setIsFetching(false);
     setResolutionMeta(null);
-    setPage(1);
+    resetPage();
     setSubmitCount((current) => current + 1);
   }, [initialClassName, initialLevel, initialLevelMode, initialQuery]);
 
@@ -283,7 +284,7 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
     setDisplayKey("");
     setIsFetching(false);
     setResolutionMeta(null);
-    setPage(1);
+    resetPage();
     currentUrlKeyRef.current = "";
     router.replace(pathname, { scroll: false });
   };
@@ -309,7 +310,7 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
       setDisplayKey("");
       setIsFetching(false);
       setResolutionMeta(null);
-      setPage(1);
+      resetPage();
       return;
     }
 
@@ -326,7 +327,7 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
         setError(null);
         setIsFetching(false);
         setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "cache" });
-        setPage(1);
+        resetPage();
       })();
       return;
     }
@@ -345,7 +346,7 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
         setDisplayKey(nextKey);
         setCachedSpells(nextKey, nextResults);
         setResolutionMeta({ key: nextKey, durationMs: performance.now() - startedAt, source: "network" });
-        setPage(1);
+        resetPage();
       } catch (searchError) {
         if (controller.signal.aborted) return;
         console.error(searchError);
@@ -364,6 +365,7 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
   const appliedClassName = displayKey ? new URLSearchParams(displayKey).get("class") ?? "" : "";
   const displayResults = appliedClassName ? results.filter((spell) => spell.level > 0) : results;
   const { sortedRows: sortedDisplayResults, sort: tableSort } = useTableSort(displayResults, spellTableColumns, {
+    urlParam: "sort",
     groupBy: appliedClassName ? groupSpellByLevel : undefined,
     onSortChange: () => setPage(1)
   });
@@ -380,10 +382,8 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
       : null;
 
   useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
+    clampPage(totalPages);
+  }, [clampPage, totalPages]);
 
   return (
     <>
@@ -447,7 +447,7 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
         />
       ) : null}
 
-      <SectionCard title={resultTitle}>
+      <SectionCard title={resultTitle} announceTitle>
         <div className="relative">
           {showResults && results.length > 0 ? (
             <div className={isFetching ? "transition duration-200 opacity-40 blur-[2px]" : undefined}>
@@ -476,7 +476,7 @@ export function SpellSearchClient({ initialQuery, initialClassName, initialLevel
                             <td className="px-4 py-3.5 align-top text-[#e8dfcf]">
                               <div className="flex items-start gap-4">
                                 <SpellIcon icon={entry.icon} name={entry.name} size="md" />
-                                <Link href={`/spells/${entry.id}`} className="font-medium hover:underline">
+                                <Link href={`/spells/${entry.id}`} className={rowLinkClass}>
                                   {entry.name}
                                 </Link>
                               </div>

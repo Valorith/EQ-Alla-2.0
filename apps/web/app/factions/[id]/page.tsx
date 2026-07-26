@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
-import { getFactionDetail } from "@eq-alla/data";
 import { TrendingDown, TrendingUp } from "lucide-react";
+import { Breadcrumbs } from "../../../components/breadcrumbs";
+import { loadFactionDetail } from "../../../components/detail-loaders";
+import { buildNotFoundMetadata, buildPageMetadata, joinDescriptionParts } from "../../../components/page-metadata";
 import { PageHero, SectionCard } from "../../../components/catalog-shell";
 import { SearchablePaginatedLinkList } from "../../../components/searchable-paginated-link-list";
 
@@ -8,14 +10,32 @@ type FactionDetailPageProps = {
   params: Promise<{ id: string }>;
 };
 
+export async function generateMetadata({ params }: FactionDetailPageProps) {
+  const { id } = await params;
+  const faction = await loadFactionDetail(Number(id));
+
+  if (!faction) {
+    return buildNotFoundMetadata("Faction");
+  }
+
+  return buildPageMetadata({
+    title: faction.name,
+    description:
+      joinDescriptionParts([faction.overview, faction.category, faction.alignedZone]) ||
+      `NPCs that raise or lower standing with ${faction.name}.`,
+    path: `/factions/${faction.id}`
+  });
+}
+
 export default async function FactionDetailPage({ params }: FactionDetailPageProps) {
   const { id } = await params;
-  const faction = await getFactionDetail(Number(id));
+  const faction = await loadFactionDetail(Number(id));
 
   if (!faction) notFound();
 
   return (
     <>
+      <Breadcrumbs entries={[{ label: "Factions", href: "/factions" }, { label: faction.name }]} />
       <PageHero
         eyebrow="Faction Detail"
         title={faction.name}

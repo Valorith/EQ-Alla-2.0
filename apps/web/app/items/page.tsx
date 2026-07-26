@@ -1,9 +1,17 @@
 import { PageHero } from "../../components/catalog-shell";
 import { ItemSearchClient } from "./item-search-client";
+import { buildPageMetadata } from "../../components/page-metadata";
 
 type ItemsPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
+
+export const metadata = buildPageMetadata({
+  title: "Item Search",
+  description:
+    "Search EverQuest items by name, class, slot, type, and level. Every result links to full stats, drop sources, merchants, and recipes.",
+  path: "/items"
+});
 
 export default async function ItemsPage({ searchParams }: ItemsPageProps) {
   const params = await searchParams;
@@ -19,7 +27,7 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
       <PageHero
         eyebrow="Items"
         title="Item Search"
-        description="Dense item browsing with the clean route model, modern filters, and room to grow into live EQEmu queries."
+        description="Filter by name, class, slot, type, and level. Every result opens to full stats, drop sources, merchants, and recipes."
       />
       <ItemSearchClient
         frameClassName={frameClassName}

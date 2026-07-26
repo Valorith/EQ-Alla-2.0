@@ -2,14 +2,24 @@ import Link from "next/link";
 import { listZoneEraBrowseDefinitions } from "@eq-alla/data";
 import { ArrowRight } from "lucide-react";
 import { PageHero, SectionCard } from "../../../components/catalog-shell";
+import { buildPageMetadata } from "../../../components/page-metadata";
+import { Breadcrumbs } from "../../../components/breadcrumbs";
 
 export const dynamic = "force-dynamic";
+
+export const metadata = buildPageMetadata({
+  title: "Zones by Expansion",
+  description:
+    "Browse EverQuest zones grouped by the expansion recorded on each zone.",
+  path: "/zones/by-era"
+});
 
 export default async function ZonesByEraPage() {
   const eras = await listZoneEraBrowseDefinitions();
 
   return (
     <>
+      <Breadcrumbs entries={[{ label: "Zones", href: "/zones" }, { label: "By Expansion" }]} />
       <PageHero eyebrow="Zones" title="Zones by Expansion" description="Browse zones grouped by the expansion value stored on each database zone record." />
       <SectionCard title="Browse expansions">
         <div className="grid gap-3 lg:grid-cols-2">

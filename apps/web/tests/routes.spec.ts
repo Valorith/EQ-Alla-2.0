@@ -23,13 +23,15 @@ test("home page search stays clear of the desktop sidebar at narrow desktop widt
 test("legacy route redirects to clean routes", async ({ page }) => {
   await page.goto("/?a=item&id=1001");
   await expect(page).toHaveURL(/\/items\/1001$/);
-  await expect(page.getByRole("link", { name: /Items/i })).toBeVisible();
+  // Scoped to the breadcrumb: the sidebar also has an "Items" link.
+  await expect(page.getByLabel("Breadcrumb").getByRole("link", { name: "Items" })).toBeVisible();
 });
 
 test("index.php legacy routes redirect to clean routes", async ({ page }) => {
   await page.goto("/index.php?a=item&id=1001");
   await expect(page).toHaveURL(/\/items\/1001$/);
-  await expect(page.getByRole("link", { name: /Items/i })).toBeVisible();
+  // Scoped to the breadcrumb: the sidebar also has an "Items" link.
+  await expect(page.getByLabel("Breadcrumb").getByRole("link", { name: "Items" })).toBeVisible();
 });
 
 test("missing routes show the branded archive not-found page", async ({ page }) => {

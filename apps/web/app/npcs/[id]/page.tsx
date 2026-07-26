@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-import { getNpcDetail } from "@eq-alla/data";
+import { Breadcrumbs } from "../../../components/breadcrumbs";
+import { loadNpcDetail } from "../../../components/detail-loaders";
+import { buildNotFoundMetadata, buildPageMetadata, joinDescriptionParts } from "../../../components/page-metadata";
 import { PageHero, SectionCard } from "../../../components/catalog-shell";
 import { NpcDropsSection } from "../../../components/npc-drops-section";
 import { NpcModelPreview } from "../../../components/npc-model-preview";
 import { NpcSellList } from "../../../components/npc-sell-list";
 import { NpcSpellList } from "../../../components/npc-spell-list";
+import { entityLinkClass } from "@eq-alla/ui";
 
 type NpcDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -45,9 +48,29 @@ function BulletList({
   );
 }
 
+export async function generateMetadata({ params }: NpcDetailPageProps) {
+  const { id } = await params;
+  const npc = await loadNpcDetail(Number(id));
+
+  if (!npc) {
+    return buildNotFoundMetadata("NPC");
+  }
+
+  return buildPageMetadata({
+    title: npc.name,
+    description: joinDescriptionParts([
+      `Level ${npc.level} ${npc.race} ${npc.klass}`,
+      npc.zone ? `found in ${npc.zone}` : null,
+      npc.faction ? `faction ${npc.faction}` : null,
+      "Loot table, spells, and merchant inventory."
+    ]),
+    path: `/npcs/${npc.id}`
+  });
+}
+
 export default async function NpcDetailPage({ params }: NpcDetailPageProps) {
   const { id } = await params;
-  const npc = await getNpcDetail(Number(id));
+  const npc = await loadNpcDetail(Number(id));
   const useAiNpcModels = process.env.NPC_MODEL_ASSET_SET === "ai";
   const npcModelFallbackAssetBaseUrls = useAiNpcModels
     ? ["/assets/npc-models", "https://cdn.jsdelivr.net/gh/EQEmuTools/eq-asset-preview@master/assets/npc_models"]
@@ -57,6 +80,7 @@ export default async function NpcDetailPage({ params }: NpcDetailPageProps) {
 
   return (
     <>
+      <Breadcrumbs entries={[{ label: "NPCs", href: "/npcs" }, { label: npc.name }]} />
       <PageHero
         eyebrow="NPC Detail"
         title={npc.name}
@@ -78,7 +102,7 @@ export default async function NpcDetailPage({ params }: NpcDetailPageProps) {
                   {
                     label: "Main faction",
                     value: npc.mainFaction ? (
-                      <Link href={npc.mainFaction.href} className="text-[#7ab8ff] underline decoration-[1.5px] underline-offset-2 hover:text-[#a7d2ff]">
+                      <Link href={npc.mainFaction.href} className={entityLinkClass}>
                         {npc.mainFaction.name}
                       </Link>
                     ) : (
@@ -125,7 +149,7 @@ export default async function NpcDetailPage({ params }: NpcDetailPageProps) {
                 <Link
                   key={entry.shortName}
                   href={entry.href}
-                  className="text-[#7ab8ff] underline decoration-[1.5px] underline-offset-2 hover:text-[#a7d2ff]"
+                  className={entityLinkClass}
                 >
                   {entry.longName}
                 </Link>
@@ -141,7 +165,7 @@ export default async function NpcDetailPage({ params }: NpcDetailPageProps) {
             <BulletList
               items={npc.factionHits.lowers.map((entry) => (
                 <span key={entry.id}>
-                  <Link href={entry.href} className="text-[#7ab8ff] underline decoration-[1.5px] underline-offset-2 hover:text-[#a7d2ff]">
+                  <Link href={entry.href} className={entityLinkClass}>
                     {entry.name}
                   </Link>{" "}
                   ({entry.value})
@@ -158,7 +182,7 @@ export default async function NpcDetailPage({ params }: NpcDetailPageProps) {
             <BulletList
               items={npc.factionHits.raises.map((entry) => (
                 <span key={entry.id}>
-                  <Link href={entry.href} className="text-[#7ab8ff] underline decoration-[1.5px] underline-offset-2 hover:text-[#a7d2ff]">
+                  <Link href={entry.href} className={entityLinkClass}>
                     {entry.name}
                   </Link>{" "}
                   ({entry.value})

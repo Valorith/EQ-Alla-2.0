@@ -6,13 +6,14 @@ import { usePathname, useRouter } from "next/navigation";
 import type { ItemSummary } from "@eq-alla/data";
 import { itemClassFilterOptions, itemSlotFilterOptions } from "@eq-alla/data/item-search-filters";
 import { itemTypeFilterOptions } from "@eq-alla/data/item-types";
-import { Button, Input } from "@eq-alla/ui";
+import { Button, Input, rowLinkClass } from "@eq-alla/ui";
 import { PaginationControls, SearchPrompt, SectionCard, SimpleTable, TableSkeleton } from "../../components/catalog-shell";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { SearchErrorNotice } from "../../components/search-error-notice";
 import { waitForLoadingIndicator } from "../../components/loading-state";
 import { ItemIcon } from "../../components/item-icon";
 import { useTableSort, type TableSortColumn } from "../../components/table-sorting";
+import { useUrlPageState } from "../../components/url-list-state";
 
 type ItemSearchFilters = {
   q: string;
@@ -359,7 +360,7 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
   const [displayKey, setDisplayKey] = useState(initialResultsResolved ? buildSearchParams(initialFilters).toString() : "");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
   const [submitCount, setSubmitCount] = useState(0);
-  const [page, setPage] = useState(1);
+  const { page, setPage, resetPage, clampPage } = useUrlPageState(displayKey);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(buildSearchParams(initialFilters).toString());
   const lastHandledSubmitRef = useRef(0);
@@ -391,7 +392,7 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
       setDisplayKey("");
       setIsFetching(false);
       setResolutionMeta(null);
-      setPage(1);
+      resetPage();
       return;
     }
 
@@ -405,7 +406,7 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
         durationMs: 0,
         source: "cache"
       });
-      setPage(1);
+      resetPage();
       return;
     }
 
@@ -414,7 +415,7 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
     setDisplayKey("");
     setIsFetching(false);
     setResolutionMeta(null);
-    setPage(1);
+    resetPage();
     setSubmitCount((current) => current + 1);
   }, [initialFilters, initialItems, initialResultsResolved]);
 
@@ -454,7 +455,7 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
     setDisplayKey("");
     setIsFetching(false);
     setResolutionMeta(null);
-    setPage(1);
+    resetPage();
     currentUrlKeyRef.current = "";
     router.replace(pathname, { scroll: false });
   };
@@ -484,7 +485,7 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
       setDisplayKey("");
       setIsFetching(false);
       setResolutionMeta(null);
-      setPage(1);
+      resetPage();
       return;
     }
 
@@ -570,6 +571,7 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
   }, [filters, pathname, submitCount]);
 
   const { sortedRows: sortedItems, sort: tableSort } = useTableSort(items, itemTableColumns, {
+    urlParam: "sort",
     onSortChange: () => setPage(1)
   });
   const totalPages = Math.max(1, Math.ceil(sortedItems.length / itemResultsPerPage));
@@ -585,14 +587,8 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
       : null;
 
   useEffect(() => {
-    setPage(1);
-  }, [displayKey]);
-
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
+    clampPage(totalPages);
+  }, [clampPage, totalPages]);
 
   return (
     <>
@@ -673,12 +669,13 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
         />
       ) : null}
 
-      <SectionCard title={resultTitle} className={`relative z-0 ${frameClassName}`.trim()}>
+      <SectionCard title={resultTitle} announceTitle className={`relative z-0 ${frameClassName}`.trim()}>
         <div className="relative">
           {showResults && items.length > 0 ? (
             <div className={isFetching ? "transition duration-200 opacity-40 blur-[2px]" : undefined}>
               <SimpleTable
                 columns={itemTableColumnLabels}
+                stickyColumnIndex={1}
                 sort={tableSort}
                 rowKeys={pagedItems.map((item) => item.id)}
                 rows={pagedItems.map((item) => [
@@ -686,7 +683,7 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
                   <Link
                     key={item.id}
                     href={`/items/${item.id}`}
-                    className="font-medium text-[#f1e8d6] underline decoration-[#c9a772]/0 underline-offset-2 transition hover:text-[#fff5e2] hover:decoration-[#c9a772]/70"
+                    className={rowLinkClass}
                   >
                     {item.name}
                   </Link>,
@@ -713,10 +710,17 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
             ) : draftKey !== displayKey ? (
               <SearchPrompt message="Press Search to apply these filters." />
             ) : (
-              <SearchPrompt message="No items matched this search." />
+              <SearchPrompt
+                message="No items matched this search."
+                hint="Try a shorter name, widen the level range, or drop a class or slot filter."
+                action={{ label: "Clear filters", onClick: clearFilters }}
+              />
             )
           ) : (
-            <SearchPrompt message="Enter an item name or ID to load results." />
+            <SearchPrompt
+              message="Enter an item name or ID to load results."
+              hint="Partial names work - try &quot;mithril&quot;, &quot;cloak of&quot;, or an item ID."
+            />
           )}
 
           {isFetching && items.length > 0 ? (

@@ -1,13 +1,36 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight, FlaskConical, Package2, RotateCcw, ShieldCheck, Wrench } from "lucide-react";
-import { getRecipeDetail } from "@eq-alla/data";
+import { Breadcrumbs } from "../../../components/breadcrumbs";
+import { loadRecipeDetail } from "../../../components/detail-loaders";
+import { buildNotFoundMetadata, buildPageMetadata, joinDescriptionParts } from "../../../components/page-metadata";
 import { ItemIcon } from "../../../components/item-icon";
 import { RecipeStationAccess } from "../../../components/recipe-station-access";
 
 type RecipeDetailPageProps = {
   params: Promise<{ id: string }>;
 };
+
+export async function generateMetadata({ params }: RecipeDetailPageProps) {
+  const { id } = await params;
+  const recipe = await loadRecipeDetail(Number(id));
+
+  if (!recipe) {
+    return buildNotFoundMetadata("Recipe");
+  }
+
+  return buildPageMetadata({
+    title: recipe.name,
+    description:
+      joinDescriptionParts([
+        recipe.tradeskill,
+        recipe.trivial ? `trivial ${recipe.trivial}` : null,
+        recipe.container ? `made in ${recipe.container}` : null,
+        recipe.notes
+      ]) || `Ingredients, results, and stations for ${recipe.name}.`,
+    path: `/recipes/${recipe.id}`
+  });
+}
 
 function MetaBand({
   items
@@ -103,7 +126,7 @@ function UndiscoveredBadge() {
 
 export default async function RecipeDetailPage({ params }: RecipeDetailPageProps) {
   const { id } = await params;
-  const recipe = await getRecipeDetail(Number(id));
+  const recipe = await loadRecipeDetail(Number(id));
 
   if (!recipe) notFound();
 
@@ -113,6 +136,7 @@ export default async function RecipeDetailPage({ params }: RecipeDetailPageProps
 
   return (
     <div className="eq-recipe-scope space-y-6">
+      <Breadcrumbs entries={[{ label: "Recipes", href: "/recipes" }, { label: recipe.name }]} />
       <section className="relative overflow-hidden rounded-[32px] border border-white/12 bg-[linear-gradient(180deg,rgba(26,21,18,0.9),rgba(10,13,18,0.95))] shadow-[0_28px_80px_rgba(0,0,0,0.34)]">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(220,180,110,0.14),transparent_34%),radial-gradient(circle_at_80%_20%,rgba(91,124,171,0.14),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent_28%)]" />
 

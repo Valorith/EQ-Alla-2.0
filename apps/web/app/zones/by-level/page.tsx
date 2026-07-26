@@ -1,14 +1,24 @@
 import { getZonesByLevel, zoneByLevelCap } from "@eq-alla/data";
 import { PageHero, SectionCard } from "../../../components/catalog-shell";
 import { ZonesByLevelMatrix } from "./zones-by-level-matrix";
+import { buildPageMetadata } from "../../../components/page-metadata";
+import { Breadcrumbs } from "../../../components/breadcrumbs";
 
 export const dynamic = "force-dynamic";
+
+export const metadata = buildPageMetadata({
+  title: "Zones by Level",
+  description:
+    "Approximate hunting bands for every zone, binned from live NPC levels into 5-level ranges.",
+  path: "/zones/by-level"
+});
 
 export default async function ZonesByLevelPage() {
   const zones = await getZonesByLevel();
 
   return (
     <>
+      <Breadcrumbs entries={[{ label: "Zones", href: "/zones" }, { label: "By Level" }]} />
       <PageHero
         eyebrow="Zones"
         title="Zones by Level"

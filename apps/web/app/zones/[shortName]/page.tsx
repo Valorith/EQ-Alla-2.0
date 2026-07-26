@@ -22,7 +22,9 @@ import {
   Shirt,
   Wrench
 } from "lucide-react";
-import { getZoneDetail } from "@eq-alla/data";
+import { Breadcrumbs } from "../../../components/breadcrumbs";
+import { loadZoneDetail } from "../../../components/detail-loaders";
+import { buildNotFoundMetadata, buildPageMetadata, joinDescriptionParts } from "../../../components/page-metadata";
 import { ZoneResourceLedger } from "../../../components/zone-resource-ledger";
 
 type ZoneDetailPageProps = {
@@ -129,9 +131,30 @@ function ResourceLink({
   );
 }
 
+export async function generateMetadata({ params }: ZoneDetailPageProps) {
+  const { shortName } = await params;
+  const zone = await loadZoneDetail(shortName);
+
+  if (!zone) {
+    return buildNotFoundMetadata("Zone");
+  }
+
+  return buildPageMetadata({
+    title: zone.longName,
+    description: joinDescriptionParts([
+      zone.era,
+      zone.levelRange ? `levels ${zone.levelRange}` : null,
+      zone.bestiary.length ? `${zone.bestiary.length} creature types` : null,
+      zone.namedNpcs.length ? `${zone.namedNpcs.length} named spawns` : null,
+      "Bestiary, item drops, forage, and crafting stations."
+    ]),
+    path: `/zones/${zone.shortName}`
+  });
+}
+
 export default async function ZoneDetailPage({ params, searchParams }: ZoneDetailPageProps) {
   const { shortName } = await params;
-  const zone = await getZoneDetail(shortName);
+  const zone = await loadZoneDetail(shortName);
   const query = await searchParams;
 
   if (!zone) notFound();
@@ -154,6 +177,7 @@ export default async function ZoneDetailPage({ params, searchParams }: ZoneDetai
 
   return (
     <div className="space-y-5 sm:space-y-6">
+      <Breadcrumbs entries={[{ label: "Zones", href: "/zones" }, { label: zone.longName }]} />
       <section className="relative overflow-hidden rounded-[34px] border border-white/12 bg-[linear-gradient(180deg,rgba(25,21,18,0.94),rgba(10,13,18,0.98))] shadow-[0_30px_90px_rgba(0,0,0,0.34)]">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(220,180,110,0.16),transparent_34%),radial-gradient(circle_at_82%_18%,rgba(88,119,168,0.16),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent_30%)]" />
 

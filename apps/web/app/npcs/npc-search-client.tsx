@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { NpcSummary } from "@eq-alla/data";
-import { Input, Button } from "@eq-alla/ui";
+import { Button, Input, rowLinkClass } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable, TableSkeleton } from "../../components/catalog-shell";
 import { SearchErrorNotice } from "../../components/search-error-notice";
 import { waitForLoadingIndicator } from "../../components/loading-state";
 import { getLeadingSortNumber, useTableSort, type TableSortColumn } from "../../components/table-sorting";
+import { useUrlPageState } from "../../components/url-list-state";
 
 type NpcSearchClientProps = {
   mode: "basic" | "advanced";
@@ -174,7 +175,7 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
   const [displayKey, setDisplayKey] = useState("");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
   const [submitCount, setSubmitCount] = useState(0);
-  const [page, setPage] = useState(1);
+  const { page, setPage, resetPage, clampPage } = useUrlPageState(displayKey);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(buildSearchParams(initialFilters, mode).toString());
   const lastHandledSubmitRef = useRef(0);
@@ -194,7 +195,7 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
       setDisplayKey("");
       setIsFetching(false);
       setResolutionMeta(null);
-      setPage(1);
+      resetPage();
       return;
     }
 
@@ -203,7 +204,7 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
     setDisplayKey("");
     setIsFetching(false);
     setResolutionMeta(null);
-    setPage(1);
+    resetPage();
     setSubmitCount((current) => current + 1);
   }, [initialFilters, mode]);
 
@@ -242,7 +243,7 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
     setDisplayKey("");
     setIsFetching(false);
     setResolutionMeta(null);
-    setPage(1);
+    resetPage();
     currentUrlKeyRef.current = "";
     router.replace(pathname, { scroll: false });
   };
@@ -267,7 +268,7 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
       setDisplayKey("");
       setIsFetching(false);
       setResolutionMeta(null);
-      setPage(1);
+      resetPage();
       return;
     }
 
@@ -323,6 +324,7 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
         : npcBasicTableColumns;
   const npcTableColumnLabels = npcTableColumns.map((column) => column.label);
   const { sortedRows: sortedResults, sort: tableSort } = useTableSort(results, npcTableColumns, {
+    urlParam: "sort",
     onSortChange: () => setPage(1)
   });
   const totalPages = Math.max(1, Math.ceil(sortedResults.length / npcResultsPerPage));
@@ -338,14 +340,8 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
       : null;
 
   useEffect(() => {
-    setPage(1);
-  }, [displayKey]);
-
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
+    clampPage(totalPages);
+  }, [clampPage, totalPages]);
 
   return (
     <>
@@ -400,7 +396,7 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
         />
       ) : null}
 
-      <SectionCard title={resultTitle}>
+      <SectionCard title={resultTitle} announceTitle>
         <div className="relative">
           {showResults && results.length > 0 ? (
             <div className={isFetching ? "transition duration-200 opacity-40 blur-[2px]" : undefined}>
@@ -411,13 +407,13 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
                 rows={pagedResults.map((npc) =>
                   mode === "advanced"
                     ? [
-                        <Link key={npc.id} href={`/npcs/${npc.id}`} className="font-medium hover:underline">
+                        <Link key={npc.id} href={`/npcs/${npc.id}`} className={rowLinkClass}>
                           {npc.name}
                         </Link>,
                         ...(filters.showLevel ? [npc.level] : [])
                       ]
                     : [
-                        <Link key={npc.id} href={`/npcs/${npc.id}`} className="font-medium hover:underline">
+                        <Link key={npc.id} href={`/npcs/${npc.id}`} className={rowLinkClass}>
                           {npc.name}
                         </Link>,
                         npc.id
@@ -438,7 +434,11 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
             ) : draftKey !== displayKey ? (
               <SearchPrompt message="Press Search to apply these filters." />
             ) : (
-              <SearchPrompt message="No NPCs matched this search." />
+              <SearchPrompt
+                message="No NPCs matched this search."
+                hint="Try a partial name, or clear the zone filter to search everywhere."
+                action={{ label: "Clear filters", onClick: clearFilters }}
+              />
             )
           ) : (
             <SearchPrompt message="Enter an NPC name to load results." />

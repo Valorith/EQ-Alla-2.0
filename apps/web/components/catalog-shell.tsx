@@ -54,19 +54,32 @@ export function SectionCard({
   children,
   right,
   className = "",
-  allowOverflow = false
+  allowOverflow = false,
+  announceTitle = false
 }: {
   title: ReactNode;
   children: ReactNode;
   right?: ReactNode;
   className?: string;
   allowOverflow?: boolean;
+  /**
+   * Announces title changes to screen readers. Set on result sections, where
+   * the heading carries the match count and is the only signal that a search
+   * resolved.
+   */
+  announceTitle?: boolean;
 }) {
   return (
     <Card className={`${allowOverflow ? "overflow-visible" : "overflow-hidden"} border-white/10 bg-black/22 ${className}`.trim()}>
       <CardContent className="space-y-5">
         <div className="flex flex-col gap-2 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
-          <h3 className="font-[var(--font-display)] text-[1.25rem] font-semibold tracking-[-0.03em] text-white">{title}</h3>
+          <h3
+            className="font-[var(--font-display)] text-[1.25rem] font-semibold tracking-[-0.03em] text-white"
+            aria-live={announceTitle ? "polite" : undefined}
+            aria-atomic={announceTitle ? true : undefined}
+          >
+            {title}
+          </h3>
           {right}
         </div>
         {children}
@@ -106,7 +119,9 @@ export function LinkList({
           className="group flex items-start justify-between gap-4 rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-4 py-4 transition duration-200 hover:border-[var(--accent)] hover:bg-white/6"
         >
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-[var(--foreground)]">{item.label}</p>
+            <p className="text-sm font-semibold text-[var(--foreground)] underline decoration-[var(--accent)]/0 underline-offset-2 transition group-hover:decoration-[var(--accent)]/70">
+              {item.label}
+            </p>
             {item.meta ? <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{item.meta}</p> : null}
           </div>
           <ArrowRight className="mt-0.5 size-4 shrink-0 text-[var(--muted)] transition group-hover:translate-x-0.5 group-hover:text-[var(--foreground)]" />
@@ -116,14 +131,38 @@ export function LinkList({
   );
 }
 
+/**
+ * Wide stat tables scroll sideways on a phone, which used to carry the row's
+ * name off-screen and leave a wall of unlabelled numbers. Pinning the identity
+ * column keeps that anchor in view.
+ *
+ * Exactly one column is pinned. Pinning the icon as well was tried and rejected:
+ * on a 393px phone the two together consumed 213px of a 299px scroller, leaving
+ * room for a single stat column. Pinning only the name lets the icon slide
+ * beneath it.
+ */
+export function stickyCellClass(columnIndex: number, stickyColumnIndex: number | null) {
+  if (stickyColumnIndex === null || columnIndex !== stickyColumnIndex) {
+    return "";
+  }
+
+  // Fixed width on mobile: table auto-layout otherwise squeezes the pinned
+  // column and long names spill over the scrolling ones. `break-words` handles
+  // the overspill without `anywhere`, which would shrink min-content width to a
+  // single character and collapse the column.
+  return "max-sm:sticky max-sm:left-0 max-sm:z-20 max-sm:w-[150px] max-sm:min-w-[150px] max-sm:max-w-[150px] max-sm:break-words max-sm:shadow-[1px_0_0_rgba(201,167,114,0.18)]";
+}
+
 export function SimpleTableHeaderRow({
   columns,
   sort,
-  className
+  className,
+  stickyColumnIndex = null
 }: {
   columns: readonly string[];
   sort?: TableSortControl;
   className?: string;
+  stickyColumnIndex?: number | null;
 }) {
   return (
     <tr className={className}>
@@ -131,13 +170,16 @@ export function SimpleTableHeaderRow({
         const isSortable = Boolean(sort?.sortableColumnIndexes.includes(columnIndex));
         const isActiveSort = isSortable && sort?.columnIndex === columnIndex;
         const nextDirection = isActiveSort && sort.direction === "ascending" ? "descending" : "ascending";
+        const sticky = stickyCellClass(columnIndex, stickyColumnIndex);
 
         return (
           <th
             key={column}
             scope="col"
             aria-sort={isSortable ? (isActiveSort ? sort.direction : "none") : undefined}
-            className={`${isSortable ? "p-0" : "px-4 py-3"} text-[11px] font-semibold uppercase tracking-[0.22em]`}
+            className={`${isSortable ? "p-0" : "px-4 py-3"} text-[11px] font-semibold uppercase tracking-[0.22em] ${
+              sticky ? `${sticky} max-sm:bg-[#2a241d]` : ""
+            }`.trim()}
           >
             {isSortable ? (
               <button
@@ -173,30 +215,44 @@ export function SimpleTable({
   columns,
   rows,
   sort,
-  rowKeys
+  rowKeys,
+  stickyColumnIndex = null
 }: {
   columns: readonly string[];
   rows: ReactNode[][];
   sort?: TableSortControl;
   rowKeys?: Array<string | number>;
+  /** Index of the identity column to pin while scrolling sideways on small screens. */
+  stickyColumnIndex?: number | null;
 }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-[#7b603b]/20 bg-[linear-gradient(180deg,rgba(35,30,27,0.86),rgba(18,20,24,0.84))] shadow-[0_18px_44px_rgba(0,0,0,0.24)] backdrop-blur-md">
       <table className="min-w-full border-collapse text-left text-sm">
         <thead className="bg-[linear-gradient(180deg,rgba(215,164,95,0.08),rgba(255,255,255,0.02))] text-[#ccb594]">
-          <SimpleTableHeaderRow columns={columns} sort={sort} />
+          <SimpleTableHeaderRow columns={columns} sort={sort} stickyColumnIndex={stickyColumnIndex} />
         </thead>
         <tbody>
           {rows.map((row, index) => (
             <tr
               key={rowKeys?.[index] ?? index}
-              className="border-t border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.018),rgba(255,255,255,0.008))] transition hover:bg-[linear-gradient(180deg,rgba(215,164,95,0.075),rgba(255,255,255,0.02))]"
+              className="group border-t border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.018),rgba(255,255,255,0.008))] transition hover:bg-[linear-gradient(180deg,rgba(215,164,95,0.075),rgba(255,255,255,0.02))]"
             >
-              {row.map((cell, cellIndex) => (
-                <td key={cellIndex} className="px-4 py-3.5 align-top text-[#e8dfcf]">
-                  {cell}
-                </td>
-              ))}
+              {row.map((cell, cellIndex) => {
+                const sticky = stickyCellClass(cellIndex, stickyColumnIndex);
+
+                return (
+                  <td
+                    key={cellIndex}
+                    className={`px-4 py-3.5 align-top text-[#e8dfcf] ${
+                      // Pinned cells need an opaque backdrop or the scrolling
+                      // columns show through them.
+                      sticky ? `${sticky} max-sm:bg-[#1f1c1a] max-sm:group-hover:bg-[#2b241b]` : ""
+                    }`.trim()}
+                  >
+                    {cell}
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>
@@ -384,13 +440,25 @@ export function CompactPaginationControls({
 }
 
 export function SearchPrompt({
-  message = "Enter a search term to load results."
+  message = "Enter a search term to load results.",
+  hint,
+  action
 }: {
   message?: string;
+  /** Short guidance on how to widen or fix the search. */
+  hint?: string;
+  /** Recovery action, so a dead-end result is not the end of the road. */
+  action?: { label: string; onClick: () => void };
 }) {
   return (
     <div className="rounded-2xl border border-dashed border-[#7b603b]/28 bg-[linear-gradient(180deg,rgba(39,33,28,0.78),rgba(20,22,27,0.74))] px-4 py-6 text-sm text-[#d7ccbb]">
-      {message}
+      <p>{message}</p>
+      {hint ? <p className="mt-1.5 text-[13px] leading-6 text-[#a2977f]">{hint}</p> : null}
+      {action ? (
+        <Button type="button" variant="outline" className="mt-4" onClick={action.onClick}>
+          {action.label}
+        </Button>
+      ) : null}
     </div>
   );
 }

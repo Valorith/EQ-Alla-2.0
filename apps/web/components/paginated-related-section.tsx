@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { CompactPaginationControls } from "./catalog-shell";
+import { entityLinkClass } from "@eq-alla/ui";
 
 type RelatedEntry = {
   href: string;
@@ -44,7 +45,7 @@ export function PaginatedRelatedSection({
               <li key={`${title}-${entry.href}`}>
                 <Link
                   href={entry.href}
-                  className="font-medium text-[#7ab8ff] underline decoration-[1.5px] underline-offset-2 transition hover:text-[#a7d2ff] hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7ab8ff]/35"
+                  className={entityLinkClass}
                 >
                   {entry.label}
                 </Link>

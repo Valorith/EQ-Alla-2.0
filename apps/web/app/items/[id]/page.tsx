@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Button } from "@eq-alla/ui";
+import { Button, entityLinkClass, headingLinkClass } from "@eq-alla/ui";
 import { Package2, Search } from "lucide-react";
-import { getItemAvailability, getItemDetail, getItemMarketData } from "@eq-alla/data";
+import { getItemMarketData } from "@eq-alla/data";
+import { Breadcrumbs } from "../../../components/breadcrumbs";
+import { loadItemAvailability, loadItemDetail } from "../../../components/detail-loaders";
+import { buildNotFoundMetadata, buildPageMetadata, joinDescriptionParts } from "../../../components/page-metadata";
 import { SectionCard } from "../../../components/catalog-shell";
 import { ItemDetailPreview } from "../../../components/item-detail-preview";
 import { ItemMarketCard } from "../../../components/item-market-card";
@@ -36,7 +39,7 @@ function RelatedSection({
                 {entry.href ? (
                   <Link
                     href={entry.href}
-                    className="font-medium text-[#7ab8ff] underline decoration-[1.5px] underline-offset-2 transition hover:text-[#a7d2ff] hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7ab8ff]/35"
+                    className={entityLinkClass}
                   >
                     {entry.label}
                   </Link>
@@ -109,7 +112,7 @@ function GroupedNpcSection({
               <div key={group.zone.href} className="space-y-2 border-b border-white/8 pb-4 last:border-b-0 last:pb-0">
                 <Link
                   href={group.zone.href}
-                  className="inline-flex font-semibold text-[#d9c391] underline decoration-[1.5px] underline-offset-2 transition hover:text-[#ecd6a3] hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d9c391]/35"
+                  className={`inline-flex ${headingLinkClass}`}
                 >
                   {group.zone.label}
                 </Link>
@@ -118,7 +121,7 @@ function GroupedNpcSection({
                     <li key={`${group.zone.href}-${entry.href}`} className="break-inside-avoid">
                       <Link
                         href={entry.href}
-                        className="font-medium text-[#7ab8ff] underline decoration-[1.5px] underline-offset-2 transition hover:text-[#a7d2ff] hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7ab8ff]/35"
+                        className={entityLinkClass}
                       >
                         {entry.label}
                       </Link>
@@ -275,6 +278,35 @@ function UndiscoveredItemState({ itemId }: { itemId: number }) {
   );
 }
 
+export async function generateMetadata({ params }: ItemDetailPageProps) {
+  const { id } = await params;
+  const itemId = Number(id);
+
+  if (!Number.isInteger(itemId) || itemId <= 0) {
+    return buildNotFoundMetadata("Item");
+  }
+
+  const item = await loadItemDetail(itemId);
+
+  if (!item) {
+    return buildNotFoundMetadata("Item");
+  }
+
+  return buildPageMetadata({
+    title: item.name,
+    description: joinDescriptionParts([
+      item.itemTypeLabel,
+      item.slotDisplay,
+      item.classDisplay,
+      item.ac ? `AC ${item.ac}` : null,
+      item.hp ? `HP ${item.hp}` : null,
+      item.mana ? `Mana ${item.mana}` : null,
+      item.lore
+    ]) || `Stats, drop sources, merchants, and recipes for ${item.name}.`,
+    path: `/items/${itemId}`
+  });
+}
+
 export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
   const { id } = await params;
   const itemId = Number(id);
@@ -283,7 +315,7 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
     notFound();
   }
 
-  const availability = await getItemAvailability(itemId);
+  const availability = await loadItemAvailability(itemId);
 
   if (availability === "missing") {
     notFound();
@@ -293,7 +325,7 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
     return <UndiscoveredItemState itemId={itemId} />;
   }
 
-  const [item, market] = await Promise.all([getItemDetail(itemId), getItemMarketData(itemId)]);
+  const [item, market] = await Promise.all([loadItemDetail(itemId), getItemMarketData(itemId)]);
 
   if (!item) {
     notFound();
@@ -301,6 +333,7 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
 
   return (
     <div className="w-full space-y-8 text-[#e6e0d2]">
+      <Breadcrumbs entries={[{ label: "Items", href: "/items" }, { label: item.name }]} />
       <div className="mx-auto grid w-full max-w-[1320px] gap-4 xl:grid-cols-[minmax(280px,max-content)_minmax(420px,1fr)] xl:items-start xl:justify-center">
         <div className="xl:justify-self-end">
           <ItemDetailPreview item={item} className="max-w-[650px]" />

@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { PetSummary } from "@eq-alla/data";
-import { Button } from "@eq-alla/ui";
+import { Button, rowLinkClass } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { PaginationControls, SearchPrompt, SectionCard, SimpleTable, TableSkeleton } from "../../components/catalog-shell";
 import { SearchErrorNotice } from "../../components/search-error-notice";
 import { waitForLoadingIndicator } from "../../components/loading-state";
 import { SpellIcon } from "../../components/spell-icon";
 import { useTableSort, type TableSortColumn } from "../../components/table-sorting";
+import { useUrlPageState } from "../../components/url-list-state";
 
 type PetSearchClientProps = {
   initialClasses: string[];
@@ -211,7 +212,7 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
   const [displayKey, setDisplayKey] = useState("");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
   const [submitCount, setSubmitCount] = useState(0);
-  const [page, setPage] = useState(1);
+  const { page, setPage, resetPage, clampPage } = useUrlPageState(displayKey);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlValueRef = useRef(buildQueryValue(initialClasses));
   const lastHandledSubmitRef = useRef(0);
@@ -233,7 +234,7 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
       setDisplayKey("");
       setIsFetching(false);
       setResolutionMeta(null);
-      setPage(1);
+      resetPage();
       return;
     }
 
@@ -242,7 +243,7 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
     setDisplayKey("");
     setIsFetching(false);
     setResolutionMeta(null);
-    setPage(1);
+    resetPage();
     setSubmitCount((current) => current + 1);
   }, [initialClasses]);
 
@@ -277,7 +278,7 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
     setDisplayKey("");
     setIsFetching(false);
     setResolutionMeta(null);
-    setPage(1);
+    resetPage();
     currentUrlValueRef.current = "";
     router.replace(pathname, { scroll: false });
   };
@@ -304,7 +305,7 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
       setDisplayKey("");
       setIsFetching(false);
       setResolutionMeta(null);
-      setPage(1);
+      resetPage();
       return;
     }
 
@@ -354,6 +355,7 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
 
   const showResults = hasQuery(selectedClasses) || isFetching || displayKey.length > 0;
   const { sortedRows: sortedResults, sort: tableSort } = useTableSort(results, petTableColumns, {
+    urlParam: "sort",
     onSortChange: () => setPage(1)
   });
   const totalPages = Math.max(1, Math.ceil(sortedResults.length / petResultsPerPage));
@@ -373,14 +375,8 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
       : null;
 
   useEffect(() => {
-    setPage(1);
-  }, [displayKey]);
-
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
+    clampPage(totalPages);
+  }, [clampPage, totalPages]);
 
   return (
     <>
@@ -416,7 +412,7 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
         />
       ) : null}
 
-      <SectionCard title={resultTitle}>
+      <SectionCard title={resultTitle} announceTitle>
         <div className="relative">
           {showResults && results.length > 0 ? (
             <div className={isFetching ? "transition duration-200 opacity-40 blur-[2px]" : undefined}>
@@ -428,10 +424,10 @@ export function PetSearchClient({ initialClasses }: PetSearchClientProps) {
                   pet.ownerClass,
                   pet.spellLevel,
                   <SpellIcon key={`${pet.id}-${pet.ownerClassId}-icon`} icon={pet.spellIcon} name={pet.spellName} />,
-                  <Link key={`${pet.id}-${pet.ownerClassId}-spell`} href={`/spells/${pet.spellId}`} className="font-medium hover:underline">
+                  <Link key={`${pet.id}-${pet.ownerClassId}-spell`} href={`/spells/${pet.spellId}`} className={rowLinkClass}>
                     {pet.spellName}
                   </Link>,
-                  <Link key={`${pet.id}-${pet.ownerClassId}-detail`} href={`/pets/${pet.id}`} className="font-medium hover:underline">
+                  <Link key={`${pet.id}-${pet.ownerClassId}-detail`} href={`/pets/${pet.id}`} className={rowLinkClass}>
                     View
                   </Link>,
                   pet.race,

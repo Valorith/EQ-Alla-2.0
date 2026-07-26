@@ -10,6 +10,7 @@ import { ArrowRight, Database, Menu, Search, Settings2, ShieldCheck, X } from "l
 import { ItemHoverTooltip } from "./item-hover-tooltip";
 import { RouteLoadingOverlay } from "./route-loading-overlay";
 import { usePageLoadingPreference } from "./use-page-loading-preference";
+import { useSearchHotkey } from "./use-search-hotkey";
 
 const routesWithInlineSearch = new Set([
   "/",
@@ -290,6 +291,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const mainScrollRef = useRef<HTMLElement | null>(null);
+
+  useSearchHotkey();
 
   const mainShellClassName = isHome
     ? "min-w-0 xl:col-start-2 xl:row-start-1 xl:self-start"

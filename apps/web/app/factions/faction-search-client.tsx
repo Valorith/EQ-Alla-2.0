@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { FactionSummary } from "@eq-alla/data";
-import { Button, Input } from "@eq-alla/ui";
+import { Button, Input, rowLinkClass } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable, TableSkeleton } from "../../components/catalog-shell";
 import { SearchErrorNotice } from "../../components/search-error-notice";
 import { waitForLoadingIndicator } from "../../components/loading-state";
 import { useTableSort, type TableSortColumn } from "../../components/table-sorting";
+import { useUrlPageState } from "../../components/url-list-state";
 
 type FactionSearchClientProps = {
   initialQuery: string;
@@ -240,7 +241,7 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
   const [displayKey, setDisplayKey] = useState("");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
   const [submitCount, setSubmitCount] = useState(0);
-  const [page, setPage] = useState(1);
+  const { page, setPage, resetPage, clampPage } = useUrlPageState(displayKey);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(buildSearchKey(initialFilters));
   const lastHandledSubmitRef = useRef(0);
@@ -260,7 +261,7 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
       setDisplayKey("");
       setIsFetching(false);
       setResolutionMeta(null);
-      setPage(1);
+      resetPage();
       return;
     }
 
@@ -269,7 +270,7 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
     setDisplayKey("");
     setIsFetching(false);
     setResolutionMeta(null);
-    setPage(1);
+    resetPage();
     setSubmitCount((current) => current + 1);
   }, [initialQuery, initialRelationship, initialViewAll, initialZone]);
 
@@ -308,7 +309,7 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
     setDisplayKey("");
     setIsFetching(false);
     setResolutionMeta(null);
-    setPage(1);
+    resetPage();
     currentUrlKeyRef.current = "";
     router.replace(pathname, { scroll: false });
   };
@@ -353,7 +354,7 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
       setDisplayKey("");
       setIsFetching(false);
       setResolutionMeta(null);
-      setPage(1);
+      resetPage();
       return;
     }
 
@@ -403,6 +404,7 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
 
   const activeQuery = buildSearchKey(filters);
   const { sortedRows: sortedResults, sort: tableSort } = useTableSort(results, factionTableColumns, {
+    urlParam: "sort",
     onSortChange: () => setPage(1)
   });
   const totalPages = Math.max(1, Math.ceil(sortedResults.length / factionResultsPerPage));
@@ -417,14 +419,8 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
       : null;
 
   useEffect(() => {
-    setPage(1);
-  }, [displayKey]);
-
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
+    clampPage(totalPages);
+  }, [clampPage, totalPages]);
 
   return (
     <>
@@ -491,16 +487,17 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
         />
       ) : null}
 
-      <SectionCard title={resultTitle}>
+      <SectionCard title={resultTitle} announceTitle>
         <div className="relative">
           {showResults && results.length > 0 ? (
             <div className={isFetching ? "transition duration-200 opacity-40 blur-[2px]" : undefined}>
               <SimpleTable
                 columns={factionTableColumnLabels}
+                stickyColumnIndex={0}
                 sort={tableSort}
                 rowKeys={pagedResults.map((faction) => faction.id)}
                 rows={pagedResults.map((faction) => [
-                  <Link key={faction.id} href={`/factions/${faction.id}`} className="font-medium hover:underline">
+                  <Link key={faction.id} href={`/factions/${faction.id}`} className={rowLinkClass}>
                     {faction.name}
                   </Link>,
                   faction.alignedZone,
@@ -522,7 +519,11 @@ export function FactionSearchClient({ initialQuery, initialZone, initialRelation
             ) : activeQuery !== displayKey ? (
               <SearchPrompt message="Press Search or View all to apply these filters." />
             ) : (
-              <SearchPrompt message="No factions matched this search." />
+              <SearchPrompt
+                message="No factions matched this search."
+                hint="Try a shorter name, or clear the zone and relationship filters."
+                action={{ label: "Clear filters", onClick: clearFilters }}
+              />
             )
           ) : (
             <SearchPrompt message="Enter a faction name or zone, choose an NPC relationship filter, or use View all factions." />

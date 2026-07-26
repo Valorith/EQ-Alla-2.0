@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { getZonesByEra, resolveZoneEraLabel } from "@eq-alla/data";
+import { Breadcrumbs } from "../../../../components/breadcrumbs";
+import { buildPageMetadata } from "../../../../components/page-metadata";
 import { PageHero, SectionCard } from "../../../../components/catalog-shell";
 import { ZonesByEraTable } from "./zones-by-era-table";
 
@@ -16,6 +18,17 @@ function titleCase(input: string) {
     .join(" ");
 }
 
+export async function generateMetadata({ params }: ZonesByEraDetailPageProps) {
+  const { era } = await params;
+  const normalizedEra = resolveZoneEraLabel(era) || titleCase(era);
+
+  return buildPageMetadata({
+    title: `${normalizedEra} Zones`,
+    description: `Every EverQuest zone mapped to the ${normalizedEra} expansion, with level ranges and zone connections.`,
+    path: `/zones/by-era/${era}`
+  });
+}
+
 export default async function ZonesByEraDetailPage({ params }: ZonesByEraDetailPageProps) {
   const { era } = await params;
   const normalizedEra = resolveZoneEraLabel(era) || titleCase(era);
@@ -25,6 +38,13 @@ export default async function ZonesByEraDetailPage({ params }: ZonesByEraDetailP
 
   return (
     <>
+      <Breadcrumbs
+        entries={[
+          { label: "Zones", href: "/zones" },
+          { label: "By Expansion", href: "/zones/by-era" },
+          { label: normalizedEra }
+        ]}
+      />
       <PageHero eyebrow="Zones" title={`${normalizedEra} Zones`} description="All zones mapped to this expansion value in the current catalog." />
       <SectionCard title={`${zones.length} zones`}>
         <ZonesByEraTable zones={zones} />

@@ -16,7 +16,8 @@ test("home page fits viewport and shows search", async ({ page }) => {
 
 test("item detail page fits viewport", async ({ page }) => {
   await page.goto("/items/1001");
-  await expect(page.getByRole("link", { name: /Items/i })).toBeVisible();
+  // Scoped to the breadcrumb: the sidebar also has an "Items" link.
+  await expect(page.getByLabel("Breadcrumb").getByRole("link", { name: "Items" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
 

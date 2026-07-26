@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { TaskDetail } from "@eq-alla/data";
-import { Button, Input } from "@eq-alla/ui";
+import { Button, Input, rowLinkClass } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { PaginationControls, SearchPrompt, SectionCard, SimpleTable, TableSkeleton } from "../../components/catalog-shell";
 import { SearchErrorNotice } from "../../components/search-error-notice";
 import { waitForLoadingIndicator } from "../../components/loading-state";
 import { getLeadingSortNumber, useTableSort, type TableSortColumn } from "../../components/table-sorting";
+import { useUrlPageState } from "../../components/url-list-state";
 
 type TaskSearchClientProps = {
   initialQuery: string;
@@ -131,7 +132,7 @@ export function TaskSearchClient({ initialQuery }: TaskSearchClientProps) {
   const [displayKey, setDisplayKey] = useState("");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
   const [submitCount, setSubmitCount] = useState(0);
-  const [page, setPage] = useState(1);
+  const { page, setPage, resetPage, clampPage } = useUrlPageState(displayKey);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(buildSearchKey(initialQuery));
   const lastHandledSubmitRef = useRef(0);
@@ -151,7 +152,7 @@ export function TaskSearchClient({ initialQuery }: TaskSearchClientProps) {
       setDisplayKey("");
       setIsFetching(false);
       setResolutionMeta(null);
-      setPage(1);
+      resetPage();
       return;
     }
 
@@ -160,7 +161,7 @@ export function TaskSearchClient({ initialQuery }: TaskSearchClientProps) {
     setDisplayKey("");
     setIsFetching(false);
     setResolutionMeta(null);
-    setPage(1);
+    resetPage();
     setSubmitCount((current) => current + 1);
   }, [initialQuery]);
 
@@ -247,6 +248,7 @@ export function TaskSearchClient({ initialQuery }: TaskSearchClientProps) {
 
   const activeQuery = buildSearchKey(query);
   const { sortedRows: sortedResults, sort: tableSort } = useTableSort(results, taskTableColumns, {
+    urlParam: "sort",
     onSortChange: () => setPage(1)
   });
   const totalPages = Math.max(1, Math.ceil(sortedResults.length / taskResultsPerPage));
@@ -261,14 +263,8 @@ export function TaskSearchClient({ initialQuery }: TaskSearchClientProps) {
       : null;
 
   useEffect(() => {
-    setPage(1);
-  }, [displayKey]);
-
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
+    clampPage(totalPages);
+  }, [clampPage, totalPages]);
 
   return (
     <>
@@ -301,16 +297,17 @@ export function TaskSearchClient({ initialQuery }: TaskSearchClientProps) {
         />
       ) : null}
 
-      <SectionCard title={resultTitle}>
+      <SectionCard title={resultTitle} announceTitle>
         <div className="relative">
           {showResults && results.length > 0 ? (
             <div className={isFetching ? "transition duration-200 opacity-40 blur-[2px]" : undefined}>
               <SimpleTable
                 columns={taskTableColumnLabels}
+                stickyColumnIndex={0}
                 sort={tableSort}
                 rowKeys={pagedResults.map((task) => task.id)}
                 rows={pagedResults.map((task) => [
-                  <Link key={task.id} href={`/tasks/${task.id}`} className="font-medium hover:underline">
+                  <Link key={task.id} href={`/tasks/${task.id}`} className={rowLinkClass}>
                     {task.title}
                   </Link>,
                   task.zone.longName,

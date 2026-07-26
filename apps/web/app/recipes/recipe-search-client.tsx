@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { RecipeSummary } from "@eq-alla/data";
-import { Button, Input } from "@eq-alla/ui";
+import { Button, Input, rowLinkClass } from "@eq-alla/ui";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable, TableSkeleton } from "../../components/catalog-shell";
 import { SearchErrorNotice } from "../../components/search-error-notice";
 import { waitForLoadingIndicator } from "../../components/loading-state";
 import { useTableSort, type TableSortColumn } from "../../components/table-sorting";
+import { useUrlPageState } from "../../components/url-list-state";
 
 type RecipeSearchClientProps = {
   initialQuery: string;
@@ -153,7 +154,7 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
   const [displayKey, setDisplayKey] = useState("");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
   const [submitCount, setSubmitCount] = useState(0);
-  const [page, setPage] = useState(1);
+  const { page, setPage, resetPage, clampPage } = useUrlPageState(displayKey);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(
     buildSearchParams({ q: initialQuery, tradeskill: initialTradeskill, minTrivial: initialMinTrivial, maxTrivial: initialMaxTrivial }).toString()
@@ -181,7 +182,7 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
       setDisplayKey("");
       setIsFetching(false);
       setResolutionMeta(null);
-      setPage(1);
+      resetPage();
       return;
     }
 
@@ -190,7 +191,7 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
     setDisplayKey("");
     setIsFetching(false);
     setResolutionMeta(null);
-    setPage(1);
+    resetPage();
     setSubmitCount((current) => current + 1);
   }, [initialMaxTrivial, initialMinTrivial, initialQuery, initialTradeskill]);
 
@@ -226,7 +227,7 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
     setDisplayKey("");
     setIsFetching(false);
     setResolutionMeta(null);
-    setPage(1);
+    resetPage();
     currentUrlKeyRef.current = "";
     router.replace(pathname, { scroll: false });
   };
@@ -251,7 +252,7 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
       setDisplayKey("");
       setIsFetching(false);
       setResolutionMeta(null);
-      setPage(1);
+      resetPage();
       return;
     }
 
@@ -300,6 +301,7 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
   }, [filters, pathname, submitCount]);
 
   const { sortedRows: sortedResults, sort: tableSort } = useTableSort(results, recipeTableColumns, {
+    urlParam: "sort",
     onSortChange: () => setPage(1)
   });
   const totalPages = Math.max(1, Math.ceil(sortedResults.length / recipeResultsPerPage));
@@ -314,14 +316,8 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
       : null;
 
   useEffect(() => {
-    setPage(1);
-  }, [displayKey]);
-
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
+    clampPage(totalPages);
+  }, [clampPage, totalPages]);
 
   return (
     <>
@@ -377,16 +373,17 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
         />
       ) : null}
 
-      <SectionCard title={resultTitle}>
+      <SectionCard title={resultTitle} announceTitle>
         <div className="relative">
           {showResults && results.length > 0 ? (
             <div className={isFetching ? "transition duration-200 opacity-40 blur-[2px]" : undefined}>
               <SimpleTable
                 columns={recipeTableColumnLabels}
+                stickyColumnIndex={0}
                 sort={tableSort}
                 rowKeys={pagedResults.map((recipe) => recipe.id)}
                 rows={pagedResults.map((recipe) => [
-                  <Link key={recipe.id} href={`/recipes/${recipe.id}`} className="font-medium hover:underline">
+                  <Link key={recipe.id} href={`/recipes/${recipe.id}`} className={rowLinkClass}>
                     {recipe.name}
                   </Link>,
                   recipe.id,
@@ -408,7 +405,11 @@ export function RecipeSearchClient({ initialQuery, initialTradeskill, initialMin
             ) : buildSearchParams(filters).toString() !== displayKey ? (
               <SearchPrompt message="Press Search to apply these filters." />
             ) : (
-              <SearchPrompt message="No recipes matched this search." />
+              <SearchPrompt
+                message="No recipes matched this search."
+                hint="Try a shorter name, or widen the trivial range."
+                action={{ label: "Clear filters", onClick: clearFilters }}
+              />
             )
           ) : (
             <SearchPrompt message="Enter a recipe name to load results." />
