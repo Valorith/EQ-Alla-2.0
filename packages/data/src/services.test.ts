@@ -534,6 +534,32 @@ describe("catalog services", () => {
     expect(npcs.some((entry) => entry.id === 113457)).toBe(true);
   });
 
+  it("combines exact NPC ids with creature profile, level, HP, and role filters", async () => {
+    const baseline = (await listNpcs({ q: "113457" })).find((entry) => entry.id === 113457);
+    expect(baseline).toBeTruthy();
+    if (!baseline) return;
+
+    const matching = await listNpcs({
+      q: String(baseline.id),
+      race: baseline.race,
+      className: baseline.klass,
+      bodyType: baseline.bodyType,
+      minLevel: Number(baseline.level),
+      maxLevel: Number(baseline.level),
+      minHp: baseline.hp,
+      maxHp: baseline.hp,
+      named: baseline.named,
+      merchant: baseline.merchant
+    });
+    const excluded = await listNpcs({
+      q: String(baseline.id),
+      minHp: (baseline.hp ?? 0) + 1
+    });
+
+    expect(matching.some((entry) => entry.id === baseline.id)).toBe(true);
+    expect(excluded.some((entry) => entry.id === baseline.id)).toBe(false);
+  });
+
   it("surfaces manually overridden scripted NPCs across search, NPC detail, and zone pages", async () => {
     const cases = [
       {
@@ -1713,6 +1739,33 @@ describe("catalog services", () => {
 
     expect(items[0]?.id).toBe(1001);
     expect(items.some((item) => item.id === 1001)).toBe(true);
+  });
+
+  it("combines item race, trade rule, level, source, and stat filters", async () => {
+    const baseline = (await listItems({ q: "1001" })).find((item) => item.id === 1001);
+    expect(baseline).toBeTruthy();
+    if (!baseline) return;
+
+    const matching = await listItems({
+      q: String(baseline.id),
+      races: baseline.races?.includes("All") ? ["Human"] : baseline.races,
+      source: baseline.zone,
+      tradeable: baseline.tradeable,
+      minLevel: Math.max(1, baseline.levelRequired),
+      maxLevel: Math.max(1, baseline.levelRequired),
+      minAc: baseline.ac,
+      minHp: baseline.hp,
+      minMana: baseline.mana,
+      minDamage: baseline.damage,
+      maxDelay: baseline.delay
+    });
+    const excluded = await listItems({
+      q: String(baseline.id),
+      minAc: baseline.ac + 1
+    });
+
+    expect(matching.some((item) => item.id === baseline.id)).toBe(true);
+    expect(excluded.some((item) => item.id === baseline.id)).toBe(false);
   });
 
   it("formats item race masks using only playable races", () => {

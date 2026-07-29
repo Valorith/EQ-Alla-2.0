@@ -4,12 +4,24 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { ItemSummary } from "@eq-alla/data";
-import { itemClassFilterOptions, itemSlotFilterOptions } from "@eq-alla/data/item-search-filters";
+import { itemClassFilterOptions, itemRaceFilterOptions, itemSlotFilterOptions } from "@eq-alla/data/item-search-filters";
 import { itemTypeFilterOptions } from "@eq-alla/data/item-types";
-import { Button, Input, rowLinkClass } from "@eq-alla/ui";
+import { Input, rowLinkClass } from "@eq-alla/ui";
+import { Gauge, Gem, MapPin, Shield, Shirt } from "lucide-react";
 import { PaginationControls, SearchPrompt, SectionCard, SimpleTable, TableSkeleton } from "../../components/catalog-shell";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
 import { SearchErrorNotice } from "../../components/search-error-notice";
+import {
+  FilterField,
+  FilterGroup,
+  FilterSelect,
+  FilterWorkbench,
+  MultiSelectDropdown,
+  NumberFilter,
+  PrimarySearchField,
+  SegmentedFilter,
+  type AppliedFilter
+} from "../../components/search-filter-workbench";
 import { waitForLoadingIndicator } from "../../components/loading-state";
 import { ItemIcon } from "../../components/item-icon";
 import { useTableSort, type TableSortColumn } from "../../components/table-sorting";
@@ -18,10 +30,18 @@ import { useUrlPageState } from "../../components/url-list-state";
 type ItemSearchFilters = {
   q: string;
   classNames: string[];
+  races: string[];
   slots: string[];
   type: string;
+  source: string;
+  tradeable: string;
   minLevel: string;
   maxLevel: string;
+  minAc: string;
+  minHp: string;
+  minMana: string;
+  minDamage: string;
+  maxDelay: string;
 };
 
 type ItemSearchClientProps = {
@@ -77,12 +97,22 @@ function buildSearchParams(filters: ItemSearchFilters) {
   for (const className of filters.classNames) {
     params.append("class", className);
   }
+  for (const race of filters.races) {
+    params.append("race", race);
+  }
   for (const slot of filters.slots) {
     params.append("slot", slot);
   }
   if (filters.type) params.set("type", filters.type);
+  if (filters.source.trim()) params.set("source", filters.source.trim());
+  if (filters.tradeable) params.set("tradeable", filters.tradeable);
   if (filters.minLevel) params.set("minLevel", filters.minLevel);
   if (filters.maxLevel) params.set("maxLevel", filters.maxLevel);
+  if (filters.minAc) params.set("minAc", filters.minAc);
+  if (filters.minHp) params.set("minHp", filters.minHp);
+  if (filters.minMana) params.set("minMana", filters.minMana);
+  if (filters.minDamage) params.set("minDamage", filters.minDamage);
+  if (filters.maxDelay) params.set("maxDelay", filters.maxDelay);
 
   return params;
 }
@@ -91,10 +121,18 @@ function hasActiveFilters(filters: ItemSearchFilters) {
   return (
     filters.q.trim().length > 0 ||
     filters.classNames.length > 0 ||
+    filters.races.length > 0 ||
     filters.slots.length > 0 ||
     filters.type.length > 0 ||
+    filters.source.trim().length > 0 ||
+    filters.tradeable.length > 0 ||
     filters.minLevel.length > 0 ||
-    filters.maxLevel.length > 0
+    filters.maxLevel.length > 0 ||
+    filters.minAc.length > 0 ||
+    filters.minHp.length > 0 ||
+    filters.minMana.length > 0 ||
+    filters.minDamage.length > 0 ||
+    filters.maxDelay.length > 0
   );
 }
 
@@ -204,152 +242,6 @@ function setClientCachedItems(key: string, items: ItemSummary[]) {
   persistClientCache();
 }
 
-function SelectControl({
-  label,
-  name,
-  value,
-  options,
-  onChange
-}: {
-  label: string;
-  name: string;
-  value: string;
-  options: string[];
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="grid gap-2 text-sm">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">{label}</span>
-      <select
-        name={name}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-11 rounded-xl border border-white/10 bg-black/25 px-4 text-sm text-[#e8dfcf] outline-none transition focus:border-[var(--accent)] focus:shadow-[0_0_0_4px_rgba(215,164,95,0.12)]"
-      >
-        <option value="" className="bg-[#1a1d23] text-[#e8dfcf]">Any</option>
-        {options.map((option) => (
-          <option key={option} value={option} className="bg-[#1a1d23] text-[#e8dfcf]">
-            {option}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function formatMultiSelectSummary(values: string[]) {
-  if (values.length === 0) {
-    return "Any";
-  }
-
-  if (values.length <= 2) {
-    return values.join(", ");
-  }
-
-  return `${values.length} selected`;
-}
-
-function MultiSelectDropdown({
-  label,
-  name,
-  values,
-  options,
-  onChange
-}: {
-  label: string;
-  name: string;
-  values: string[];
-  options: string[];
-  onChange: (values: string[]) => void;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const summary = formatMultiSelectSummary(values);
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen]);
-
-  const toggleValue = (option: string) => {
-    onChange(values.includes(option) ? values.filter((value) => value !== option) : [...values, option]);
-  };
-
-  return (
-    <div ref={containerRef} className="relative grid gap-2 text-sm">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">{label}</span>
-      <button
-        type="button"
-        name={name}
-        aria-haspopup="listbox"
-        aria-expanded={isOpen}
-        onClick={() => setIsOpen((current) => !current)}
-        className="flex h-11 w-full items-center justify-between rounded-xl border border-[var(--border-strong)] bg-[var(--panel)] px-4 text-left text-sm text-[var(--foreground)] outline-none transition hover:border-[color:rgba(215,164,95,0.38)] focus:border-[var(--accent)] focus:shadow-[0_0_0_4px_rgba(215,164,95,0.12)]"
-      >
-        <span className={values.length === 0 ? "text-[var(--muted)]" : ""}>{summary}</span>
-        <span className="text-xs text-[var(--muted)]">{isOpen ? "▲" : "▼"}</span>
-      </button>
-      {isOpen ? (
-        <div className="absolute top-full z-30 mt-2 w-full overflow-hidden rounded-xl border border-[var(--border-strong)] bg-[var(--panel)] shadow-[0_18px_44px_rgba(0,0,0,0.3)] backdrop-blur-md">
-          <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-2 text-[11px] uppercase tracking-[0.16em] text-[var(--muted)]">
-            <span>{values.length === 0 ? "Any" : `${values.length} selected`}</span>
-            {values.length > 0 ? (
-              <button
-                type="button"
-                className="font-semibold text-[#d7a45f] transition hover:text-[#f0c98a]"
-                onClick={() => onChange([])}
-              >
-                Clear
-              </button>
-            ) : null}
-          </div>
-          <div role="listbox" aria-multiselectable="true" className="max-h-72 overflow-y-auto py-1">
-            {options.map((option) => {
-              const checked = values.includes(option);
-
-              return (
-                <label
-                  key={option}
-                  className="flex cursor-pointer items-center gap-3 px-4 py-2 text-sm text-[var(--foreground)] transition hover:bg-white/7"
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleValue(option)}
-                    className="size-4 rounded border-[var(--border-strong)] bg-transparent text-[#d7a45f] focus:ring-[#c69a5f]"
-                  />
-                  <span>{option}</span>
-                </label>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 export function ItemSearchClient({ initialFilters, initialItems, initialResultsResolved, frameClassName }: ItemSearchClientProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -360,6 +252,10 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
   const [displayKey, setDisplayKey] = useState(initialResultsResolved ? buildSearchParams(initialFilters).toString() : "");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
   const [submitCount, setSubmitCount] = useState(0);
+  const [filtersExpanded, setFiltersExpanded] = useState(() => {
+    const { q: _query, ...advancedFilters } = initialFilters;
+    return hasActiveFilters({ ...advancedFilters, q: "" });
+  });
   const { page, setPage, resetPage, clampPage } = useUrlPageState(displayKey);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(buildSearchParams(initialFilters).toString());
@@ -383,6 +279,9 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
     const nextKey = buildSearchParams(initialFilters).toString();
 
     setFilters(initialFilters);
+    if (hasActiveFilters({ ...initialFilters, q: "" })) {
+      setFiltersExpanded(true);
+    }
     currentUrlKeyRef.current = nextKey;
     abortRef.current?.abort();
 
@@ -445,10 +344,18 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
     setFilters({
       q: "",
       classNames: [],
+      races: [],
       slots: [],
       type: "",
+      source: "",
+      tradeable: "",
       minLevel: "",
-      maxLevel: ""
+      maxLevel: "",
+      minAc: "",
+      minHp: "",
+      minMana: "",
+      minDamage: "",
+      maxDelay: ""
     });
     setItems([]);
     setError(null);
@@ -579,12 +486,62 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
   const pagedItems = sortedItems.slice((visiblePage - 1) * itemResultsPerPage, visiblePage * itemResultsPerPage);
   const draftKey = buildSearchParams(filters).toString();
   const showResults = hasActiveFilters(filters) || isFetching || displayKey.length > 0;
-  const resultTitle = showResults ? (isFetching && items.length === 0 ? "Loading items" : `${items.length} matching items`) : "Results";
+  const resultTitle = showResults
+    ? isFetching && items.length === 0
+      ? "Loading items"
+      : `${items.length} matching ${items.length === 1 ? "item" : "items"}`
+    : "Results";
   const statusLabel = isFetching ? "Refreshing results..." : draftKey === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
   const resolvedTiming =
     resolutionMeta && resolutionMeta.key === displayKey && !isFetching
       ? `Loaded in ${formatDuration(resolutionMeta.durationMs)}${resolutionMeta.source === "cache" ? " from cache" : ""}`
       : null;
+  const removeArrayFilter = (key: "classNames" | "races" | "slots", value: string) => {
+    setFilter(key, filters[key].filter((entry) => entry !== value));
+  };
+  const appliedFilters: AppliedFilter[] = [
+    ...(filters.q.trim()
+      ? [{ key: "q", label: `Name or ID: ${filters.q.trim()}`, onRemove: () => setFilter("q", "") }]
+      : []),
+    ...filters.classNames.map((value) => ({
+      key: `class-${value}`,
+      label: `Class: ${value}`,
+      onRemove: () => removeArrayFilter("classNames", value)
+    })),
+    ...filters.races.map((value) => ({
+      key: `race-${value}`,
+      label: `Race: ${value}`,
+      onRemove: () => removeArrayFilter("races", value)
+    })),
+    ...filters.slots.map((value) => ({
+      key: `slot-${value}`,
+      label: `Slot: ${value}`,
+      onRemove: () => removeArrayFilter("slots", value)
+    })),
+    ...(filters.type ? [{ key: "type", label: `Type: ${filters.type}`, onRemove: () => setFilter("type", "") }] : []),
+    ...(filters.source.trim()
+      ? [{ key: "source", label: `Source: ${filters.source.trim()}`, onRemove: () => setFilter("source", "") }]
+      : []),
+    ...(filters.tradeable
+      ? [
+          {
+            key: "tradeable",
+            label: filters.tradeable === "true" ? "Tradeable" : "No-drop",
+            onRemove: () => setFilter("tradeable", "")
+          }
+        ]
+      : []),
+    ...(filters.minLevel ? [{ key: "minLevel", label: `Level ≥ ${filters.minLevel}`, onRemove: () => setFilter("minLevel", "") }] : []),
+    ...(filters.maxLevel ? [{ key: "maxLevel", label: `Level ≤ ${filters.maxLevel}`, onRemove: () => setFilter("maxLevel", "") }] : []),
+    ...(filters.minAc ? [{ key: "minAc", label: `AC ≥ ${filters.minAc}`, onRemove: () => setFilter("minAc", "") }] : []),
+    ...(filters.minHp ? [{ key: "minHp", label: `HP ≥ ${filters.minHp}`, onRemove: () => setFilter("minHp", "") }] : []),
+    ...(filters.minMana ? [{ key: "minMana", label: `Mana ≥ ${filters.minMana}`, onRemove: () => setFilter("minMana", "") }] : []),
+    ...(filters.minDamage
+      ? [{ key: "minDamage", label: `Damage ≥ ${filters.minDamage}`, onRemove: () => setFilter("minDamage", "") }]
+      : []),
+    ...(filters.maxDelay ? [{ key: "maxDelay", label: `Delay ≤ ${filters.maxDelay}`, onRemove: () => setFilter("maxDelay", "") }] : [])
+  ];
+  const advancedFilterCount = Math.max(0, appliedFilters.length - (filters.q.trim() ? 1 : 0));
 
   useEffect(() => {
     clampPage(totalPages);
@@ -592,74 +549,122 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
 
   return (
     <>
-      <SectionCard
-        title="Filters"
-        className={`relative z-20 ${frameClassName}`.trim()}
-        allowOverflow
-        right={<p className="text-xs font-medium text-[#ccb594]">{statusLabel}</p>}
+      <FilterWorkbench
+        title="Find the right item"
+        description="Search first, then narrow by equipability, requirements, source, and stats."
+        status={statusLabel}
+        activeCount={advancedFilterCount}
+        expanded={filtersExpanded}
+        onExpandedChange={setFiltersExpanded}
+        onSearch={submitSearch}
+        onClear={clearFilters}
+        className={frameClassName}
+        appliedFilters={appliedFilters}
+        primary={
+          <PrimarySearchField
+            label="Item name or ID"
+            name="q"
+            value={filters.q}
+            onChange={(value) => setFilter("q", value)}
+            placeholder="e.g. Runed Mithril or 1001"
+          />
+        }
       >
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <label className="grid gap-2 text-sm">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">Name</span>
-            <Input
-              name="q"
-              type="search"
-              value={filters.q}
-              onChange={(event) => setFilter("q", event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  submitSearch();
-                }
-              }}
-              placeholder="Runed Mithril..."
-            />
-          </label>
-          <MultiSelectDropdown
-            label="Class"
-            name="class"
-            values={filters.classNames}
-            onChange={(values) => setFilter("classNames", values)}
-            options={[...itemClassFilterOptions]}
-          />
-          <MultiSelectDropdown
-            label="Slot"
-            name="slot"
-            values={filters.slots}
-            onChange={(values) => setFilter("slots", values)}
-            options={[...itemSlotFilterOptions, "Inventory"]}
-          />
-          <SelectControl
-            label="Item type"
-            name="type"
-            value={filters.type}
-            onChange={(value) => setFilter("type", value)}
-            options={itemTypeFilterOptions}
-          />
-          <SelectControl
-            label="Min level"
-            name="minLevel"
-            value={filters.minLevel}
-            onChange={(value) => setFilter("minLevel", value)}
-            options={["1", "20", "35", "50", "60"]}
-          />
-          <SelectControl
-            label="Max level"
-            name="maxLevel"
-            value={filters.maxLevel}
-            onChange={(value) => setFilter("maxLevel", value)}
-            options={["20", "35", "50", "60", "65"]}
-          />
-          <div className="flex items-end gap-3 md:col-span-2 xl:col-span-4">
-            <Button type="button" className="w-full sm:w-auto" onClick={submitSearch}>
-              Search
-            </Button>
-            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={clearFilters}>
-              Clear filters
-            </Button>
-          </div>
+        <div className="grid gap-5 xl:grid-cols-2">
+          <FilterGroup
+            title="Equipability"
+            description="Match the characters and equipment slots that can use the item."
+            icon={<Shirt className="size-4" />}
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <MultiSelectDropdown
+                label="Class"
+                name="class"
+                values={filters.classNames}
+                onChange={(values) => setFilter("classNames", values)}
+                options={[...itemClassFilterOptions]}
+              />
+              <MultiSelectDropdown
+                label="Playable race"
+                name="race"
+                values={filters.races}
+                onChange={(values) => setFilter("races", values)}
+                options={[...itemRaceFilterOptions]}
+              />
+              <MultiSelectDropdown
+                label="Slot"
+                name="slot"
+                values={filters.slots}
+                onChange={(values) => setFilter("slots", values)}
+                options={[...itemSlotFilterOptions, "Inventory"]}
+              />
+              <FilterSelect
+                label="Item type"
+                name="type"
+                value={filters.type}
+                onChange={(value) => setFilter("type", value)}
+                options={itemTypeFilterOptions}
+              />
+            </div>
+          </FilterGroup>
+
+          <FilterGroup
+            title="Requirements & source"
+            description="Limit required level, trade rules, or the source label stored with the item."
+            icon={<MapPin className="size-4" />}
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <NumberFilter label="Minimum required level" name="minLevel" value={filters.minLevel} onChange={(value) => setFilter("minLevel", value)} placeholder="1" min={1} />
+              <NumberFilter label="Maximum required level" name="maxLevel" value={filters.maxLevel} onChange={(value) => setFilter("maxLevel", value)} placeholder="65" min={1} />
+              <SegmentedFilter
+                label="Trade rules"
+                value={filters.tradeable}
+                onChange={(value) => setFilter("tradeable", value)}
+                options={[
+                  { value: "", label: "Any" },
+                  { value: "true", label: "Tradeable" },
+                  { value: "false", label: "No-drop" }
+                ]}
+              />
+              <FilterField label="Source contains" hint="Optional">
+                <Input
+                  name="source"
+                  value={filters.source}
+                  onChange={(event) => setFilter("source", event.target.value)}
+                  placeholder="Zone or source label"
+                />
+              </FilterField>
+            </div>
+          </FilterGroup>
+
+          <FilterGroup
+            title="Defensive stats"
+            description="Set minimum survivability values; leave a field empty to ignore it."
+            icon={<Shield className="size-4" />}
+          >
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              <NumberFilter label="Minimum AC" name="minAc" value={filters.minAc} onChange={(value) => setFilter("minAc", value)} placeholder="0" />
+              <NumberFilter label="Minimum HP" name="minHp" value={filters.minHp} onChange={(value) => setFilter("minHp", value)} placeholder="0" />
+              <NumberFilter label="Minimum mana" name="minMana" value={filters.minMana} onChange={(value) => setFilter("minMana", value)} placeholder="0" />
+            </div>
+          </FilterGroup>
+
+          <FilterGroup
+            title="Weapon profile"
+            description="Find weapons that meet a damage floor and speed ceiling."
+            icon={<Gauge className="size-4" />}
+          >
+            <div className="grid grid-cols-2 gap-4">
+              <NumberFilter label="Minimum damage" name="minDamage" value={filters.minDamage} onChange={(value) => setFilter("minDamage", value)} placeholder="0" />
+              <NumberFilter label="Maximum delay" name="maxDelay" value={filters.maxDelay} onChange={(value) => setFilter("maxDelay", value)} placeholder="40" />
+            </div>
+            <p className="mt-3 flex items-center gap-2 text-[11px] leading-5 text-[#8f836f]">
+              <Gem className="size-3.5 text-[#b89869]" />
+              Combine both values to quickly isolate efficient weapon candidates.
+            </p>
+          </FilterGroup>
         </div>
-      </SectionCard>
+      </FilterWorkbench>
 
       {error ? (
         <SearchErrorNotice

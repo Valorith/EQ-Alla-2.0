@@ -1,3 +1,5 @@
+import { playableItemRaceFlags } from "./race-names";
+
 export const itemClassNames = [
   "Warrior",
   "Cleric",
@@ -46,3 +48,5 @@ export const itemSlotFlags: ReadonlyArray<readonly [number, string]> = [
 ] as const;
 
 export const itemSlotFilterOptions = [...new Set(itemSlotFlags.map(([, label]) => label))];
+
+export const itemRaceFilterOptions = playableItemRaceFlags.map(([, label]) => label);

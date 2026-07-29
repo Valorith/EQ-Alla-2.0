@@ -38,7 +38,7 @@ export const bodyTypeNames = {
   60: "No Target v2",
   63: "Swarm pet",
   64: "Monster Summon",
-  65: "Invsible Man",
+  65: "Invisible Man",
   67: "Special"
 } as const satisfies Record<number, string>;
 

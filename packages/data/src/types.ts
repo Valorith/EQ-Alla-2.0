@@ -26,6 +26,7 @@ export type ItemSummary = {
   type: string;
   slot: string;
   classes: string[];
+  races?: string[];
   tradeable: boolean;
   levelRequired: number;
   zone: string;
@@ -251,6 +252,9 @@ export type NpcSummary = {
   level: string;
   zone: string;
   named: boolean;
+  bodyType?: string;
+  merchant?: boolean;
+  hp?: number;
 };
 
 export type NpcDetail = NpcSummary & {

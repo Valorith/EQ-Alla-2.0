@@ -4,10 +4,23 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { NpcSummary } from "@eq-alla/data";
-import { Button, Input, rowLinkClass } from "@eq-alla/ui";
+import { bodyTypeNames } from "@eq-alla/data/body-type-names";
+import { itemClassFilterOptions } from "@eq-alla/data/item-search-filters";
+import { Input, rowLinkClass } from "@eq-alla/ui";
+import { Activity, MapPin, Swords, Users } from "lucide-react";
 import { ClassLoadingIndicator } from "../../components/class-loading-indicator";
-import { PaginationControls, SearchPrompt, SectionCard, SelectField, SimpleTable, TableSkeleton } from "../../components/catalog-shell";
+import { PaginationControls, SearchPrompt, SectionCard, SimpleTable, TableSkeleton } from "../../components/catalog-shell";
 import { SearchErrorNotice } from "../../components/search-error-notice";
+import {
+  FilterField,
+  FilterGroup,
+  FilterSelect,
+  FilterWorkbench,
+  NumberFilter,
+  PrimarySearchField,
+  SegmentedFilter,
+  type AppliedFilter
+} from "../../components/search-filter-workbench";
 import { waitForLoadingIndicator } from "../../components/loading-state";
 import { getLeadingSortNumber, useTableSort, type TableSortColumn } from "../../components/table-sorting";
 import { useUrlPageState } from "../../components/url-list-state";
@@ -18,10 +31,14 @@ type NpcSearchClientProps = {
     q: string;
     zone: string;
     race: string;
+    className: string;
+    bodyType: string;
     minLevel: string;
     maxLevel: string;
+    minHp: string;
+    maxHp: string;
     named: string;
-    showLevel: string;
+    merchant: string;
   };
 };
 
@@ -29,10 +46,14 @@ type NpcFilters = {
   q: string;
   zone: string;
   race: string;
+  className: string;
+  bodyType: string;
   minLevel: string;
   maxLevel: string;
+  minHp: string;
+  maxHp: string;
   named: string;
-  showLevel: string;
+  merchant: string;
 };
 
 type SearchResolutionMeta = {
@@ -47,17 +68,19 @@ type NpcCacheEntry = {
   touchedAt: number;
 };
 
-const npcBasicTableColumns: TableSortColumn<NpcSummary>[] = [
+const npcTableColumns: TableSortColumn<NpcSummary>[] = [
   { label: "Name", getSortValue: (npc) => npc.name },
+  { label: "Level", getSortValue: (npc) => getLeadingSortNumber(npc.level) },
+  { label: "Race", getSortValue: (npc) => npc.race },
+  { label: "Class", getSortValue: (npc) => npc.klass },
+  { label: "Zone", getSortValue: (npc) => npc.zone },
+  { label: "HP", getSortValue: (npc) => npc.hp ?? null },
+  { label: "Kind", getSortValue: (npc) => (npc.merchant ? "Merchant" : npc.named ? "Named" : "Common") },
   { label: "NPC ID", getSortValue: (npc) => npc.id }
 ];
-const npcAdvancedTableColumns: TableSortColumn<NpcSummary>[] = [
-  { label: "Name", getSortValue: (npc) => npc.name }
-];
-const npcAdvancedLevelTableColumns: TableSortColumn<NpcSummary>[] = [
-  { label: "Name", getSortValue: (npc) => npc.name },
-  { label: "Level", getSortValue: (npc) => getLeadingSortNumber(npc.level) }
-];
+const npcTableColumnLabels = npcTableColumns.map((column) => column.label);
+const npcClassOptions = [...itemClassFilterOptions, "Merchant"];
+const npcBodyTypeOptions = [...new Set(Object.values(bodyTypeNames))].sort((left, right) => left.localeCompare(right));
 
 const npcResultsPerPage = 25;
 const npcSearchCacheTtlMs = 180_000;
@@ -71,26 +94,32 @@ function buildSearchParams(filters: NpcFilters, mode: "basic" | "advanced") {
   const params = new URLSearchParams();
   const query = filters.q.trim();
   if (query) params.set(mode === "advanced" ? "name" : "q", query);
-  if (mode === "basic" && filters.zone) params.set("zone", filters.zone);
-  if (mode === "advanced") {
-    if (filters.race) params.set("race", filters.race);
-    if (filters.minLevel) params.set("minLevel", filters.minLevel);
-    if (filters.maxLevel) params.set("maxLevel", filters.maxLevel);
-    if (filters.named) params.set("named", filters.named);
-    if (filters.showLevel) params.set("showLevel", filters.showLevel);
-  }
+  if (filters.zone.trim()) params.set("zone", filters.zone.trim());
+  if (filters.race.trim()) params.set("race", filters.race.trim());
+  if (filters.className) params.set("class", filters.className);
+  if (filters.bodyType) params.set("bodyType", filters.bodyType);
+  if (filters.minLevel) params.set("minLevel", filters.minLevel);
+  if (filters.maxLevel) params.set("maxLevel", filters.maxLevel);
+  if (filters.minHp) params.set("minHp", filters.minHp);
+  if (filters.maxHp) params.set("maxHp", filters.maxHp);
+  if (filters.named) params.set("named", filters.named);
+  if (filters.merchant) params.set("merchant", filters.merchant);
   return params;
 }
 
 function hasActiveFilters(filters: NpcFilters) {
   return (
     filters.q.trim().length > 0 ||
-    filters.zone.length > 0 ||
-    filters.race.length > 0 ||
+    filters.zone.trim().length > 0 ||
+    filters.race.trim().length > 0 ||
+    filters.className.length > 0 ||
+    filters.bodyType.length > 0 ||
     filters.minLevel.length > 0 ||
     filters.maxLevel.length > 0 ||
+    filters.minHp.length > 0 ||
+    filters.maxHp.length > 0 ||
     filters.named.length > 0 ||
-    filters.showLevel.length > 0
+    filters.merchant.length > 0
   );
 }
 
@@ -175,6 +204,7 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
   const [displayKey, setDisplayKey] = useState("");
   const [resolutionMeta, setResolutionMeta] = useState<SearchResolutionMeta | null>(null);
   const [submitCount, setSubmitCount] = useState(0);
+  const [filtersExpanded, setFiltersExpanded] = useState(() => hasActiveFilters({ ...initialFilters, q: "" }));
   const { page, setPage, resetPage, clampPage } = useUrlPageState(displayKey);
   const abortRef = useRef<AbortController | null>(null);
   const currentUrlKeyRef = useRef(buildSearchParams(initialFilters, mode).toString());
@@ -186,6 +216,9 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
     const nextKey = buildSearchParams(initialFilters, mode).toString();
 
     setFilters(initialFilters);
+    if (hasActiveFilters({ ...initialFilters, q: "" })) {
+      setFiltersExpanded(true);
+    }
     currentUrlKeyRef.current = nextKey;
     abortRef.current?.abort();
 
@@ -233,10 +266,14 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
       q: "",
       zone: "",
       race: "",
+      className: "",
+      bodyType: "",
       minLevel: "",
       maxLevel: "",
+      minHp: "",
+      maxHp: "",
       named: "",
-      showLevel: ""
+      merchant: ""
     });
     setResults([]);
     setError(null);
@@ -316,13 +353,6 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
     })();
   }, [filters, mode, pathname, submitCount]);
 
-  const npcTableColumns =
-    mode === "advanced" && filters.showLevel
-      ? npcAdvancedLevelTableColumns
-      : mode === "advanced"
-        ? npcAdvancedTableColumns
-        : npcBasicTableColumns;
-  const npcTableColumnLabels = npcTableColumns.map((column) => column.label);
   const { sortedRows: sortedResults, sort: tableSort } = useTableSort(results, npcTableColumns, {
     urlParam: "sort",
     onSortChange: () => setPage(1)
@@ -332,12 +362,52 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
   const pagedResults = sortedResults.slice((visiblePage - 1) * npcResultsPerPage, visiblePage * npcResultsPerPage);
   const draftKey = buildSearchParams(filters, mode).toString();
   const showResults = hasActiveFilters(filters) || isFetching || displayKey.length > 0;
-  const resultTitle = showResults ? (isFetching && results.length === 0 ? "Loading NPCs" : `${results.length} ${mode === "advanced" ? "matches" : "matching NPCs"}`) : "Results";
+  const resultTitle = showResults
+    ? isFetching && results.length === 0
+      ? "Loading NPCs"
+      : `${results.length} matching ${results.length === 1 ? "NPC" : "NPCs"}`
+    : "Results";
   const statusLabel = isFetching ? "Refreshing results..." : draftKey === displayKey && displayKey ? "Filters applied" : "Press Search to apply filters";
   const resolvedTiming =
     resolutionMeta && resolutionMeta.key === displayKey && !isFetching
       ? `Loaded in ${formatDuration(resolutionMeta.durationMs)}${resolutionMeta.source === "cache" ? " from cache" : ""}`
       : null;
+  const appliedFilters: AppliedFilter[] = [
+    ...(filters.q.trim()
+      ? [{ key: "q", label: `Name or ID: ${filters.q.trim()}`, onRemove: () => setFilter("q", "") }]
+      : []),
+    ...(filters.zone.trim() ? [{ key: "zone", label: `Zone: ${filters.zone.trim()}`, onRemove: () => setFilter("zone", "") }] : []),
+    ...(filters.race.trim() ? [{ key: "race", label: `Race: ${filters.race.trim()}`, onRemove: () => setFilter("race", "") }] : []),
+    ...(filters.className
+      ? [{ key: "class", label: `Class: ${filters.className}`, onRemove: () => setFilter("className", "") }]
+      : []),
+    ...(filters.bodyType
+      ? [{ key: "bodyType", label: `Body: ${filters.bodyType}`, onRemove: () => setFilter("bodyType", "") }]
+      : []),
+    ...(filters.minLevel ? [{ key: "minLevel", label: `Level ≥ ${filters.minLevel}`, onRemove: () => setFilter("minLevel", "") }] : []),
+    ...(filters.maxLevel ? [{ key: "maxLevel", label: `Level ≤ ${filters.maxLevel}`, onRemove: () => setFilter("maxLevel", "") }] : []),
+    ...(filters.minHp ? [{ key: "minHp", label: `HP ≥ ${filters.minHp}`, onRemove: () => setFilter("minHp", "") }] : []),
+    ...(filters.maxHp ? [{ key: "maxHp", label: `HP ≤ ${filters.maxHp}`, onRemove: () => setFilter("maxHp", "") }] : []),
+    ...(filters.named
+      ? [
+          {
+            key: "named",
+            label: filters.named === "true" ? "Named NPCs" : "Common NPCs",
+            onRemove: () => setFilter("named", "")
+          }
+        ]
+      : []),
+    ...(filters.merchant
+      ? [
+          {
+            key: "merchant",
+            label: filters.merchant === "true" ? "Merchants" : "Non-merchants",
+            onRemove: () => setFilter("merchant", "")
+          }
+        ]
+      : [])
+  ];
+  const advancedFilterCount = Math.max(0, appliedFilters.length - (filters.q.trim() ? 1 : 0));
 
   useEffect(() => {
     clampPage(totalPages);
@@ -345,48 +415,119 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
 
   return (
     <>
-      <SectionCard
-        title={mode === "advanced" ? "Advanced filters" : "Filters"}
-        right={
-          <p className="text-xs font-medium text-[#ccb594]">{statusLabel}</p>
+      <FilterWorkbench
+        title="Search the bestiary"
+        description="Start with a name or ID, then narrow by habitat, creature profile, level, and role."
+        status={statusLabel}
+        activeCount={advancedFilterCount}
+        expanded={filtersExpanded}
+        onExpandedChange={setFiltersExpanded}
+        onSearch={submitSearch}
+        onClear={clearFilters}
+        appliedFilters={appliedFilters}
+        emptyMessage="No filters selected. Add a name or open more filters to browse the bestiary."
+        primary={
+          <PrimarySearchField
+            label="NPC name or ID"
+            name={mode === "advanced" ? "name" : "q"}
+            value={filters.q}
+            onChange={(value) => setFilter("q", value)}
+            placeholder="e.g. mistmoore guard or 59000"
+          />
         }
       >
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <label className="grid gap-2 text-sm">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">Name</span>
-            <Input
-              name={mode === "advanced" ? "name" : "q"}
-              type="search"
-              value={filters.q}
-              onChange={(event) => setFilter("q", event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  submitSearch();
-                }
-              }}
-              placeholder={mode === "advanced" ? "V'Lyra..." : "mistmoore guard..."}
-            />
-          </label>
-          {mode === "basic" ? null : (
-            <>
-              <SelectField label="Race" name="race" value={filters.race} onChange={(value) => setFilter("race", value)} options={["Dark Elf", "Human"]} />
-              <SelectField label="Min level" name="minLevel" value={filters.minLevel} onChange={(value) => setFilter("minLevel", value)} options={["30", "50", "60"]} />
-              <SelectField label="Max level" name="maxLevel" value={filters.maxLevel} onChange={(value) => setFilter("maxLevel", value)} options={["38", "52", "60"]} />
-              <SelectField label="Named only" name="named" value={filters.named} onChange={(value) => setFilter("named", value)} options={["true"]} />
-              <SelectField label="Show level" name="showLevel" value={filters.showLevel} onChange={(value) => setFilter("showLevel", value)} options={["true"]} />
-            </>
-          )}
-          <div className="flex items-end gap-3 md:col-span-2 xl:col-span-4">
-            <Button type="button" className="w-full sm:w-auto" onClick={submitSearch}>
-              Search
-            </Button>
-            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={clearFilters}>
-              Clear filters
-            </Button>
-          </div>
+        <div className="grid gap-5 xl:grid-cols-2">
+          <FilterGroup
+            title="Habitat & appearance"
+            description="Zone and race accept partial names, so broad searches stay quick to enter."
+            icon={<MapPin className="size-4" />}
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FilterField label="Zone contains">
+                <Input
+                  name="zone"
+                  value={filters.zone}
+                  onChange={(event) => setFilter("zone", event.target.value)}
+                  placeholder="Castle Mistmoore"
+                />
+              </FilterField>
+              <FilterField label="Race contains">
+                <Input
+                  name="race"
+                  value={filters.race}
+                  onChange={(event) => setFilter("race", event.target.value)}
+                  placeholder="Skeleton, Dragon..."
+                />
+              </FilterField>
+            </div>
+          </FilterGroup>
+
+          <FilterGroup
+            title="Creature profile"
+            description="Filter by combat class or EQ body type classification."
+            icon={<Users className="size-4" />}
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FilterSelect
+                label="Class"
+                name="class"
+                value={filters.className}
+                onChange={(value) => setFilter("className", value)}
+                options={npcClassOptions}
+              />
+              <FilterSelect
+                label="Body type"
+                name="bodyType"
+                value={filters.bodyType}
+                onChange={(value) => setFilter("bodyType", value)}
+                options={npcBodyTypeOptions}
+              />
+            </div>
+          </FilterGroup>
+
+          <FilterGroup
+            title="Combat range"
+            description="Use level for encounter difficulty and HP for a finer durability window."
+            icon={<Activity className="size-4" />}
+          >
+            <div className="grid grid-cols-2 gap-4">
+              <NumberFilter label="Minimum level" name="minLevel" value={filters.minLevel} onChange={(value) => setFilter("minLevel", value)} placeholder="1" min={1} />
+              <NumberFilter label="Maximum level" name="maxLevel" value={filters.maxLevel} onChange={(value) => setFilter("maxLevel", value)} placeholder="65" min={1} />
+              <NumberFilter label="Minimum HP" name="minHp" value={filters.minHp} onChange={(value) => setFilter("minHp", value)} placeholder="0" />
+              <NumberFilter label="Maximum HP" name="maxHp" value={filters.maxHp} onChange={(value) => setFilter("maxHp", value)} placeholder="10000" />
+            </div>
+          </FilterGroup>
+
+          <FilterGroup
+            title="Encounter role"
+            description="Separate named encounters, everyday creatures, and merchant populations."
+            icon={<Swords className="size-4" />}
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <SegmentedFilter
+                label="Name classification"
+                value={filters.named}
+                onChange={(value) => setFilter("named", value)}
+                options={[
+                  { value: "", label: "Any" },
+                  { value: "true", label: "Named" },
+                  { value: "false", label: "Common" }
+                ]}
+              />
+              <SegmentedFilter
+                label="Merchant role"
+                value={filters.merchant}
+                onChange={(value) => setFilter("merchant", value)}
+                options={[
+                  { value: "", label: "Any" },
+                  { value: "true", label: "Merchant" },
+                  { value: "false", label: "Other" }
+                ]}
+              />
+            </div>
+          </FilterGroup>
         </div>
-      </SectionCard>
+      </FilterWorkbench>
 
       {error ? (
         <SearchErrorNotice
@@ -402,23 +543,32 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
             <div className={isFetching ? "transition duration-200 opacity-40 blur-[2px]" : undefined}>
               <SimpleTable
                 columns={npcTableColumnLabels}
+                stickyColumnIndex={0}
                 sort={tableSort}
                 rowKeys={pagedResults.map((npc) => npc.id)}
-                rows={pagedResults.map((npc) =>
-                  mode === "advanced"
-                    ? [
-                        <Link key={npc.id} href={`/npcs/${npc.id}`} className={rowLinkClass}>
-                          {npc.name}
-                        </Link>,
-                        ...(filters.showLevel ? [npc.level] : [])
-                      ]
-                    : [
-                        <Link key={npc.id} href={`/npcs/${npc.id}`} className={rowLinkClass}>
-                          {npc.name}
-                        </Link>,
-                        npc.id
-                      ]
-                )}
+                rows={pagedResults.map((npc) => [
+                  <Link key={npc.id} href={`/npcs/${npc.id}`} className={rowLinkClass}>
+                    {npc.name}
+                  </Link>,
+                  npc.level,
+                  npc.race,
+                  npc.klass,
+                  npc.zone,
+                  npc.hp ? npc.hp.toLocaleString() : "—",
+                  <span
+                    key={`${npc.id}-kind`}
+                    className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${
+                      npc.merchant
+                        ? "border-sky-400/20 bg-sky-400/8 text-sky-200"
+                        : npc.named
+                          ? "border-[#d7a45f]/25 bg-[#d7a45f]/9 text-[#e8c58a]"
+                          : "border-white/10 bg-white/5 text-[#aaa08f]"
+                    }`}
+                  >
+                    {npc.merchant ? "Merchant" : npc.named ? "Named" : "Common"}
+                  </span>,
+                  npc.id
+                ])}
               />
               <PaginationControls
                 currentPage={visiblePage}
@@ -441,7 +591,10 @@ export function NpcSearchClient({ mode, initialFilters }: NpcSearchClientProps) 
               />
             )
           ) : (
-            <SearchPrompt message="Enter an NPC name to load results." />
+            <SearchPrompt
+              message="Enter an NPC name or ID, or open more filters to browse the bestiary."
+              hint="You can search by zone, race, class, body type, level, HP, named status, and merchant role."
+            />
           )}
 
           {isFetching && results.length > 0 ? (

@@ -19,24 +19,28 @@ export default async function NpcsPage({ searchParams }: NpcsPageProps) {
   const zone = typeof params.zone === "string" ? params.zone : "";
 
   return (
-    <>
+    <div className="space-y-6">
       <PageHero
         eyebrow="Bestiary"
         title="NPC Search"
-        description="Search named mobs, guards, merchants, and creatures across the live bestiary."
+        description="Search the live bestiary by encounter, habitat, creature profile, combat range, and role."
       />
       <NpcSearchClient
         mode="basic"
         initialFilters={{
           q,
           zone,
-          race: "",
-          minLevel: "",
-          maxLevel: "",
-          named: "",
-          showLevel: ""
+          race: typeof params.race === "string" ? params.race : "",
+          className: typeof params.class === "string" ? params.class : "",
+          bodyType: typeof params.bodyType === "string" ? params.bodyType : "",
+          minLevel: typeof params.minLevel === "string" ? params.minLevel : "",
+          maxLevel: typeof params.maxLevel === "string" ? params.maxLevel : "",
+          minHp: typeof params.minHp === "string" ? params.minHp : "",
+          maxHp: typeof params.maxHp === "string" ? params.maxHp : "",
+          named: typeof params.named === "string" ? params.named : "",
+          merchant: typeof params.merchant === "string" ? params.merchant : ""
         }}
       />
-    </>
+    </div>
   );
 }

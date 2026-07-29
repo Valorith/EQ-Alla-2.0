@@ -13,7 +13,7 @@ import {
   getLootChestZoneShortNamesBySourceNpcId
 } from "./loot-chest-npc-attribution";
 import { getManualNpcIdsForZone, getManualNpcZoneLinksByNpcId } from "./manual-npc-zone-overrides";
-import { formatPlayableItemRaceMask, raceNames } from "./race-names";
+import { formatPlayableItemRaceMask, playableItemRaceFlags, raceNames } from "./race-names";
 import { getReferenceSpellEffectName, getSpellEffectName, resolveSpellEffectDirection, summarizeSpellEffects } from "./spell-effects";
 import { formatExpansion, formatZoneEra, getZoneEraLabels, listZoneEraDefinitions, matchesZoneEraFilter } from "./zone-eras";
 import { sql } from "kysely";
@@ -50,14 +50,33 @@ import type {
 type ItemFilters = {
   q?: string;
   classNames?: string[];
+  races?: string[];
   slots?: string[];
   type?: string;
+  source?: string;
   tradeable?: boolean;
   minLevel?: number;
   maxLevel?: number;
+  minAc?: number;
+  minHp?: number;
+  minMana?: number;
+  minDamage?: number;
+  maxDelay?: number;
 };
 type SpellFilters = { q?: string; className?: string; level?: number; levelMode?: "exact" | "min" | "max" };
-type NpcFilters = { q?: string; zone?: string; minLevel?: number; maxLevel?: number; race?: string; named?: boolean };
+type NpcFilters = {
+  q?: string;
+  zone?: string;
+  minLevel?: number;
+  maxLevel?: number;
+  minHp?: number;
+  maxHp?: number;
+  race?: string;
+  className?: string;
+  bodyType?: string;
+  named?: boolean;
+  merchant?: boolean;
+};
 type ZoneFilters = { q?: string; era?: string };
 type RecipeFilters = { q?: string; tradeskill?: string; minTrivial?: number; maxTrivial?: number };
 type PetFilters = { className?: string; classNames?: string[] };
@@ -69,6 +88,7 @@ type ItemSearchRow = {
   itemtype: number;
   slots: number;
   classes: number;
+  races: number;
   nodrop: number;
   reqlevel: number;
   damage: number;
@@ -716,6 +736,9 @@ function normalizeItemFilters(filters: ItemFilters = {}): ItemFilters {
   const classNames = Array.from(
     new Set((filters.classNames ?? []).map((value) => normalizeText(value)).filter((value): value is string => Boolean(value)))
   );
+  const races = Array.from(
+    new Set((filters.races ?? []).map((value) => normalizeText(value)).filter((value): value is string => Boolean(value)))
+  );
   const slots = Array.from(
     new Set((filters.slots ?? []).map((value) => normalizeText(value)).filter((value): value is string => Boolean(value)))
   );
@@ -723,11 +746,18 @@ function normalizeItemFilters(filters: ItemFilters = {}): ItemFilters {
   return {
     q: normalizeText(filters.q),
     classNames,
+    races,
     slots,
     type: normalizeText(filters.type),
+    source: normalizeText(filters.source),
     tradeable: typeof filters.tradeable === "boolean" ? filters.tradeable : undefined,
     minLevel: normalizeNumber(filters.minLevel),
-    maxLevel: normalizeNumber(filters.maxLevel)
+    maxLevel: normalizeNumber(filters.maxLevel),
+    minAc: normalizeNumber(filters.minAc),
+    minHp: normalizeNumber(filters.minHp),
+    minMana: normalizeNumber(filters.minMana),
+    minDamage: normalizeNumber(filters.minDamage),
+    maxDelay: normalizeNumber(filters.maxDelay)
   };
 }
 
@@ -735,11 +765,18 @@ function createItemSearchCacheKey(filters: ItemFilters) {
   return `items:${JSON.stringify({
     q: filters.q ?? "",
     classNames: filters.classNames ?? [],
+    races: filters.races ?? [],
     slots: filters.slots ?? [],
     type: filters.type ?? "",
+    source: filters.source ?? "",
     tradeable: typeof filters.tradeable === "boolean" ? String(filters.tradeable) : "",
     minLevel: filters.minLevel ?? "",
-    maxLevel: filters.maxLevel ?? ""
+    maxLevel: filters.maxLevel ?? "",
+    minAc: filters.minAc ?? "",
+    minHp: filters.minHp ?? "",
+    minMana: filters.minMana ?? "",
+    minDamage: filters.minDamage ?? "",
+    maxDelay: filters.maxDelay ?? ""
   })}`;
 }
 
@@ -752,6 +789,13 @@ function classMaskForFilter(classNamesFilter: string[] = []) {
     .filter((mask) => mask > 0);
 
   return masks.length > 0 ? masks.reduce((sum, mask) => sum | mask, 0) : null;
+}
+
+function raceMaskForFilter(racesFilter: string[] = []) {
+  const flags = playableItemRaceFlags
+    .filter(([, label]) => racesFilter.some((race) => label.toLowerCase() === race.toLowerCase()))
+    .map(([flag]) => flag);
+  return flags.length > 0 ? flags.reduce((sum, flag) => sum | flag, 0) : null;
 }
 
 function slotMaskForFilter(slotsFilter: string[] = []) {
@@ -809,12 +853,25 @@ function itemMatchesFilters(item: ItemSummary, filters: ItemFilters) {
   ) {
     return false;
   }
+  if (
+    filters.races?.length &&
+    !(item.races ?? ["All"]).includes("All") &&
+    !filters.races.some((race) => (item.races ?? []).some((itemRace) => includesFolded(itemRace, race)))
+  ) {
+    return false;
+  }
   if (filters.slots?.length && !filters.slots.some((slot) => includesFolded(item.slot, slot))) return false;
   if (!itemTypeMatchesFilter(item.type, filters.type)) return false;
+  if (!includesFolded(item.zone, filters.source)) return false;
   if (typeof filters.tradeable === "boolean" && item.tradeable !== filters.tradeable) return false;
   const itemLevel = effectiveItemLevel(item.levelRequired);
   if (filters.minLevel && itemLevel < filters.minLevel) return false;
   if (filters.maxLevel && itemLevel > filters.maxLevel) return false;
+  if (filters.minAc !== undefined && item.ac < filters.minAc) return false;
+  if (filters.minHp !== undefined && item.hp < filters.minHp) return false;
+  if (filters.minMana !== undefined && item.mana < filters.minMana) return false;
+  if (filters.minDamage !== undefined && item.damage < filters.minDamage) return false;
+  if (filters.maxDelay !== undefined && item.delay > filters.maxDelay) return false;
   return true;
 }
 
@@ -825,6 +882,15 @@ function decodeClassMask(mask: number | null | undefined) {
 
   const classes = classNames.filter((_, index) => (mask & (1 << index)) !== 0);
   return classes.length > 0 ? [...classes] : ["All"];
+}
+
+function decodePlayableRaceMask(mask: number | null | undefined) {
+  if (!mask || mask <= 0 || mask >= 65535) {
+    return ["All"];
+  }
+
+  const races = playableItemRaceFlags.filter(([flag]) => (mask & flag) !== 0).map(([, label]) => label);
+  return races.length > 0 ? races : ["All"];
 }
 
 function formatClassMask(mask: number | null | undefined) {
@@ -2557,10 +2623,15 @@ function npcLiveZoneLinks(row: { zone_name: string | null; zone_short_name: stri
 function npcSummaryMatchesFilters(npc: NpcSummary, filters: NpcFilters) {
   if (filters.zone && !includesFolded(npc.zone, filters.zone)) return false;
   if (filters.race && !includesFolded(npc.race, filters.race)) return false;
+  if (filters.className && !includesFolded(npc.klass, filters.className)) return false;
+  if (filters.bodyType && !includesFolded(npc.bodyType ?? "", filters.bodyType)) return false;
   if (typeof filters.named === "boolean" && npc.named !== filters.named) return false;
+  if (typeof filters.merchant === "boolean" && npc.merchant !== filters.merchant) return false;
   const min = numberFromLevelRange(npc.level);
   if (filters.minLevel && min < filters.minLevel) return false;
   if (filters.maxLevel && min > filters.maxLevel) return false;
+  if (filters.minHp !== undefined && (npc.hp ?? 0) < filters.minHp) return false;
+  if (filters.maxHp !== undefined && (npc.hp ?? 0) > filters.maxHp) return false;
   return true;
 }
 
@@ -2642,14 +2713,13 @@ async function collectCatalogNpcHits(query: string, npcSearchPatterns: string[])
 }
 
 async function fetchNpcListCandidateRows(filters: NpcFilters, npcSearchPatterns: string[], limit: number, offset: number) {
-  return sql<{ id: number; name: string; race: number; level: number; class: number; zone_name: string | null; zone_short_name: string | null }>`
-    select nt.id, nt.name, nt.race, nt.level, nt.class, min(ps.long_name) as zone_name, min(ps.zone) as zone_short_name
-    from npc_types nt
-    left join spawnentry se on se.npcID = nt.id
-    left join spawngroup sg on sg.id = se.spawngroupID
-    left join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
-    where (
+  const clauses = [sql.raw(trackableNpcCondition("nt"))];
+  const exactQueryId = parseExactNumericQueryId(filters.q);
+
+  if (filters.q) {
+    clauses.push(sql`(
       nt.name like ${like(filters.q)}
+      ${exactQueryId !== undefined ? sql`or nt.id = ${exactQueryId}` : sql``}
       ${npcSearchPatterns.length > 0
         ? sql`or ${sql.join(
             npcSearchPatterns.map(
@@ -2659,9 +2729,48 @@ async function fetchNpcListCandidateRows(filters: NpcFilters, npcSearchPatterns:
             sql` or `
           )}`
         : sql``}
-    )
-      and ${sql.raw(trackableNpcCondition("nt"))}
-    group by nt.id, nt.name, nt.race, nt.level, nt.class
+    )`);
+  }
+
+  if (filters.minLevel !== undefined) clauses.push(sql`nt.level >= ${filters.minLevel}`);
+  if (filters.maxLevel !== undefined) clauses.push(sql`nt.level <= ${filters.maxLevel}`);
+  if (filters.minHp !== undefined) clauses.push(sql`coalesce(nt.hp, 0) >= ${filters.minHp}`);
+  if (filters.maxHp !== undefined) clauses.push(sql`coalesce(nt.hp, 0) <= ${filters.maxHp}`);
+
+  if (filters.className) {
+    const classId = Object.entries(npcClassNames).find(([, name]) => name.toLowerCase() === filters.className?.toLowerCase())?.[0];
+    if (classId) clauses.push(sql`nt.class = ${Number(classId)}`);
+  }
+
+  if (filters.bodyType) {
+    const bodyTypeId = Object.entries(bodyTypeNameMap).find(([, name]) => name.toLowerCase() === filters.bodyType?.toLowerCase())?.[0];
+    if (bodyTypeId) clauses.push(sql`nt.bodytype = ${Number(bodyTypeId)}`);
+  }
+
+  if (typeof filters.merchant === "boolean") {
+    clauses.push(filters.merchant ? sql`coalesce(nt.merchant_id, 0) > 0` : sql`coalesce(nt.merchant_id, 0) = 0`);
+  }
+
+  return sql<{
+    id: number;
+    name: string;
+    race: number;
+    level: number;
+    class: number;
+    bodytype: number;
+    merchant_id: number;
+    hp: number;
+    zone_name: string | null;
+    zone_short_name: string | null;
+  }>`
+    select nt.id, nt.name, nt.race, nt.level, nt.class, nt.bodytype, nt.merchant_id, nt.hp,
+           min(ps.long_name) as zone_name, min(ps.zone) as zone_short_name
+    from npc_types nt
+    left join spawnentry se on se.npcID = nt.id
+    left join spawngroup sg on sg.id = se.spawngroupID
+    left join ${publicEnabledSpawnSubquery("ps")} on ps.spawngroupID = sg.id
+    where ${sql.join(clauses, sql` and `)}
+    group by nt.id, nt.name, nt.race, nt.level, nt.class, nt.bodytype, nt.merchant_id, nt.hp
     order by nt.level desc, nt.name asc
     limit ${limit}
     offset ${offset}
@@ -2701,7 +2810,10 @@ async function collectNpcSummaries(filters: NpcFilters, npcSearchPatterns: strin
         klass: formatNpcClass(row.class),
         level: String(row.level),
         zone: summarizeZoneNames(zones),
-        named: isNamedNpcName(row.name)
+        named: isNamedNpcName(row.name),
+        bodyType: bodyTypeNameMap[row.bodytype] ?? `Body type ${row.bodytype}`,
+        merchant: Number(row.merchant_id ?? 0) > 0,
+        hp: Number(row.hp ?? 0)
       };
 
       if (!npcSummaryMatchesFilters(npc, filters)) {
@@ -2934,6 +3046,7 @@ function mapItemRowToSummary(row: ItemSearchRow): ItemSummary {
     type: formatItemType(row.itemclass, row.itemtype, row.damage),
     slot: formatSlotMask(row.slots, row.itemclass),
     classes: decodeClassMask(row.classes),
+    races: decodePlayableRaceMask(row.races),
     tradeable: isTradeableItem(row.nodrop),
     levelRequired: Number(row.reqlevel ?? 0),
     zone: row.source?.trim() || "Various",
@@ -2966,6 +3079,11 @@ function buildItemFilterClauses(filters: ItemFilters) {
     clauses.push(sql`(classes <= 0 or classes >= 65535 or (classes & ${classMask}) <> 0)`);
   }
 
+  const raceMask = raceMaskForFilter(filters.races);
+  if (raceMask) {
+    clauses.push(sql`(races <= 0 or races >= 65535 or (races & ${raceMask}) <> 0)`);
+  }
+
   if (filters.slots?.length) {
     const includesInventory = filters.slots.some((slot) => slot.toLowerCase() === "inventory");
     const wornSlots = filters.slots.filter((slot) => slot.toLowerCase() !== "inventory");
@@ -2983,6 +3101,30 @@ function buildItemFilterClauses(filters: ItemFilters) {
   const typeClause = typeClauseForFilter(filters.type);
   if (typeClause) {
     clauses.push(typeClause);
+  }
+
+  if (filters.source) {
+    clauses.push(sql`coalesce(source, '') like ${like(filters.source)}`);
+  }
+
+  if (filters.minAc !== undefined) {
+    clauses.push(sql`coalesce(ac, 0) >= ${filters.minAc}`);
+  }
+
+  if (filters.minHp !== undefined) {
+    clauses.push(sql`coalesce(hp, 0) >= ${filters.minHp}`);
+  }
+
+  if (filters.minMana !== undefined) {
+    clauses.push(sql`coalesce(mana, 0) >= ${filters.minMana}`);
+  }
+
+  if (filters.minDamage !== undefined) {
+    clauses.push(sql`coalesce(damage, 0) >= ${filters.minDamage}`);
+  }
+
+  if (filters.maxDelay !== undefined) {
+    clauses.push(sql`coalesce(delay, 0) <= ${filters.maxDelay}`);
   }
 
   return clauses;
@@ -3032,7 +3174,7 @@ async function fetchItemsByIds(ids: number[]) {
   }
 
   const rows = await sql<ItemSearchRow>`
-    select i.id, i.Name as name, i.itemclass, i.itemtype, i.slots, i.classes, i.nodrop, i.reqlevel, i.damage, i.delay, i.source, i.ac, i.hp, i.mana, i.icon
+    select i.id, i.Name as name, i.itemclass, i.itemtype, i.slots, i.classes, i.races, i.nodrop, i.reqlevel, i.damage, i.delay, i.source, i.ac, i.hp, i.mana, i.icon
     from items i
     where ${discoveredItemClause("i.id")}
       and i.id in (${sql.join(ids)})
@@ -4111,8 +4253,21 @@ export async function listNpcs(filters: NpcFilters = {}) {
   requireDatabaseConnection();
 
   return (async () => {
-    const npcSearchPatterns = npcSearchTerms(filters.q).map((term) => like(term));
-    return collectNpcSummaries(filters, npcSearchPatterns);
+    const normalizedFilters: NpcFilters = {
+      q: normalizeText(filters.q),
+      zone: normalizeText(filters.zone),
+      minLevel: normalizeNumber(filters.minLevel),
+      maxLevel: normalizeNumber(filters.maxLevel),
+      minHp: normalizeNumber(filters.minHp),
+      maxHp: normalizeNumber(filters.maxHp),
+      race: normalizeText(filters.race),
+      className: normalizeText(filters.className),
+      bodyType: normalizeText(filters.bodyType),
+      named: typeof filters.named === "boolean" ? filters.named : undefined,
+      merchant: typeof filters.merchant === "boolean" ? filters.merchant : undefined
+    };
+    const npcSearchPatterns = npcSearchTerms(normalizedFilters.q).map((term) => like(term));
+    return collectNpcSummaries(normalizedFilters, npcSearchPatterns);
   })();
 }
 

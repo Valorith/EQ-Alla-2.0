@@ -70,6 +70,22 @@ html {
   }
 }
 
+.eq-filter-reveal {
+  transform-origin: top;
+  animation: eq-filter-reveal 180ms ease-out both;
+}
+
+@keyframes eq-filter-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 body {
   margin: 0;
   color: var(--foreground);

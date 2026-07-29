@@ -17,6 +17,7 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
   const params = await searchParams;
   const q = typeof params.q === "string" ? params.q : "";
   const classNames = Array.isArray(params.class) ? params.class.filter((value): value is string => typeof value === "string") : typeof params.class === "string" ? [params.class] : [];
+  const races = Array.isArray(params.race) ? params.race.filter((value): value is string => typeof value === "string") : typeof params.race === "string" ? [params.race] : [];
   const slots = Array.isArray(params.slot) ? params.slot.filter((value): value is string => typeof value === "string") : typeof params.slot === "string" ? [params.slot] : [];
   const type = typeof params.type === "string" ? params.type : "";
   const frameClassName =
@@ -27,7 +28,7 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
       <PageHero
         eyebrow="Items"
         title="Item Search"
-        description="Filter by name, class, slot, type, and level. Every result opens to full stats, drop sources, merchants, and recipes."
+        description="Search discovered equipment and narrow it by who can use it, where it comes from, and the stats that matter."
       />
       <ItemSearchClient
         frameClassName={frameClassName}
@@ -36,10 +37,18 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
         initialFilters={{
           q,
           classNames,
+          races,
           slots,
           type,
+          source: typeof params.source === "string" ? params.source : "",
+          tradeable: typeof params.tradeable === "string" ? params.tradeable : "",
           minLevel: typeof params.minLevel === "string" ? params.minLevel : "",
-          maxLevel: typeof params.maxLevel === "string" ? params.maxLevel : ""
+          maxLevel: typeof params.maxLevel === "string" ? params.maxLevel : "",
+          minAc: typeof params.minAc === "string" ? params.minAc : "",
+          minHp: typeof params.minHp === "string" ? params.minHp : "",
+          minMana: typeof params.minMana === "string" ? params.minMana : "",
+          minDamage: typeof params.minDamage === "string" ? params.minDamage : "",
+          maxDelay: typeof params.maxDelay === "string" ? params.maxDelay : ""
         }}
       />
     </div>
