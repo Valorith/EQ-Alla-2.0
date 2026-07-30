@@ -764,6 +764,36 @@ function isTradeableItem(nodrop: number | null | undefined) {
   return Number(nodrop ?? 0) !== 0;
 }
 
+export function formatItemFlags(item: {
+  magic?: number | null;
+  loregroup?: number | null;
+  nodrop?: number | null;
+  norent?: number | null;
+  attuneable?: number | null;
+  artifactflag?: number | null;
+  evoitem?: number | null;
+  summonedflag?: number | null;
+  questitemflag?: number | null;
+  tradeskills?: number | null;
+  potionbelt?: number | null;
+  nopet?: number | null;
+}) {
+  return [
+    Number(item.magic ?? 0) > 0 ? "Magic" : null,
+    Number(item.loregroup ?? 0) !== 0 ? "Lore" : null,
+    !isTradeableItem(item.nodrop) ? "No Drop" : null,
+    Number(item.norent ?? 1) === 0 ? "No Rent" : null,
+    Number(item.attuneable ?? 0) > 0 ? "Attuneable" : null,
+    Number(item.artifactflag ?? 0) > 0 ? "Artifact" : null,
+    Number(item.evoitem ?? 0) > 0 ? "Evolving" : null,
+    Number(item.summonedflag ?? 0) > 0 ? "Summoned" : null,
+    Number(item.questitemflag ?? 0) > 0 ? "Quest Item" : null,
+    Number(item.tradeskills ?? 0) > 0 ? "Tradeskill" : null,
+    Number(item.potionbelt ?? 0) > 0 ? "Potion Belt" : null,
+    Number(item.nopet ?? 0) > 0 ? "No Pet" : null
+  ].filter((value): value is string => Boolean(value));
+}
+
 function effectiveItemLevel(levelRequired: number | null | undefined) {
   return Math.max(1, Number(levelRequired ?? 0));
 }
@@ -3573,8 +3603,16 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       classes: number;
       races: number;
       nodrop: number;
+      norent: number;
       attuneable: number;
       magic: number;
+      artifactflag: number;
+      summonedflag: number;
+      questitemflag: number;
+      tradeskills: number;
+      nopet: number;
+      potionbelt: number;
+      evoitem: number;
       reqlevel: number;
       reclevel: number;
       damage: number;
@@ -3664,6 +3702,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       clicklevel2: number;
       clicktype: number;
       scrolleffect: number;
+      loregroup: number;
       lore: string | null;
       source: string | null;
       size: number;
@@ -3672,7 +3711,8 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
       price: number;
       icon: number;
       }>`
-      select id, Name as name, itemclass, itemtype, slots, classes, races, nodrop, attuneable, magic, reqlevel, reclevel,
+      select id, Name as name, itemclass, itemtype, slots, classes, races, nodrop, norent, attuneable, magic,
+             artifactflag, summonedflag, questitemflag, tradeskills, nopet, potionbelt, evoitem, reqlevel, reclevel,
              damage, delay, ${sql.raw("`range`")} as item_range, attack, haste, hp, mana, endur, damageshield, dsmitigation, regen, manaregen, enduranceregen,
              spellshield, shielding, avoidance, accuracy, strikethrough, stunresist, dotshielding, ac,
              astr, asta, aagi, adex, aint, awis, acha, mr, fr, cr, dr, pr, svcorruption,
@@ -3684,7 +3724,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
              augslot1type, augslot1visible, augslot2type, augslot2visible, augslot3type, augslot3visible,
              augslot4type, augslot4visible, augslot5type, augslot5visible, augslot6type, augslot6visible,
              proceffect, proclevel2, procrate, worneffect, wornlevel, focuseffect, focuslevel, clickeffect, clicklevel2, clicktype, scrolleffect,
-             lore, source, size, weight, light, price, icon
+             loregroup, lore, source, size, weight, light, price, icon
       from items i
       where i.id = ${id}
         and ${discoveredItemClause("i.id")}
@@ -3955,11 +3995,7 @@ export async function getItemDetail(id: number): Promise<ItemDetail | undefined>
         section: definition.section
       }));
 
-    const flags = [
-      Number(row.magic ?? 0) > 0 ? "Magic" : null,
-      !isTradeableItem(row.nodrop) ? "No Drop" : null,
-      Number(row.attuneable ?? 0) > 0 ? "Attuneable" : null
-    ].filter((value): value is string => Boolean(value));
+    const flags = formatItemFlags(row);
 
     const augmentSlots = Array.from({ length: 6 }, (_, index) => index + 1)
       .map((slot) => ({

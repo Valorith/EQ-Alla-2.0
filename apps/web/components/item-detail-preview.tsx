@@ -265,9 +265,16 @@ export function ItemDetailPreview({ item, className = "" }: { item: ItemDetail; 
           <div className="min-w-0 space-y-1.5">
             <h2 className="text-[21px] font-medium leading-tight tracking-[-0.03em] text-[#f2ead9]">{item.name}</h2>
             <div className="space-y-px text-[14px] leading-5 text-[#e6e0d2]">
-              {item.flags.map((flag) => (
-                <div key={flag}>{flag}</div>
-              ))}
+              {item.flags.length > 0 ? (
+                <div className="flex flex-wrap gap-x-1">
+                  {item.flags.map((flag, index) => (
+                    <span key={flag} className="whitespace-nowrap">
+                      {flag}
+                      {index < item.flags.length - 1 ? "," : null}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
               <StatPairRow label="Class" value={classDisplay} allowWrap />
               <StatPairRow label="Race" value={raceDisplay} allowWrap />
               <div className="break-words font-semibold text-[#e9dfc5]">{item.slotDisplay}</div>

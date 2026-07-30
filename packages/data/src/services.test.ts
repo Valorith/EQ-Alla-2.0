@@ -6,6 +6,7 @@ import { sql } from "kysely";
 import {
   bodyTypeNameMap,
   formatPlayableItemRaceMask,
+  formatItemFlags,
   formatZoneEra,
   getCatalogStats,
   getFactionDetail,
@@ -62,6 +63,46 @@ describe("catalog services", () => {
     expect(prayerShawl?.flags.includes("No Drop")).toBe(true);
     expect(tradeableClothCaps.some((item) => item.id === 1001)).toBe(true);
     expect(noDropShawls.some((item) => item.id === 1175)).toBe(true);
+  });
+
+  it("maps nonzero lore groups to the Lore detail flag", async () => {
+    const loreItem = await getItemDetail(1044);
+    const ordinaryItem = await getItemDetail(1001);
+
+    expect(loreItem?.flags).toContain("Lore");
+    expect(ordinaryItem?.flags).not.toContain("Lore");
+  });
+
+  it("formats player-facing item flags in item-card order", () => {
+    expect(
+      formatItemFlags({
+        magic: 1,
+        loregroup: -1,
+        nodrop: 0,
+        norent: 0,
+        attuneable: 1,
+        artifactflag: 1,
+        evoitem: 1,
+        summonedflag: 1,
+        questitemflag: 1,
+        tradeskills: 1,
+        potionbelt: 1,
+        nopet: 1
+      })
+    ).toEqual([
+      "Magic",
+      "Lore",
+      "No Drop",
+      "No Rent",
+      "Attuneable",
+      "Artifact",
+      "Evolving",
+      "Summoned",
+      "Quest Item",
+      "Tradeskill",
+      "Potion Belt",
+      "No Pet"
+    ]);
   });
 
   it("treats items discovered only by elevated-status accounts as undiscovered", async () => {
