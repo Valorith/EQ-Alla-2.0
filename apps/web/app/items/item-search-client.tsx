@@ -42,6 +42,9 @@ type ItemSearchFilters = {
   minMana: string;
   minDamage: string;
   maxDelay: string;
+  minStr: string; minSta: string; minAgi: string; minDex: string; minInt: string; minWis: string; minCha: string;
+  minMr: string; minFr: string; minCr: string; minDr: string; minPr: string; minCorruption: string;
+  minAttack: string; minHaste: string; minAccuracy: string; minSpellDamage: string; minHealAmount: string;
 };
 
 type ItemSearchClientProps = {
@@ -113,6 +116,9 @@ function buildSearchParams(filters: ItemSearchFilters) {
   if (filters.minMana) params.set("minMana", filters.minMana);
   if (filters.minDamage) params.set("minDamage", filters.minDamage);
   if (filters.maxDelay) params.set("maxDelay", filters.maxDelay);
+  for (const key of ["minStr", "minSta", "minAgi", "minDex", "minInt", "minWis", "minCha", "minMr", "minFr", "minCr", "minDr", "minPr", "minCorruption", "minAttack", "minHaste", "minAccuracy", "minSpellDamage", "minHealAmount"] as const) {
+    if (filters[key]) params.set(key, filters[key]);
+  }
 
   return params;
 }
@@ -132,7 +138,8 @@ function hasActiveFilters(filters: ItemSearchFilters) {
     filters.minHp.length > 0 ||
     filters.minMana.length > 0 ||
     filters.minDamage.length > 0 ||
-    filters.maxDelay.length > 0
+    filters.maxDelay.length > 0 ||
+    [filters.minStr, filters.minSta, filters.minAgi, filters.minDex, filters.minInt, filters.minWis, filters.minCha, filters.minMr, filters.minFr, filters.minCr, filters.minDr, filters.minPr, filters.minCorruption, filters.minAttack, filters.minHaste, filters.minAccuracy, filters.minSpellDamage, filters.minHealAmount].some(Boolean)
   );
 }
 
@@ -355,7 +362,10 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
       minHp: "",
       minMana: "",
       minDamage: "",
-      maxDelay: ""
+      maxDelay: "",
+      minStr: "", minSta: "", minAgi: "", minDex: "", minInt: "", minWis: "", minCha: "",
+      minMr: "", minFr: "", minCr: "", minDr: "", minPr: "", minCorruption: "",
+      minAttack: "", minHaste: "", minAccuracy: "", minSpellDamage: "", minHealAmount: ""
     });
     setItems([]);
     setError(null);
@@ -539,7 +549,14 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
     ...(filters.minDamage
       ? [{ key: "minDamage", label: `Damage ≥ ${filters.minDamage}`, onRemove: () => setFilter("minDamage", "") }]
       : []),
-    ...(filters.maxDelay ? [{ key: "maxDelay", label: `Delay ≤ ${filters.maxDelay}`, onRemove: () => setFilter("maxDelay", "") }] : [])
+    ...(filters.maxDelay ? [{ key: "maxDelay", label: `Delay ≤ ${filters.maxDelay}`, onRemove: () => setFilter("maxDelay", "") }] : []),
+    ...([
+      ["minStr", "STR"], ["minSta", "STA"], ["minAgi", "AGI"], ["minDex", "DEX"], ["minInt", "INT"], ["minWis", "WIS"], ["minCha", "CHA"],
+      ["minMr", "MR"], ["minFr", "FR"], ["minCr", "CR"], ["minDr", "DR"], ["minPr", "PR"], ["minCorruption", "Corruption"],
+      ["minAttack", "Attack"], ["minHaste", "Haste"], ["minAccuracy", "Accuracy"], ["minSpellDamage", "Spell damage"], ["minHealAmount", "Heal amount"]
+    ] as const).flatMap(([key, label]) =>
+      filters[key] ? [{ key, label: `${label} ≥ ${filters[key]}`, onRemove: () => setFilter(key, "") }] : []
+    )
   ];
   const advancedFilterCount = Math.max(0, appliedFilters.length - (filters.q.trim() ? 1 : 0));
 
@@ -603,7 +620,7 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
                 name="type"
                 value={filters.type}
                 onChange={(value) => setFilter("type", value)}
-                options={itemTypeFilterOptions}
+                options={[...itemTypeFilterOptions]}
               />
             </div>
           </FilterGroup>
@@ -650,6 +667,30 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
           </FilterGroup>
 
           <FilterGroup
+            title="Attributes & resists"
+            description="Set a floor for the core character stats or the resistance line you need."
+            icon={<Shield className="size-4" />}
+          >
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <NumberFilter label="Minimum STR" name="minStr" value={filters.minStr} onChange={(value) => setFilter("minStr", value)} placeholder="0" />
+              <NumberFilter label="Minimum STA" name="minSta" value={filters.minSta} onChange={(value) => setFilter("minSta", value)} placeholder="0" />
+              <NumberFilter label="Minimum AGI" name="minAgi" value={filters.minAgi} onChange={(value) => setFilter("minAgi", value)} placeholder="0" />
+              <NumberFilter label="Minimum DEX" name="minDex" value={filters.minDex} onChange={(value) => setFilter("minDex", value)} placeholder="0" />
+              <NumberFilter label="Minimum INT" name="minInt" value={filters.minInt} onChange={(value) => setFilter("minInt", value)} placeholder="0" />
+              <NumberFilter label="Minimum WIS" name="minWis" value={filters.minWis} onChange={(value) => setFilter("minWis", value)} placeholder="0" />
+              <NumberFilter label="Minimum CHA" name="minCha" value={filters.minCha} onChange={(value) => setFilter("minCha", value)} placeholder="0" />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <NumberFilter label="Minimum MR" name="minMr" value={filters.minMr} onChange={(value) => setFilter("minMr", value)} placeholder="0" />
+              <NumberFilter label="Minimum FR" name="minFr" value={filters.minFr} onChange={(value) => setFilter("minFr", value)} placeholder="0" />
+              <NumberFilter label="Minimum CR" name="minCr" value={filters.minCr} onChange={(value) => setFilter("minCr", value)} placeholder="0" />
+              <NumberFilter label="Minimum DR" name="minDr" value={filters.minDr} onChange={(value) => setFilter("minDr", value)} placeholder="0" />
+              <NumberFilter label="Minimum PR" name="minPr" value={filters.minPr} onChange={(value) => setFilter("minPr", value)} placeholder="0" />
+              <NumberFilter label="Minimum corruption" name="minCorruption" value={filters.minCorruption} onChange={(value) => setFilter("minCorruption", value)} placeholder="0" />
+            </div>
+          </FilterGroup>
+
+          <FilterGroup
             title="Weapon profile"
             description="Find weapons that meet a damage floor and speed ceiling."
             icon={<Gauge className="size-4" />}
@@ -662,6 +703,20 @@ export function ItemSearchClient({ initialFilters, initialItems, initialResultsR
               <Gem className="size-3.5 text-[#b89869]" />
               Combine both values to quickly isolate efficient weapon candidates.
             </p>
+          </FilterGroup>
+
+          <FilterGroup
+            title="Combat & spell modifiers"
+            description="Narrow for offensive stats and caster-friendly item bonuses."
+            icon={<Gauge className="size-4" />}
+          >
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              <NumberFilter label="Minimum attack" name="minAttack" value={filters.minAttack} onChange={(value) => setFilter("minAttack", value)} placeholder="0" />
+              <NumberFilter label="Minimum haste" name="minHaste" value={filters.minHaste} onChange={(value) => setFilter("minHaste", value)} placeholder="0" />
+              <NumberFilter label="Minimum accuracy" name="minAccuracy" value={filters.minAccuracy} onChange={(value) => setFilter("minAccuracy", value)} placeholder="0" />
+              <NumberFilter label="Minimum spell damage" name="minSpellDamage" value={filters.minSpellDamage} onChange={(value) => setFilter("minSpellDamage", value)} placeholder="0" />
+              <NumberFilter label="Minimum heal amount" name="minHealAmount" value={filters.minHealAmount} onChange={(value) => setFilter("minHealAmount", value)} placeholder="0" />
+            </div>
           </FilterGroup>
         </div>
       </FilterWorkbench>

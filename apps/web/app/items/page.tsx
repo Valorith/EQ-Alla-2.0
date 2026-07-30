@@ -48,7 +48,25 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
           minHp: typeof params.minHp === "string" ? params.minHp : "",
           minMana: typeof params.minMana === "string" ? params.minMana : "",
           minDamage: typeof params.minDamage === "string" ? params.minDamage : "",
-          maxDelay: typeof params.maxDelay === "string" ? params.maxDelay : ""
+          maxDelay: typeof params.maxDelay === "string" ? params.maxDelay : "",
+          minStr: typeof params.minStr === "string" ? params.minStr : "",
+          minSta: typeof params.minSta === "string" ? params.minSta : "",
+          minAgi: typeof params.minAgi === "string" ? params.minAgi : "",
+          minDex: typeof params.minDex === "string" ? params.minDex : "",
+          minInt: typeof params.minInt === "string" ? params.minInt : "",
+          minWis: typeof params.minWis === "string" ? params.minWis : "",
+          minCha: typeof params.minCha === "string" ? params.minCha : "",
+          minMr: typeof params.minMr === "string" ? params.minMr : "",
+          minFr: typeof params.minFr === "string" ? params.minFr : "",
+          minCr: typeof params.minCr === "string" ? params.minCr : "",
+          minDr: typeof params.minDr === "string" ? params.minDr : "",
+          minPr: typeof params.minPr === "string" ? params.minPr : "",
+          minCorruption: typeof params.minCorruption === "string" ? params.minCorruption : "",
+          minAttack: typeof params.minAttack === "string" ? params.minAttack : "",
+          minHaste: typeof params.minHaste === "string" ? params.minHaste : "",
+          minAccuracy: typeof params.minAccuracy === "string" ? params.minAccuracy : "",
+          minSpellDamage: typeof params.minSpellDamage === "string" ? params.minSpellDamage : "",
+          minHealAmount: typeof params.minHealAmount === "string" ? params.minHealAmount : ""
         }}
       />
     </div>

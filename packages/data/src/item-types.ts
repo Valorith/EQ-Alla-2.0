@@ -75,10 +75,45 @@ export const itemTypeNames = {
   255: "None"
 } as const satisfies Record<number, string>;
 
-export const itemTypeFilterOptions = Object.values(itemTypeNames);
+// These are deliberately the useful, player-facing categories rather than a
+// byte-for-byte dump of every historical client enum. The raw names above stay
+// available for item rendering and legacy URLs.
+export const itemTypeFilterOptions = [
+  "Weapon",
+  "1H Slashing",
+  "2H Slashing",
+  "Piercing",
+  "2H Piercing",
+  "1H Blunt",
+  "2H Blunt",
+  "Hand to Hand",
+  "Archery",
+  "Crossbow",
+  "Throwing",
+  "Armor",
+  "Shield",
+  "Jewelry",
+  "Container",
+  "Augment",
+  "Spell",
+  "Scroll",
+  "Potion",
+  "Book",
+  "Bard Instrument",
+  "Food & Drink",
+  "Fishing",
+  "Key",
+  "Currency",
+  "Mount",
+  "Illusion",
+  "Familiar",
+  "Placeable",
+  "Collectible",
+  "Misc"
+] as const;
 const itemTypeNameMap: Record<number, string> = itemTypeNames;
 
-const itemTypeNameLookup = new Map(itemTypeFilterOptions.map((name) => [name.toLowerCase(), name]));
+const itemTypeNameLookup = new Map(Object.values(itemTypeNames).map((name) => [name.toLowerCase(), name]));
 
 export function canonicalizeItemTypeName(type?: string) {
   if (!type) return undefined;

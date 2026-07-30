@@ -62,6 +62,24 @@ type ItemFilters = {
   minMana?: number;
   minDamage?: number;
   maxDelay?: number;
+  minStr?: number;
+  minSta?: number;
+  minAgi?: number;
+  minDex?: number;
+  minInt?: number;
+  minWis?: number;
+  minCha?: number;
+  minMr?: number;
+  minFr?: number;
+  minCr?: number;
+  minDr?: number;
+  minPr?: number;
+  minCorruption?: number;
+  minAttack?: number;
+  minHaste?: number;
+  minAccuracy?: number;
+  minSpellDamage?: number;
+  minHealAmount?: number;
 };
 type SpellFilters = { q?: string; className?: string; level?: number; levelMode?: "exact" | "min" | "max" };
 type NpcFilters = {
@@ -97,6 +115,24 @@ type ItemSearchRow = {
   ac: number;
   hp: number;
   mana: number;
+  astr: number;
+  asta: number;
+  aagi: number;
+  adex: number;
+  aint: number;
+  awis: number;
+  acha: number;
+  mr: number;
+  fr: number;
+  cr: number;
+  dr: number;
+  pr: number;
+  svcorruption: number;
+  attack: number;
+  haste: number;
+  accuracy: number;
+  spelldmg: number;
+  healamt: number;
   icon: number;
 };
 
@@ -757,7 +793,25 @@ function normalizeItemFilters(filters: ItemFilters = {}): ItemFilters {
     minHp: normalizeNumber(filters.minHp),
     minMana: normalizeNumber(filters.minMana),
     minDamage: normalizeNumber(filters.minDamage),
-    maxDelay: normalizeNumber(filters.maxDelay)
+    maxDelay: normalizeNumber(filters.maxDelay),
+    minStr: normalizeNumber(filters.minStr),
+    minSta: normalizeNumber(filters.minSta),
+    minAgi: normalizeNumber(filters.minAgi),
+    minDex: normalizeNumber(filters.minDex),
+    minInt: normalizeNumber(filters.minInt),
+    minWis: normalizeNumber(filters.minWis),
+    minCha: normalizeNumber(filters.minCha),
+    minMr: normalizeNumber(filters.minMr),
+    minFr: normalizeNumber(filters.minFr),
+    minCr: normalizeNumber(filters.minCr),
+    minDr: normalizeNumber(filters.minDr),
+    minPr: normalizeNumber(filters.minPr),
+    minCorruption: normalizeNumber(filters.minCorruption),
+    minAttack: normalizeNumber(filters.minAttack),
+    minHaste: normalizeNumber(filters.minHaste),
+    minAccuracy: normalizeNumber(filters.minAccuracy),
+    minSpellDamage: normalizeNumber(filters.minSpellDamage),
+    minHealAmount: normalizeNumber(filters.minHealAmount)
   };
 }
 
@@ -776,7 +830,11 @@ function createItemSearchCacheKey(filters: ItemFilters) {
     minHp: filters.minHp ?? "",
     minMana: filters.minMana ?? "",
     minDamage: filters.minDamage ?? "",
-    maxDelay: filters.maxDelay ?? ""
+    maxDelay: filters.maxDelay ?? "",
+    minStr: filters.minStr ?? "", minSta: filters.minSta ?? "", minAgi: filters.minAgi ?? "", minDex: filters.minDex ?? "",
+    minInt: filters.minInt ?? "", minWis: filters.minWis ?? "", minCha: filters.minCha ?? "",
+    minMr: filters.minMr ?? "", minFr: filters.minFr ?? "", minCr: filters.minCr ?? "", minDr: filters.minDr ?? "", minPr: filters.minPr ?? "", minCorruption: filters.minCorruption ?? "",
+    minAttack: filters.minAttack ?? "", minHaste: filters.minHaste ?? "", minAccuracy: filters.minAccuracy ?? "", minSpellDamage: filters.minSpellDamage ?? "", minHealAmount: filters.minHealAmount ?? ""
   })}`;
 }
 
@@ -823,6 +881,18 @@ function typeClauseForFilter(type?: string) {
       }
       return sql`itemclass = 2`;
     }
+    case "throwing":
+      return sql`itemclass = 0 and itemtype in (7, 19)`;
+    case "bard instrument":
+      return sql`itemclass = 0 and itemtype in (23, 24, 25, 26, 50, 51)`;
+    case "food & drink":
+      return sql`itemclass = 0 and itemtype in (14, 15, 38)`;
+    case "fishing":
+      return sql`itemclass = 0 and itemtype in (36, 37)`;
+    case "key":
+      return sql`itemclass = 0 and itemtype in (33, 39, 41)`;
+    case "currency":
+      return sql`itemclass = 0 and itemtype = 63`;
     default:
       break;
   }
@@ -837,6 +907,17 @@ function itemTypeMatchesFilter(itemType: string, filterType?: string) {
   if (filterType.trim().toLowerCase() === "weapon") {
     return ["1H Slashing", "2H Slashing", "Piercing", "1H Blunt", "2H Blunt", "Archery", "Crossbow", "Throwing v1", "Throwing v2", "2H Piercing", "Hand to Hand"].includes(itemType);
   }
+
+  const groupedTypes: Record<string, string[]> = {
+    throwing: ["Throwing v1", "Throwing v2"],
+    "bard instrument": ["Wind Instrument", "Stringed Instrument", "Brass Instrument", "Percussion Instrument", "Singing Instrument", "All Instruments"],
+    "food & drink": ["Food", "Drink", "Alcohol"],
+    fishing: ["Fishing Pole", "Fishing Bait"],
+    key: ["Key v1", "Key v2", "Metal Key"],
+    currency: ["Alternate Currency"]
+  };
+  const grouped = groupedTypes[filterType.trim().toLowerCase()];
+  if (grouped) return grouped.includes(itemType);
 
   const canonical = canonicalizeItemTypeName(filterType);
   return canonical ? itemType === canonical : includesFolded(itemType, filterType);
@@ -3127,6 +3208,25 @@ function buildItemFilterClauses(filters: ItemFilters) {
     clauses.push(sql`coalesce(delay, 0) <= ${filters.maxDelay}`);
   }
 
+  if (filters.minStr !== undefined) clauses.push(sql`coalesce(astr, 0) >= ${filters.minStr}`);
+  if (filters.minSta !== undefined) clauses.push(sql`coalesce(asta, 0) >= ${filters.minSta}`);
+  if (filters.minAgi !== undefined) clauses.push(sql`coalesce(aagi, 0) >= ${filters.minAgi}`);
+  if (filters.minDex !== undefined) clauses.push(sql`coalesce(adex, 0) >= ${filters.minDex}`);
+  if (filters.minInt !== undefined) clauses.push(sql`coalesce(aint, 0) >= ${filters.minInt}`);
+  if (filters.minWis !== undefined) clauses.push(sql`coalesce(awis, 0) >= ${filters.minWis}`);
+  if (filters.minCha !== undefined) clauses.push(sql`coalesce(acha, 0) >= ${filters.minCha}`);
+  if (filters.minMr !== undefined) clauses.push(sql`coalesce(mr, 0) >= ${filters.minMr}`);
+  if (filters.minFr !== undefined) clauses.push(sql`coalesce(fr, 0) >= ${filters.minFr}`);
+  if (filters.minCr !== undefined) clauses.push(sql`coalesce(cr, 0) >= ${filters.minCr}`);
+  if (filters.minDr !== undefined) clauses.push(sql`coalesce(dr, 0) >= ${filters.minDr}`);
+  if (filters.minPr !== undefined) clauses.push(sql`coalesce(pr, 0) >= ${filters.minPr}`);
+  if (filters.minCorruption !== undefined) clauses.push(sql`coalesce(svcorruption, 0) >= ${filters.minCorruption}`);
+  if (filters.minAttack !== undefined) clauses.push(sql`coalesce(attack, 0) >= ${filters.minAttack}`);
+  if (filters.minHaste !== undefined) clauses.push(sql`coalesce(haste, 0) >= ${filters.minHaste}`);
+  if (filters.minAccuracy !== undefined) clauses.push(sql`coalesce(accuracy, 0) >= ${filters.minAccuracy}`);
+  if (filters.minSpellDamage !== undefined) clauses.push(sql`coalesce(spelldmg, 0) >= ${filters.minSpellDamage}`);
+  if (filters.minHealAmount !== undefined) clauses.push(sql`coalesce(healamt, 0) >= ${filters.minHealAmount}`);
+
   return clauses;
 }
 
@@ -3174,7 +3274,8 @@ async function fetchItemsByIds(ids: number[]) {
   }
 
   const rows = await sql<ItemSearchRow>`
-    select i.id, i.Name as name, i.itemclass, i.itemtype, i.slots, i.classes, i.races, i.nodrop, i.reqlevel, i.damage, i.delay, i.source, i.ac, i.hp, i.mana, i.icon
+    select i.id, i.Name as name, i.itemclass, i.itemtype, i.slots, i.classes, i.races, i.nodrop, i.reqlevel, i.damage, i.delay, i.source, i.ac, i.hp, i.mana,
+           i.astr, i.asta, i.aagi, i.adex, i.aint, i.awis, i.acha, i.mr, i.fr, i.cr, i.dr, i.pr, i.svcorruption, i.attack, i.haste, i.accuracy, i.spelldmg, i.healamt, i.icon
     from items i
     where ${discoveredItemClause("i.id")}
       and i.id in (${sql.join(ids)})

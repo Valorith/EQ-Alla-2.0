@@ -1774,12 +1774,14 @@ describe("catalog services", () => {
     expect(formatPlayableItemRaceMask(65535)).toBe("ALL");
   });
 
-  it("exposes the full EQEmu item type filter list", () => {
+  it("exposes a curated player-facing item type filter list", () => {
     expect(itemTypeFilterOptions).toContain("Crossbow");
-    expect(itemTypeFilterOptions).toContain("Poison");
+    expect(itemTypeFilterOptions).toContain("Throwing");
+    expect(itemTypeFilterOptions).toContain("Bard Instrument");
     expect(itemTypeFilterOptions).toContain("Placeable");
     expect(itemTypeFilterOptions).toContain("Container");
-    expect(itemTypeFilterOptions).toContain("None");
+    expect(itemTypeFilterOptions).not.toContain("Unknown71");
+    expect(itemTypeFilterOptions).not.toContain("None");
   });
 
   it("treats items with no required level as level 1 for level filters", async () => {

@@ -27,6 +27,24 @@ export async function GET(request: Request) {
   const minMana = optionalNumber(searchParams, "minMana");
   const minDamage = optionalNumber(searchParams, "minDamage");
   const maxDelay = optionalNumber(searchParams, "maxDelay");
+  const minStr = optionalNumber(searchParams, "minStr");
+  const minSta = optionalNumber(searchParams, "minSta");
+  const minAgi = optionalNumber(searchParams, "minAgi");
+  const minDex = optionalNumber(searchParams, "minDex");
+  const minInt = optionalNumber(searchParams, "minInt");
+  const minWis = optionalNumber(searchParams, "minWis");
+  const minCha = optionalNumber(searchParams, "minCha");
+  const minMr = optionalNumber(searchParams, "minMr");
+  const minFr = optionalNumber(searchParams, "minFr");
+  const minCr = optionalNumber(searchParams, "minCr");
+  const minDr = optionalNumber(searchParams, "minDr");
+  const minPr = optionalNumber(searchParams, "minPr");
+  const minCorruption = optionalNumber(searchParams, "minCorruption");
+  const minAttack = optionalNumber(searchParams, "minAttack");
+  const minHaste = optionalNumber(searchParams, "minHaste");
+  const minAccuracy = optionalNumber(searchParams, "minAccuracy");
+  const minSpellDamage = optionalNumber(searchParams, "minSpellDamage");
+  const minHealAmount = optionalNumber(searchParams, "minHealAmount");
   let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
 
   try {
@@ -45,7 +63,10 @@ export async function GET(request: Request) {
         minHp,
         minMana,
         minDamage,
-        maxDelay
+        maxDelay,
+        minStr, minSta, minAgi, minDex, minInt, minWis, minCha,
+        minMr, minFr, minCr, minDr, minPr, minCorruption,
+        minAttack, minHaste, minAccuracy, minSpellDamage, minHealAmount
       }),
       new Promise<never>((_, reject) => {
         timeoutHandle = setTimeout(() => reject(new Error(`Item search timed out after ${itemSearchRouteTimeoutMs}ms`)), itemSearchRouteTimeoutMs);
@@ -78,6 +99,9 @@ export async function GET(request: Request) {
       minMana,
       minDamage,
       maxDelay,
+      minStr, minSta, minAgi, minDex, minInt, minWis, minCha,
+      minMr, minFr, minCr, minDr, minPr, minCorruption,
+      minAttack, minHaste, minAccuracy, minSpellDamage, minHealAmount,
       error
     });
 
