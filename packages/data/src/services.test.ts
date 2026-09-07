@@ -105,7 +105,7 @@ describe("catalog services", () => {
     ]);
   });
 
-  it("treats items discovered only by elevated-status accounts as undiscovered", async () => {
+  it("treats items discovered only by elevated-status accounts as discovered", async () => {
     const db = getDb();
     expect(db).toBeTruthy();
 
@@ -129,8 +129,9 @@ describe("catalog services", () => {
     const detail = await getItemDetail(itemId);
     const results = await listItems({ q: itemName });
 
-    expect(detail).toBeUndefined();
-    expect(results.some((item) => item.id === itemId)).toBe(false);
+    expect(await getItemAvailability(itemId)).toBe("available");
+    expect(detail).toBeTruthy();
+    expect(results.some((item) => item.id === itemId)).toBe(true);
   });
 
   it("distinguishes available, undiscovered, and missing item availability", async () => {
@@ -1683,7 +1684,6 @@ describe("catalog services", () => {
           select 1
           from discovered_items di
           where di.item_id = tre.item_id
-            and coalesce(di.account_status, 0) <= 0
         ) as is_discovered
       from tradeskill_recipe_entries tre
       join items i on i.id = tre.item_id

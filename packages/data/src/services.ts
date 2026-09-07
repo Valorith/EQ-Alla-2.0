@@ -1313,7 +1313,6 @@ function discoveredItemClause(columnRef: string) {
     select 1
     from discovered_items di
     where di.item_id = ${sql.ref(columnRef)}
-      and coalesce(di.account_status, 0) <= 0
   )`;
 }
 
@@ -4495,7 +4494,6 @@ export async function getNpcDetail(id: number): Promise<NpcDetail | undefined> {
                      select 1
                      from discovered_items di
                      where di.item_id = i.id
-                       and coalesce(di.account_status, 0) <= 0
                    ) as is_discovered
             from merchantlist ml
             join items i on i.id = ml.item
