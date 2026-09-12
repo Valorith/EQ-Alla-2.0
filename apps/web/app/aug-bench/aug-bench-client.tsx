@@ -312,7 +312,7 @@ export function AugBench() {
         </div>
         <CharacterPicker onLoad={(profile) => {
           change(planFromCharacter(profile), `Loaded ${profile.character.name}'s equipment. Your previous plan is available with Undo. Owned counts include equipped augments only.`);
-          setEquipmentView("equipment"); setTarget(null); setRecommendationSlot(null); setMovingFrom(null); setExpanded(null); setTab("catalog");
+          setEquipmentView("augments"); setTarget(null); setRecommendationSlot(null); setMovingFrom(null); setExpanded(null); setTab("catalog");
           setQ(""); setCategory(""); setBenefit(""); setType(""); setTrade(""); setOwnership(""); setSort("name"); setDescending(false);
         }} />
         {plan.character && <div className="ab-character-summary"><strong>{plan.character.character.name}</strong><span>Level {plan.character.character.level} {itemClassNames[plan.character.character.classId - 1]} · {openSockets} / {profileSockets.length} sockets open</span>
