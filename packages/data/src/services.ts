@@ -199,7 +199,7 @@ const skillNames: Record<number, string> = {
 };
 
 // Canonical EQEmu skill IDs from common/skills.h.
-const eqEmuSkillTypeNames: Record<number, string> = {
+export const eqEmuSkillTypeNames: Record<number, string> = {
   [-1]: "Hit",
   0: "1H Blunt",
   1: "1H Slashing",
@@ -335,7 +335,7 @@ const spellSkillSpecialNames: Record<number, string> = {
   98: "Combat Ability"
 };
 
-const itemElementDamageTypeNames: Record<number, string> = {
+export const itemElementDamageTypeNames: Record<number, string> = {
   1: "Magic",
   2: "Fire",
   3: "Cold",
@@ -346,7 +346,7 @@ const itemElementDamageTypeNames: Record<number, string> = {
   9: "Corruption"
 };
 
-const bardSkillTypeNames: Record<number, string> = {
+export const bardSkillTypeNames: Record<number, string> = {
   23: "Woodwind",
   24: "Strings",
   25: "Brass",

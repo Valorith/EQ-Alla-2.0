@@ -13,6 +13,7 @@ import { usePageLoadingPreference } from "./use-page-loading-preference";
 import { useSearchHotkey } from "./use-search-hotkey";
 
 const routesWithInlineSearch = new Set([
+  "/aug-bench",
   "/",
   "/crafted-spells",
   "/items",
@@ -314,6 +315,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     {
       label: "Reference",
       items: [
+        { href: "/aug-bench", label: "Aug Bench" },
         { href: "/crafted-spells", label: "Crafted Spells" },
         { href: "/factions", label: "Factions" },
         { href: "/recipes", label: "Recipes" },

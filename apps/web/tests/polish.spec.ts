@@ -11,7 +11,7 @@ test.describe("page metadata", () => {
 
   test("detail routes title from the record", async ({ page }) => {
     await page.goto("/items");
-    await page.getByPlaceholder("Runed Mithril...").fill("cloak");
+    await page.getByRole("searchbox", { name: "Item name or ID" }).fill("cloak");
     await page.getByRole("button", { name: "Search", exact: true }).click();
 
     const firstResult = page.locator('a[href^="/items/"]').first();
@@ -58,7 +58,7 @@ test.describe("search hotkey", () => {
 
   test("slash typed inside a field is not swallowed", async ({ page }) => {
     await page.goto("/items");
-    const input = page.getByPlaceholder("Runed Mithril...");
+    const input = page.getByRole("searchbox", { name: "Item name or ID" });
     await input.click();
     await input.fill("");
     await page.keyboard.type("a/b");

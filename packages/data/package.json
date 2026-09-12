@@ -9,6 +9,9 @@
     ".": "./src/index.ts",
     "./body-type-names": "./src/body-type-names.ts",
     "./item-search-filters": "./src/item-search-filters.ts",
+    "./aug-bench": "./src/aug-bench.ts",
+    "./aug-recommendations": "./src/aug-recommendations.ts",
+    "./aug-optimizer": "./src/aug-optimizer.ts",
     "./item-types": "./src/item-types.ts",
     "./legacy-routes": "./src/legacy-routes.ts"
   },
