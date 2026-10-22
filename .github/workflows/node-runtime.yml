@@ -34,4 +34,4 @@ jobs:
           PY
       - run: docker build --file Dockerfile.qa --tag node-runtime-qa .
       - name: Verify standalone runtime version
-        run: docker run --rm --entrypoint node node-runtime-qa --version | grep -Fx v22.23.4
+        run: docker run --rm --entrypoint node node-runtime-qa --version | grep -Fx "v$(cat .node-version)"
